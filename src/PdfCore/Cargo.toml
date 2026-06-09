@@ -1,0 +1,10 @@
+[package]
+name = "pdf_core"
+version = "1.0.12"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lopdf = { version = "0.31.0", features = ["embed_image"] }

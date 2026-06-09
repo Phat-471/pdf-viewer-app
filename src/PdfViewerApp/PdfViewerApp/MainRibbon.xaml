@@ -1,0 +1,348 @@
+<UserControl x:Class="PdfViewerApp.MainRibbon"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:fluent="urn:fluent-ribbon"
+             Background="#00FFFFFF">
+  <fluent:Ribbon Background="#FFFFFF" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" IsMinimized="False">
+    <fluent:Ribbon.Menu>
+      <fluent:Backstage Header="Tệp" Background="#0F766E" Foreground="#FFFFFFFF" WindowChrome.IsHitTestVisibleInChrome="True">
+        <fluent:BackstageTabControl>
+          <fluent:Button Header="Mở File PDF" Click="OpenPdf_Click" />
+          <fluent:Button Header="Lưu" Click="SavePdf_Click" />
+          <fluent:Button Header="Lưu Dưới Dạng..." Click="SavePdfAs_Click" />
+          <fluent:Button Header="Thoát" Click="Exit_Click" />
+        </fluent:BackstageTabControl>
+      </fluent:Backstage>
+    </fluent:Ribbon.Menu>
+    <fluent:RibbonTabItem Header="Trang Chủ">
+      <fluent:RibbonGroupBox Header="Thao Tác File">
+        <fluent:Button Header="Mở File" Margin="8,0,8,0" Click="OpenPdf_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Lưu" Margin="8,0,8,0" Click="SavePdf_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Lưu Dưới Dạng" Margin="8,0,8,0" Click="SavePdfAs_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="In Ấn" Margin="8,0,8,0" Click="PrintPdf_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="BatchPrintBtn" Header="In Hàng Loạt" Margin="8,0,8,0" Click="BatchPrint_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#107C41" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Chế Độ Xem">
+        <fluent:Button Header="Phóng To" Margin="8,0,8,0" Click="ZoomIn_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Thu Nhỏ" Margin="8,0,8,0" Click="ZoomOut_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Độ Rộng" Margin="8,0,8,0" Click="FitWidth_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:ToggleButton Name="SelectTextToolBtn" Header="Chọn Văn Bản" Margin="8,0,8,0" Click="SelectTextTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="EditTextToolBtn" Header="Sửa Trực Tiếp" Margin="8,0,8,0" Click="EditTextTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Giao Diện">
+        <fluent:Button Header="Ẩn/Hiện Sidebar" Margin="8,0,8,0" Click="ToggleSidebar_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:ToggleButton Name="ThemeToggleBtn" Header="Tối" Margin="8,0,8,0" IsChecked="True" Click="ThemeToggle_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock Name="ThemeToggleIcon" FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#38BDF8" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:Button Header="Cài Đặt" Margin="8,0,8,0" Click="Settings_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Tính Năng Độc Quyền">
+        <fluent:Button Name="MergeFilesBtn" Header="Ghép Nhiều File" Margin="8,0,8,0" Click="MergeFiles_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="MergeFromExplorerBtn" Header="Chọn Nhiều File &amp; Ghép" Margin="8,0,8,0" Click="MergeFromExplorer_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Quản Lý Trang">
+      <fluent:RibbonGroupBox Header="Xoay Bản Vẽ">
+        <fluent:SplitButton Header="Xoay Trái 90°" Margin="8,0,8,0" Click="RotateLeft_Click">
+          <fluent:SplitButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:SplitButton.LargeIcon>
+          <fluent:MenuItem Header="Xoay trang hiện tại" Click="RotateLeft_Click" />
+          <fluent:MenuItem Header="Xoay tất cả các trang" Click="RotateLeftAll_Click" />
+        </fluent:SplitButton>
+        <fluent:SplitButton Header="Xoay Phải 90°" Margin="8,0,8,0" Click="RotateRight_Click">
+          <fluent:SplitButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:SplitButton.LargeIcon>
+          <fluent:MenuItem Header="Xoay trang hiện tại" Click="RotateRight_Click" />
+          <fluent:MenuItem Header="Xoay tất cả các trang" Click="RotateRightAll_Click" />
+        </fluent:SplitButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Biên Tập">
+        <fluent:Button Name="MovePageUpBtn" Header="Lên" Margin="8,0,8,0" Click="MovePageUp_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="MovePageDownBtn" Header="Xuống" Margin="8,0,8,0" Click="MovePageDown_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="ReversePageOrderBtn" Header="Đảo Thứ Tự" Margin="8,0,8,0" Click="ReversePageOrder_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe UI" Text="REV" FontSize="24" FontWeight="Bold" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="ResetPageOrderBtn" Header="Thứ Tự Gốc" Margin="8,0,8,0" Click="ResetPageOrder_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe UI" Text="0" FontSize="32" FontWeight="Bold" Foreground="#64748B" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="DeletePageBtn" Header="Xóa Trang" Margin="8,0,8,0" Click="DeletePage_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="InsertBlankPageBtn" Header="Chèn Trang Trống" Margin="8,0,8,0" Click="InsertBlankPage_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Nhân Bản Trang" Margin="8,0,8,0" Click="DuplicatePage_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="SplitCurrentPageBtn" Header="Tách Trang" Margin="8,0,8,0" Click="SplitCurrentPage_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="ExtractPagesBtn" Header="Trích Xuất" Margin="8,0,8,0" Click="ExtractPages_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Định Dạng Chú Thích">
+      <fluent:RibbonGroupBox Header="Công Cụ Chú Thích">
+        <fluent:ToggleButton Name="SelectToolBtn" Header="Con Trỏ Chọn" Margin="8,0,8,0" Click="SelectTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="InkToolBtn" Header="Bút Vẽ" Margin="8,0,8,0" Click="InkTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="RectToolBtn" Header="Chữ Nhật" Margin="8,0,8,0" Click="RectTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="OvalToolBtn" Header="Hình Tròn" Margin="8,0,8,0" Click="OvalTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="LineToolBtn" Header="Đường Thẳng" Margin="8,0,8,0" Click="LineTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="TextBoxToolBtn" Header="Hộp Văn Bản" Margin="8,0,8,0" Click="TextBoxTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="CalloutToolBtn" Header="Mũi Tên Chỉ Dẫn" Margin="8,0,8,0" Click="CalloutTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="StickyNoteToolBtn" Header="Ghi Chú" Margin="8,0,8,0" Click="StickyNoteTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="SnapshotToolBtn" Header="Snapshot" Margin="8,0,8,0" Click="SnapshotTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" Margin="8,0,8,0" Click="AiSnapshotTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Phông Chữ">
+        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,2,4,2">
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <fluent:ComboBox Name="FontFamilyCombo" Width="140" Header="Phông:" SelectedIndex="0" Margin="0,0,6,0" SelectionChanged="FontFamilyCombo_SelectionChanged">
+              <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" />
+              <ComboBoxItem Content="Arial" Tag="Arial" />
+              <ComboBoxItem Content="Times New Roman" Tag="Times New Roman" />
+              <ComboBoxItem Content="Courier New" Tag="Courier New" />
+            </fluent:ComboBox>
+            <fluent:ComboBox Name="FontSizeCombo" Width="70" Header="Cỡ:" SelectedIndex="3" SelectionChanged="FontSizeCombo_SelectionChanged">
+              <ComboBoxItem Content="9" Tag="9" />
+              <ComboBoxItem Content="11" Tag="11" />
+              <ComboBoxItem Content="12" Tag="12" />
+              <ComboBoxItem Content="14" Tag="14" />
+              <ComboBoxItem Content="16" Tag="16" />
+              <ComboBoxItem Content="18" Tag="18" />
+              <ComboBoxItem Content="24" Tag="24" />
+              <ComboBoxItem Content="36" Tag="36" />
+              <ComboBoxItem Content="48" Tag="48" />
+            </fluent:ComboBox>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+            <fluent:ToggleButton Name="BoldToggle" Header="B" FontWeight="Bold" Width="32" Height="22" Click="BoldToggle_Click" />
+            <fluent:ToggleButton Name="ItalicToggle" Header="I" FontStyle="Italic" Width="32" Height="22" Margin="6,0,0,0" Click="ItalicToggle_Click" />
+            <fluent:ToggleButton Name="UnderlineToggle" Header="U" Width="32" Height="22" Margin="6,0,0,0" Click="UnderlineToggle_Click" />
+          </StackPanel>
+        </StackPanel>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Kiểu Viền &amp; Nền">
+        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,2,4,2">
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <fluent:ComboBox Name="StrokeColorCombo" Width="120" Header="Viền:" SelectedIndex="0" Margin="0,0,6,0" SelectionChanged="StrokeColorCombo_SelectionChanged">
+              <ComboBoxItem Content="Đỏ (Red)" Tag="Red" />
+              <ComboBoxItem Content="Xanh Dương" Tag="Blue" />
+              <ComboBoxItem Content="Xanh Lá" Tag="Green" />
+              <ComboBoxItem Content="Đen" Tag="Black" />
+              <ComboBoxItem Content="Vàng" Tag="Yellow" />
+            </fluent:ComboBox>
+            <fluent:ComboBox Name="BgColorCombo" Width="120" Header="Nền:" SelectedIndex="0" SelectionChanged="BgColorCombo_SelectionChanged">
+              <ComboBoxItem Content="Trong Suốt" Tag="Transparent" />
+              <ComboBoxItem Content="Trắng" Tag="White" />
+              <ComboBoxItem Content="Vàng Nhạt" Tag="LightYellow" />
+              <ComboBoxItem Content="Đỏ Nhạt" Tag="MistyRose" />
+              <ComboBoxItem Content="Xanh Nhạt" Tag="AliceBlue" />
+            </fluent:ComboBox>
+          </StackPanel>
+          <fluent:Spinner Name="OpacitySpinner" Minimum="10" Maximum="100" Value="100" Header="Độ mờ (%):" Width="150" HorizontalAlignment="Left" ValueChanged="OpacitySpinner_ValueChanged" />
+        </StackPanel>
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Đo Đạc &amp; Ký Số">
+      <fluent:RibbonGroupBox Header="Thang Đo &amp; Tỷ Lệ">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <fluent:ComboBox Name="MeasurementScaleCombo" Width="145" Header="Tỷ Lệ:" SelectedIndex="3" SelectionChanged="MeasurementScaleCombo_SelectionChanged" Margin="0,0,4,0">
+            <ComboBoxItem Content="Tỷ lệ 1:1" Tag="1.0" />
+            <ComboBoxItem Content="Tỷ lệ 1:10" Tag="10.0" />
+            <ComboBoxItem Content="Tỷ lệ 1:50" Tag="50.0" />
+            <ComboBoxItem Content="Tỷ lệ 1:100" Tag="100.0" />
+            <ComboBoxItem Content="Tỷ lệ 1:200" Tag="200.0" />
+            <ComboBoxItem Content="Tỷ lệ 1:500" Tag="500.0" />
+          </fluent:ComboBox>
+          <fluent:Button Name="CalibrateScaleBtn" Header="Hiệu Chuẩn" Click="CalibrateScale_Click" Height="24">
+            <fluent:Button.Icon>
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="14" Foreground="#14B8A6" VerticalAlignment="Center" />
+            </fluent:Button.Icon>
+          </fluent:Button>
+        </StackPanel>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Đo Đạc Bản Vẽ">
+        <fluent:ToggleButton Name="MeasureDistanceToolBtn" Header="Đo Khoảng Cách" Margin="8,0,8,0" Click="MeasureDistanceTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="MeasureAreaToolBtn" Header="Đo Diện Tích" Margin="8,0,8,0" Click="MeasureAreaTool_Click">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Ký Số &amp; Con Dấu">
+        <fluent:Button Name="HandwriteSignBtn" Header="Ký Tay" Margin="8,0,8,0" Click="HandwriteSign_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="StampApproveBtn" Header="Đóng Dấu" Margin="8,0,8,0" Click="StampApprove_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Trợ Giúp">
+      <fluent:RibbonGroupBox Header="Trợ Giúp &amp; Hệ Thống">
+        <fluent:Button Header="Hướng Dẫn" Margin="8,0,8,0" Click="UserGuide_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Phản Hồi" Margin="8,0,8,0" Click="Feedback_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Cài Máy In" Margin="8,0,8,0" Click="VirtualPrinterConfig_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Cập Nhật" Margin="8,0,8,0" Click="ManualUpdateCheck_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Kích Hoạt" Margin="8,0,8,0" Click="Activation_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Giới Thiệu" Margin="8,0,8,0" Click="About_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+  </fluent:Ribbon>
+</UserControl>

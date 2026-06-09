@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="PdfViewerApp.MergeProgressWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Đang ghép tệp PDF" Height="180" Width="400" WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" Background="#00FFFFFF" Topmost="True" ShowInTaskbar="True" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
+  <Border CornerRadius="12" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="1.5">
+    <UIElement.Effect>
+      <DropShadowEffect Color="#0F172A" Opacity="0.15" BlurRadius="20" ShadowDepth="4" Direction="270" />
+    </UIElement.Effect>
+    <Grid Margin="24">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock Text="Đang Ghép Các Tệp PDF" FontWeight="Bold" FontSize="16" Foreground="#0F766E" HorizontalAlignment="Center" Margin="0,0,0,16" />
+      <ProgressBar Name="MergeProgressBar" Grid.Row="1" Height="12" Minimum="0" Maximum="100" Value="0" Foreground="#0F766E" Background="#F1F5F9" BorderThickness="0" Margin="0,0,0,12" />
+      <Grid Row="2">
+        <TextBlock Name="ProgressStatusText" Text="Đang chuẩn bị ghép..." Foreground="#64748B" FontSize="13" VerticalAlignment="Center" />
+        <Button Content="Hủy" Width="75" HorizontalAlignment="Right" Background="#F8FAFC" BorderBrush="#CBD5E1" Foreground="#0F172A" Padding="6,3" Click="CancelButton_Click" />
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

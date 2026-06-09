@@ -1,0 +1,106 @@
+name: Build, Package & Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up .NET Core SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Set up Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Package project
+      id: package
+      shell: pwsh
+      run: |
+        # Run the existing packaging script
+        .\package_project.ps1
+        
+        # Parse update-manifest.json to set outputs for release action
+        $manifestPath = "releases/update-manifest.json"
+        if (Test-Path $manifestPath) {
+            $manifest = Get-Content $manifestPath | ConvertFrom-Json
+            echo "version=$($manifest.version)" >> $env:GITHUB_OUTPUT
+            echo "zip_file=$($manifest.file)" >> $env:GITHUB_OUTPUT
+            echo "sha256=$($manifest.sha256)" >> $env:GITHUB_OUTPUT
+            echo "size=$($manifest.size)" >> $env:GITHUB_OUTPUT
+            echo "release_date=$($manifest.release_date)" >> $env:GITHUB_OUTPUT
+        } else {
+            Write-Error "update-manifest.json not found after packaging!"
+            exit 1
+        }
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          releases/${{ steps.package.outputs.zip_file }}
+          releases/update-manifest.json
+        name: Release ${{ steps.package.outputs.version }}
+        tag_name: ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Notify WordPress Licensing Server
+      shell: pwsh
+      env:
+        SITE_URL: ${{ secrets.PDFPRO_UPDATE_SITE_URL }}
+        TOKEN: ${{ secrets.PDFPRO_PUBLISH_TOKEN }}
+      run: |
+        if ([string]::IsNullOrEmpty($env:SITE_URL) -or [string]::IsNullOrEmpty($env:TOKEN)) {
+            Write-Warning "PDFPRO_UPDATE_SITE_URL or PDFPRO_PUBLISH_TOKEN secret is not set. Skipping WordPress server update notification."
+            exit 0
+        }
+
+        # Build download URL pointing to the GitHub Release asset
+        $repo = "${{ github.repository }}"
+        $tag = "${{ github.ref_name }}"
+        $zipFile = "${{ steps.package.outputs.zip_file }}"
+        $downloadUrl = "https://github.com/$repo/releases/download/$tag/$zipFile"
+        
+        $body = @{
+            token = $env:TOKEN
+            version = "${{ steps.package.outputs.version }}"
+            download_url = $downloadUrl
+            sha256 = "${{ steps.package.outputs.sha256 }}"
+            size = [int]("${{ steps.package.outputs.size }}")
+            release_date = "${{ steps.package.outputs.release_date }}"
+            changelog = "Tự động phát hành phiên bản mới qua GitHub Actions CI/CD cho tag $tag."
+        }
+
+        $apiUrl = "$($env:SITE_URL.TrimEnd('/'))/wp-json/pdfpro/v1/update-publish"
+        Write-Host "Sending update publish notification to: $apiUrl"
+        Write-Host "Download URL will be: $downloadUrl"
+        
+        try {
+            $jsonBody = $body | ConvertTo-Json -Depth 4
+            $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $jsonBody -ContentType "application/json" -ErrorAction Stop
+            Write-Host "WordPress Server Response:"
+            $response | ConvertTo-Json | Write-Host
+        } catch {
+            Write-Error "Failed to update WordPress Server: $_"
+            if ($_.Exception.Response) {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $responseBody = $reader.ReadToEnd()
+                Write-Error "Server response body: $responseBody"
+            }
+            exit 1
+        }

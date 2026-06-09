@@ -1,0 +1,38 @@
+# Git Ignore file for PDF Pro Project (Rust Core & C# WPF App)
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+
+# Rust build target
+src/PdfCore/target/
+**/*.rs.bk
+
+# .NET Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+obj/
+bin/
+publish/
+*.userprefs
+
+# Local package and release directories
+/releases/
+/backups/
+/crash.log
+
+# Compiled libraries (we compile pdf_core.dll from Rust)
+libs/pdf_core.dll
+
+# Explicitly keep pdfium.dll as it is a third-party dependency
+!libs/pdfium.dll

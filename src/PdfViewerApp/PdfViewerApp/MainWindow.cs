@@ -1,0 +1,2834 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Markup;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Resources;
+using System.Windows.Threading;
+using ControlzEx.Theming;
+using Microsoft.Win32;
+using PdfViewerApp.Ai;
+using PdfViewerApp.UpdateClient;
+using System.Net.Http;
+
+namespace PdfViewerApp;
+
+public partial class MainWindow : Window, IComponentConnector
+{
+	private const string StartupMergeMutexName = "Local\\PdfPro.MergeStartupOwner";
+
+	private bool _updatingStatusControls;
+
+	private readonly DispatcherTimer _zoomSliderTimer = new DispatcherTimer();
+
+	private double? _pendingZoomSliderPercent;
+
+	private AiSettings _aiSettings = AiSettings.Load();
+
+	private AiSnapshotRouter _aiSnapshotRouter;
+
+	private bool _isDarkMode = true;
+
+	private bool _startupArgsProcessed;
+
+	private readonly AppPreferences _appPreferences = AppPreferences.Load();
+
+	public static Mutex? _explorerMergeMutex;
+
+	private WelcomeDashboard? _welcomeDashboard;
+
+	private MainRibbon? _mainRibbon;
+
+	private AiPanelControl? _aiPanelControl;
+
+	private string _activeTool = "Select";
+
+	public string ActiveFontFamily { get; set; } = "Segoe UI";
+
+	public double ActiveFontSize { get; set; } = 14.0;
+
+	public bool ActiveIsBold { get; set; }
+
+	public bool ActiveIsItalic { get; set; }
+
+	public bool ActiveIsUnderline { get; set; }
+
+	public Color ActiveStrokeColor { get; set; } = Colors.Red;
+
+	public Color ActiveBgColor { get; set; } = Colors.Transparent;
+
+	public double ActiveOpacity { get; set; } = 1.0;
+
+	public string ActiveTool
+	{
+		get
+		{
+			return _activeTool;
+		}
+		set
+		{
+			_activeTool = value;
+			UpdateToolButtonStates();
+		}
+	}
+
+	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+	public static extern bool merge_pdfs([MarshalAs(UnmanagedType.LPUTF8Str)] string pathsSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
+	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+	public static extern bool extract_pdf_pages([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, [MarshalAs(UnmanagedType.LPUTF8Str)] string pagesSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
+	public MainWindow()
+	{
+		InitializeComponent();
+		_aiSnapshotRouter = new AiSnapshotRouter(_aiSettings);
+		EnsureWelcomeDashboardHost();
+		EnsureAiPanelHost();
+		EnsureMainRibbonHost();
+		UpdateToolButtonStates();
+		ApplyThemeFromPreferences(_appPreferences.IsDarkTheme);
+		ApplyAppActivationState();
+		ApplyAiSettingsToUi();
+		TryApplyAppLogo();
+		HookDashboardEvents();
+		base.Loaded += delegate
+		{
+			HandleStartupPdfArguments();
+			UpdateTabEmptyState();
+			EnsureDiagnosticsButtons();
+			EnsureRollbackButtonGroup();
+			LocalAiInstaller.StartInitializeBackground();
+			RefreshRecentFilesDashboard();
+			base.Dispatcher.InvokeAsync((Func<Task>)async delegate
+			{
+				string successFlag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update-success.flag");
+				string failedFlag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update-failed.flag");
+
+				if (File.Exists(successFlag))
+				{
+					try { File.Delete(successFlag); } catch {}
+					MessageBox.Show(this, $"Cập nhật thành công ứng dụng PDF Pro lên phiên bản mới v{ActivationLicense.AppVersion}!", "Cập Nhật Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+				}
+				else if (File.Exists(failedFlag))
+				{
+					try { File.Delete(failedFlag); } catch {}
+					MessageBox.Show(this, "Quá trình cập nhật gặp sự cố nên hệ thống đã tự động khôi phục (rollback) về phiên bản hoạt động trước đó để đảm bảo ổn định.", "Cập Nhật Thất Bại", MessageBoxButton.OK, MessageBoxImage.Warning);
+				}
+
+				await AppUpdateService.TryConfirmPendingLaunchAsync();
+				await RunUpdateCheckAsync();
+			}, DispatcherPriority.ApplicationIdle);
+		};
+		LogStatus("Sẵn sàng");
+		base.PreviewKeyDown += MainWindow_PreviewKeyDown;
+		_zoomSliderTimer.Interval = TimeSpan.FromMilliseconds(90.0);
+		_zoomSliderTimer.Tick += delegate
+		{
+			_zoomSliderTimer.Stop();
+			if (_pendingZoomSliderPercent.HasValue)
+			{
+				GetActiveTab()?.SetZoomPercent(_pendingZoomSliderPercent.Value);
+				_pendingZoomSliderPercent = null;
+			}
+		};
+		base.StateChanged += MainWindow_StateChanged;
+	}
+
+	private async Task RunUpdateCheckAsync()
+	{
+		if (_aiSettings.EnableUpdateCheck)
+		{
+			try
+			{
+				using var httpClient = new HttpClient();
+				var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
+				var result = await updateService.CheckAsync();
+				if (result.HasUpdate && !string.IsNullOrEmpty(result.Response.DownloadUrl))
+				{
+					UpdateDialog updateDialog = new UpdateDialog(result.Response, updateService);
+					updateDialog.Owner = this;
+					updateDialog.ShowDialog();
+				}
+			}
+			catch
+			{
+				// Tránh crash ứng dụng nếu lỗi mạng khi khởi động
+			}
+		}
+	}
+
+	private void HideUpdateNotification_Click(object sender, RoutedEventArgs e)
+	{
+		UpdateNotificationBanner.Visibility = Visibility.Collapsed;
+	}
+
+	private void UpdateNotificationAction_Click(object sender, RoutedEventArgs e)
+	{
+		UpdateNotificationBanner.Visibility = Visibility.Collapsed;
+		ManualUpdateCheck_Click(this, new RoutedEventArgs());
+	}
+
+	private async void ManualUpdateCheck_Click(object sender, RoutedEventArgs e)
+	{
+		LogStatus("Đang kiểm tra cập nhật...");
+		try
+		{
+			using var httpClient = new HttpClient();
+			var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
+			var result = await updateService.CheckAsync();
+			if (result.HasUpdate)
+			{
+				if (string.IsNullOrEmpty(result.Response.DownloadUrl))
+				{
+					MessageBox.Show(this, "Phát hiện phiên bản mới v" + result.LatestVersion + " trên máy chủ, nhưng quản trềEviên chưa cấu hình \"Link tải bản cập nhật (Download URL)\" trong trang quản trềEWordPress.", "Kiểm tra cập nhật", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+				}
+				else
+				{
+					UpdateDialog updateDialog = new UpdateDialog(result.Response, updateService);
+					updateDialog.Owner = this;
+					updateDialog.ShowDialog();
+				}
+			}
+			else
+			{
+				MessageBox.Show(this, "Ứng dụng của bạn đã là phiên bản mới nhất (v" + result.CurrentVersion + ").", "Kiểm tra cập nhật", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			}
+		}
+		catch (Exception ex)
+		{
+			App.SendCrashTelemetry(ex);
+			MessageBox.Show(this, "Lỗi khi kiểm tra cập nhật: " + ex.Message, "Kiểm tra cập nhật", MessageBoxButton.OK, MessageBoxImage.Error);
+		}
+		LogStatus("Sẵn sàng");
+	}
+
+	private void EnsureDiagnosticsButtons()
+	{
+		Fluent.RibbonGroupBox? diagnosticsGroup = FindRibbonGroupBoxByHeader("Trợ Giúp & Hệ Thống");
+		if (diagnosticsGroup == null)
+		{
+			return;
+		}
+
+		foreach (object item in diagnosticsGroup.Items)
+		{
+			if (item is Fluent.Button existing && string.Equals(existing.Header?.ToString(), "Khôi phục bản trước", StringComparison.Ordinal))
+			{
+				return;
+			}
+		}
+
+		Fluent.Button restoreButton = new Fluent.Button
+		{
+			Header = "Khôi phục bản trước",
+			Margin = new Thickness(8, 0, 8, 0)
+		};
+		restoreButton.Click += RestorePreviousVersion_Click;
+		restoreButton.LargeIcon = new TextBlock
+		{
+			FontFamily = new FontFamily("Segoe MDL2 Assets"),
+			Text = "\ue72e",
+			FontSize = 32,
+			Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+
+		int insertIndex = Math.Min(1, diagnosticsGroup.Items.Count);
+		diagnosticsGroup.Items.Insert(insertIndex, restoreButton);
+	}
+
+	private void EnsureRollbackButtonGroup()
+	{
+		Fluent.RibbonTabItem? diagnosticsTab = FindVisualChildren<Fluent.RibbonTabItem>(this).LastOrDefault();
+		if (diagnosticsTab == null)
+		{
+			return;
+		}
+
+		if (diagnosticsTab.Groups.OfType<Fluent.RibbonGroupBox>().Any(group => group.Items.OfType<Fluent.Button>().Any(button => string.Equals(button.Header?.ToString(), "Khôi phục bản trước", StringComparison.Ordinal))))
+		{
+			return;
+		}
+
+		if (diagnosticsTab.Groups.OfType<Fluent.RibbonGroupBox>().Any(group => string.Equals(group.Header?.ToString(), "Khôi Phục", StringComparison.Ordinal)))
+		{
+			return;
+		}
+
+		Fluent.RibbonGroupBox rollbackGroup = new Fluent.RibbonGroupBox
+		{
+			Header = "Khôi Phục"
+		};
+
+		Fluent.Button restoreButton = new Fluent.Button
+		{
+			Header = "Khôi phục bản trước",
+			Margin = new Thickness(8, 0, 8, 0)
+		};
+		restoreButton.Click += RestorePreviousVersion_Click;
+		restoreButton.LargeIcon = new TextBlock
+		{
+			FontFamily = new FontFamily("Segoe MDL2 Assets"),
+			Text = "\ue72e",
+			FontSize = 32,
+			Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+
+		rollbackGroup.Items.Add(restoreButton);
+		diagnosticsTab.Groups.Add(rollbackGroup);
+	}
+
+	private Fluent.RibbonGroupBox? FindRibbonGroupBoxByHeader(string header)
+	{
+		foreach (var group in FindVisualChildren<Fluent.RibbonGroupBox>(this))
+		{
+			if (string.Equals(group.Header?.ToString(), header, StringComparison.Ordinal))
+			{
+				return group;
+			}
+		}
+
+		return null;
+	}
+
+	private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
+	{
+		int count = VisualTreeHelper.GetChildrenCount(parent);
+		for (int i = 0; i < count; i++)
+		{
+			DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+			if (child is T match)
+			{
+				yield return match;
+			}
+
+			foreach (T descendant in FindVisualChildren<T>(child))
+			{
+				yield return descendant;
+			}
+		}
+	}
+
+	private async void RestorePreviousVersion_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			UpdateRollbackState? state = AppUpdateService.LoadRollbackState();
+			if (state == null || string.IsNullOrWhiteSpace(state.BackupZipPath) || !File.Exists(state.BackupZipPath))
+			{
+				MessageBox.Show(this, "Chưa có bản backup rollback hợp lệ để khôi phục.", "Khôi phục bản trước", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			string currentVersion = string.IsNullOrWhiteSpace(state.TargetVersion) ? "unknown" : state.TargetVersion;
+			string previousVersion = string.IsNullOrWhiteSpace(state.CurrentVersion) ? "unknown" : state.CurrentVersion;
+			string confirmMessage = $"Khôi phục từ v{currentVersion} vềEv{previousVersion}?\n\nỨng dụng hiện tại sẽ đóng trước khi quá trình restore bắt đầu.";
+			if (MessageBox.Show(this, confirmMessage, "Khôi phục bản trước", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+			{
+				return;
+			}
+
+			string scriptPath = Path.Combine(Path.GetTempPath(), "pdfpro_restore_previous.ps1");
+			File.WriteAllText(scriptPath, BuildRestoreScript(), Encoding.UTF8);
+
+			Process.Start(new ProcessStartInfo
+			{
+				FileName = "powershell.exe",
+				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{state.InstallDirectory}\" -BackupZip \"{state.BackupZipPath}\" -AppExe \"{state.AppExecutablePath}\" -CurrentPid {Environment.ProcessId} -TimeoutSeconds 120",
+				UseShellExecute = false,
+				CreateNoWindow = true,
+				WindowStyle = ProcessWindowStyle.Hidden
+			});
+
+			Application.Current.Shutdown();
+		}
+		catch (Exception ex)
+		{
+			App.SendCrashTelemetry(ex);
+			MessageBox.Show(this, "Không thềEkhôi phục bản trước: " + ex.Message, "Khôi phục bản trước", MessageBoxButton.OK, MessageBoxImage.Error);
+		}
+	}
+
+	private static string BuildRestoreScript()
+	{
+		return @"param(
+    [Parameter(Mandatory = $true)]
+    [string]$InstallDir,
+    [Parameter(Mandatory = $true)]
+    [string]$BackupZip,
+    [Parameter(Mandatory = $true)]
+    [string]$AppExe,
+    [Parameter(Mandatory = $true)]
+    [int]$CurrentPid,
+    [int]$TimeoutSeconds = 120
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Remove-Tree([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_.PSIsContainer) {
+                Remove-Tree $_.FullName
+            }
+            else {
+                try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue } catch {}
+            }
+        }
+        try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch {}
+    }
+}
+
+if (-not (Test-Path -LiteralPath $BackupZip)) {
+    throw ""Rollback backup not found: $BackupZip""
+}
+
+$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+while ((Get-Date) -lt $deadline) {
+    try {
+        Get-Process -Id $CurrentPid -ErrorAction Stop | Out-Null
+        Start-Sleep -Milliseconds 500
+    }
+    catch {
+        break
+    }
+}
+
+Remove-Tree $InstallDir
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+Expand-Archive -LiteralPath $BackupZip -DestinationPath $InstallDir -Force
+
+try { Start-Process -FilePath $AppExe } catch {}
+exit 0
+";
+	}
+
+	private void MainWindow_StateChanged(object? sender, EventArgs e)
+	{
+		if (BtnMaximize != null && BtnMaximize.Template.FindName("MaxIcon", BtnMaximize) is TextBlock textBlock)
+		{
+			textBlock.Text = ((base.WindowState == WindowState.Maximized) ? "\ue923" : "\ue922");
+		}
+	}
+
+	private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+	{
+		SetTheme(!_isDarkMode);
+	}
+
+	private void SetTheme(bool isDark)
+	{
+		_isDarkMode = isDark;
+		_appPreferences.IsDarkTheme = isDark;
+		_appPreferences.Save();
+		base.Tag = isDark;
+		try
+		{
+			ThemeManager.Current.ChangeTheme(Application.Current, isDark ? "Dark.Blue" : "Light.Blue");
+		}
+		catch
+		{
+		}
+		if (MainRootGrid != null)
+		{
+			var bgBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0B0F19" : "#F8FAFC"));
+			base.Background = bgBrush;
+			MainRootGrid.Background = bgBrush;
+		}
+		if (TitleBarGrid != null)
+		{
+			TitleBarGrid.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#E2E8F0"));
+		}
+		if (TitleBarText != null)
+		{
+			TitleBarText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
+		}
+		if (TitleBarSubtitle != null)
+		{
+			TitleBarSubtitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
+		}
+		if (TabEmptyState != null)
+		{
+			TabEmptyState.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#FFFFFF"));
+			TabEmptyState.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#CBD5E1"));
+		}
+		if (AppStatusBar != null)
+		{
+			if (isDark)
+			{
+				LinearGradientBrush linearGradientBrush = new LinearGradientBrush
+				{
+					StartPoint = new Point(0.0, 0.0),
+					EndPoint = new Point(1.0, 0.0)
+				};
+				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F172A"), 0.0));
+				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#1E293B"), 0.4));
+				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F766E"), 1.0));
+				AppStatusBar.Background = linearGradientBrush;
+				AppStatusBar.Foreground = Brushes.White;
+			}
+			else
+			{
+				LinearGradientBrush linearGradientBrush2 = new LinearGradientBrush
+				{
+					StartPoint = new Point(0.0, 0.0),
+					EndPoint = new Point(1.0, 0.0)
+				};
+				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#E2E8F0"), 0.0));
+				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#F1F5F9"), 0.4));
+				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F766E"), 1.0));
+				AppStatusBar.Background = linearGradientBrush2;
+				AppStatusBar.Foreground = Brushes.Black;
+			}
+		}
+		if (StatusMessage != null)
+		{
+			StatusMessage.Foreground = (isDark ? Brushes.White : Brushes.Black);
+		}
+		if (PageTotalText != null)
+		{
+			PageTotalText.Foreground = (isDark ? Brushes.White : Brushes.Black);
+		}
+		if (ZoomIndicator != null)
+		{
+			ZoomIndicator.Foreground = (isDark ? Brushes.White : Brushes.Black);
+		}
+		if (PdfTabControl != null)
+		{
+			foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
+			{
+				if (item.Content is PdfDocumentTab pdfDocumentTab)
+				{
+					pdfDocumentTab.ApplyTheme(isDark);
+				}
+			}
+		}
+		_welcomeDashboard?.ApplyTheme(isDark);
+		_mainRibbon?.ApplyTheme(isDark);
+	}
+
+	private void Minimize_Click(object sender, RoutedEventArgs e)
+	{
+		base.WindowState = WindowState.Minimized;
+	}
+
+	private void Maximize_Click(object sender, RoutedEventArgs e)
+	{
+		base.WindowState = ((base.WindowState != WindowState.Maximized) ? WindowState.Maximized : WindowState.Normal);
+	}
+
+	private void Close_Click(object sender, RoutedEventArgs e)
+	{
+		Close();
+	}
+
+	private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+	{
+		if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.K)
+		{
+			e.Handled = true;
+			OpenCommandPalette();
+			return;
+		}
+
+		if (IsTextInputFocused())
+		{
+			return;
+		}
+		if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None && ActiveTool != "Select")
+		{
+			ActiveTool = "Select";
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab != null)
+			{
+				activeTab.ActiveTool = "Select";
+			}
+			LogStatus("Đã hủy chế đềEvẽ/chú thích");
+			e.Handled = true;
+		}
+		else if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+		{
+			GetActiveTab()?.HandleDeleteKey();
+			e.Handled = true;
+		}
+		else if (Keyboard.Modifiers == (ModifierKeys.Alt | ModifierKeys.Control) && e.Key == Key.V)
+		{
+			e.Handled = true;
+			GetActiveTab()?.PasteAnnotation(inPlace: true);
+		}
+		else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && (e.Key == Key.OemPlus || e.Key == Key.Add))
+		{
+			e.Handled = true;
+			GetActiveTab()?.RotateSelectedPageAsync(90);
+		}
+		else if (Keyboard.Modifiers == ModifierKeys.Control)
+		{
+			switch (e.Key)
+			{
+			case Key.O:
+				e.Handled = true;
+				OpenPdf_Click(this, new RoutedEventArgs());
+				break;
+			case Key.P:
+				e.Handled = true;
+				PrintPdf_Click(this, new RoutedEventArgs());
+				break;
+			case Key.C:
+			{
+				e.Handled = true;
+				PdfDocumentTab activeTab3 = GetActiveTab();
+				if (activeTab3 != null)
+				{
+					if (activeTab3.ActiveTool == "SelectText")
+					{
+						activeTab3.CopySelectedText();
+					}
+					else
+					{
+						activeTab3.CopySelectedAnnotation();
+					}
+				}
+				break;
+			}
+			case Key.V:
+				e.Handled = true;
+				GetActiveTab()?.PasteAnnotation(inPlace: false);
+				break;
+			case Key.H:
+				e.Handled = true;
+				GetActiveTab()?.ContextReadMode_Click(this, new RoutedEventArgs());
+				break;
+			case Key.R:
+				e.Handled = true;
+				GetActiveTab()?.ContextRulers_Click(this, new RoutedEventArgs());
+				break;
+			case Key.W:
+				e.Handled = true;
+				if (PdfTabControl.SelectedItem is TabItem removeItem)
+				{
+					PdfTabControl.Items.Remove(removeItem);
+					if (PdfTabControl.Items.Count == 0)
+					{
+						LogStatus("Sẵn sàng");
+						UpdatePageIndicator();
+						UpdateZoomText();
+					}
+				}
+				break;
+			case Key.Add:
+			case Key.OemPlus:
+				e.Handled = true;
+				ZoomIn_Click(this, new RoutedEventArgs());
+				break;
+			case Key.Subtract:
+			case Key.OemMinus:
+				e.Handled = true;
+				ZoomOut_Click(this, new RoutedEventArgs());
+				break;
+			case Key.D0:
+			case Key.NumPad0:
+				e.Handled = true;
+				FitWidth_Click(this, new RoutedEventArgs());
+				break;
+			case Key.D1:
+			case Key.NumPad1:
+				e.Handled = true;
+				GetActiveTab()?.SetZoomPercent(100.0);
+				break;
+			case Key.D2:
+			case Key.NumPad2:
+				e.Handled = true;
+				GetActiveTab()?.FitWidth();
+				break;
+			case Key.B:
+				e.Handled = true;
+				ToggleSidebar_Click(this, new RoutedEventArgs());
+				break;
+			case Key.Home:
+				e.Handled = true;
+				GetActiveTab()?.GoToPage(1);
+				break;
+			case Key.End:
+			{
+				e.Handled = true;
+				PdfDocumentTab activeTab2 = GetActiveTab();
+				activeTab2?.GoToPage(activeTab2.PageCount);
+				break;
+			}
+			}
+		}
+		else
+		{
+			switch (e.Key)
+			{
+			case Key.F11:
+				e.Handled = true;
+				GetActiveTab()?.ContextFullScreen_Click(this, new RoutedEventArgs());
+				break;
+			case Key.F4:
+				e.Handled = true;
+				ToggleSidebar_Click(this, new RoutedEventArgs());
+				break;
+			case Key.Escape:
+			case Key.V:
+				e.Handled = true;
+				SelectTool_Click(this, new RoutedEventArgs());
+				break;
+			case Key.T:
+				e.Handled = true;
+				TextBoxTool_Click(this, new RoutedEventArgs());
+				break;
+			case Key.C:
+				e.Handled = true;
+				CalloutTool_Click(this, new RoutedEventArgs());
+				break;
+			case Key.S:
+				e.Handled = true;
+				SnapshotTool_Click(this, new RoutedEventArgs());
+				break;
+			case Key.A:
+				e.Handled = true;
+				AiSnapshotTool_Click(this, new RoutedEventArgs());
+				break;
+			case Key.Next:
+				e.Handled = true;
+				GoRelativePage(1);
+				break;
+			case Key.Prior:
+				e.Handled = true;
+				GoRelativePage(-1);
+				break;
+			case Key.Home:
+				e.Handled = true;
+				GetActiveTab()?.GoToPage(1);
+				break;
+			case Key.End:
+			{
+				e.Handled = true;
+				PdfDocumentTab activeTab4 = GetActiveTab();
+				activeTab4?.GoToPage(activeTab4.PageCount);
+				break;
+			}
+			}
+		}
+	}
+
+	private static bool IsTextInputFocused()
+	{
+		for (DependencyObject dependencyObject = Keyboard.FocusedElement as DependencyObject; dependencyObject != null; dependencyObject = VisualTreeHelper.GetParent(dependencyObject))
+		{
+			if (dependencyObject is TextBox || dependencyObject is ComboBox)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private void OpenCommandPalette()
+	{
+		QuickCommandPaletteWindow palette = new QuickCommandPaletteWindow(BuildQuickCommands())
+		{
+			Owner = this
+		};
+		palette.ShowDialog();
+	}
+
+	private List<QuickCommandItem> BuildQuickCommands()
+	{
+		bool HasDocument() => GetActiveTab() != null;
+		return new List<QuickCommandItem>
+		{
+			new QuickCommandItem("Open PDF", "Open one or many PDF files.", "file open pdf import", () => OpenPdf_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Save PDF", "Save changes into the current PDF workflow.", "save write persist", () => SavePdf_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Save PDF As", "Save the active PDF into a new file.", "save as export file", () => SavePdfAs_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Print", "Print the active PDF document.", "print printer hardcopy", () => PrintPdf_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Merge PDFs", "Open the merge dialog.", "merge combine join pdf", () => MergeFiles_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Extract Pages", "Extract typed range or selected thumbnail pages.", "extract export split selected pages", () => ExtractPages_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Fit Width", "Fit the active document to the viewer width.", "zoom fit width", () => FitWidth_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Zoom In", "Increase zoom on the active document.", "zoom in plus", () => ZoomIn_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Zoom Out", "Decrease zoom on the active document.", "zoom out minus", () => ZoomOut_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Toggle Sidebar", "Show or hide thumbnails/navigation sidebar.", "sidebar thumbnails navigation panel", () => ToggleSidebar_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Read Mode", "Toggle distraction-free read mode.", "read mode focus hide", () => GetActiveTab()?.ContextReadMode_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Full Screen", "Toggle full screen viewer.", "fullscreen presentation f11", () => GetActiveTab()?.ContextFullScreen_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Rotate Left", "Rotate selected thumbnail pages left.", "rotate left selected pages", () => RotateLeft_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Rotate Right", "Rotate selected thumbnail pages right.", "rotate right selected pages", () => RotateRight_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Rotate All Left", "Rotate every page left.", "rotate all left", () => RotateLeftAll_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Rotate All Right", "Rotate every page right.", "rotate all right", () => RotateRightAll_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Move Selected Pages Up", "Move selected thumbnail pages up as a batch.", "move selected page up reorder", () => MovePageUp_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Move Selected Pages Down", "Move selected thumbnail pages down as a batch.", "move selected page down reorder", () => MovePageDown_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Reverse Page Order", "Reverse the current page order preview.", "reverse reorder pages", () => ReversePageOrder_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Reset Page Order", "Restore original page order preview.", "reset reorder pages original", () => ResetPageOrder_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Duplicate Selected Pages", "Duplicate selected pages into a new PDF.", "duplicate copy selected pages", () => DuplicatePage_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Delete Selected Pages", "Delete selected pages into a new output PDF.", "delete remove selected pages", () => DeletePage_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Insert Blank Page", "Insert a blank page near the active page.", "insert blank page", () => InsertBlankPage_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Split Current Page", "Export the current page as a PDF.", "split current page export", () => SplitCurrentPage_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Select Tool", "Return to the default select tool.", "select pointer tool", () => SelectTool_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Select Text Tool", "Select text from the PDF.", "select text copy tool", () => SelectTextTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Edit Text Tool", "Edit text overlays where supported.", "edit text tool", () => EditTextTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Text Box Tool", "Create a text box annotation.", "annotation textbox text", () => TextBoxTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Callout Tool", "Create an arrow callout annotation.", "annotation callout arrow", () => CalloutTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Ink Tool", "Draw freehand ink annotation.", "annotation ink draw pen", () => InkTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Rectangle Tool", "Draw rectangle annotation.", "annotation rectangle shape", () => RectTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Oval Tool", "Draw oval annotation.", "annotation oval ellipse shape", () => OvalTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Line Tool", "Draw line annotation.", "annotation line shape", () => LineTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Sticky Note Tool", "Add a sticky note annotation.", "annotation sticky note comment", () => StickyNoteTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Snapshot Tool", "Capture a region for copy, save or print.", "snapshot crop capture image", () => SnapshotTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("AI Snapshot", "Capture a region and send it to AI Copilot.", "ai snapshot copilot ask", () => AiSnapshotTool_Click(this, new RoutedEventArgs()), HasDocument),
+			new QuickCommandItem("Check AI System", "Run the local AI readiness check.", "ai check system diagnostics", () => CheckAi_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Settings", "Open application settings.", "settings preferences options", () => Settings_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Check Updates", "Check for application updates.", "update version check", () => ManualUpdateCheck_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Performance Trace", "Open the performance trace report.", "performance trace diagnostics", () => ShowPerformanceTrace_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("About", "Show app and license information.", "about info license", () => About_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Toggle Theme", "Switch light/dark theme.", "theme dark light", () => ThemeToggle_Click(this, new RoutedEventArgs())),
+			new QuickCommandItem("Close Current Tab", "Close the active PDF tab.", "close tab document", CloseActiveTabFromCommandPalette, HasDocument)
+		};
+	}
+
+	private void CloseActiveTabFromCommandPalette()
+	{
+		if (PdfTabControl.SelectedItem is TabItem removeItem)
+		{
+			PdfTabControl.Items.Remove(removeItem);
+			UpdateTabEmptyState();
+			if (PdfTabControl.Items.Count == 0)
+			{
+				LogStatus("Sẵn sàng");
+				UpdatePageIndicator();
+				UpdateZoomText();
+			}
+		}
+	}
+
+	private void GoRelativePage(int delta)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null && activeTab.PageCount > 0)
+		{
+			activeTab.GoToPage(activeTab.SelectedPageNumber + delta);
+		}
+	}
+
+	private void TryApplyAppLogo()
+	{
+		try
+		{
+			if (Application.Current.TryFindResource("AppLogoImage") is ImageSource imageSource)
+			{
+				base.Icon = imageSource;
+				return;
+			}
+
+			StreamResourceInfo resourceStream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/hphat_logo_1780279208636.png", UriKind.Absolute));
+			if (resourceStream?.Stream != null)
+			{
+				BitmapImage bitmapImage = new BitmapImage();
+				bitmapImage.BeginInit();
+				bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+				bitmapImage.StreamSource = resourceStream.Stream;
+				bitmapImage.EndInit();
+				bitmapImage.Freeze();
+				base.Icon = bitmapImage;
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	private PdfDocumentTab? GetActiveTab()
+	{
+		if (PdfTabControl != null && PdfTabControl.SelectedItem is TabItem tabItem)
+		{
+			return tabItem.Content as PdfDocumentTab;
+		}
+		return null;
+	}
+
+	public static bool SkipStartupMergeArgs { get; set; } = false;
+
+	public async void HandleStartupPdfArguments()
+	{
+		if (SkipStartupMergeArgs)
+		{
+			return;
+		}
+		if (!_startupArgsProcessed)
+		{
+			_startupArgsProcessed = true;
+			string[] source = Environment.GetCommandLineArgs().Skip(1).ToArray();
+			bool flag = source.Any((string arg) => arg.Equals("--merge", StringComparison.OrdinalIgnoreCase));
+			bool flag2 = source.Any((string arg) => arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase));
+			string[] array = FilterPdfFiles(source.Where((string arg) => !arg.Equals("--merge", StringComparison.OrdinalIgnoreCase) && !arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase))).OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+			if (flag || flag2)
+			{
+				Hide();
+				await HandleExplorerMergeStartupAsync(array);
+			}
+			else if (array.Length == 1)
+			{
+				OpenPdfTab(array[0]);
+			}
+			else if (array.Length > 1)
+			{
+				await ShowMergeDialogAsync(array, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+			}
+		}
+	}
+
+	private void OpenPdf_Click(object sender, RoutedEventArgs e)
+	{
+		OpenFileDialog openFileDialog = new OpenFileDialog
+		{
+			Filter = "PDF documents (*.pdf)|*.pdf",
+			Title = "MềEFile PDF",
+			Multiselect = true
+		};
+		if (openFileDialog.ShowDialog() == true)
+		{
+			string[] fileNames = openFileDialog.FileNames;
+			foreach (string path in fileNames)
+			{
+				OpenPdfTab(path);
+			}
+		}
+	}
+
+	public void OpenPdfTab(string path)
+	{
+		foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
+		{
+			if (item.Content is PdfDocumentTab pdfDocumentTab && pdfDocumentTab.CurrentPdfPath == path)
+			{
+				PdfTabControl.SelectedItem = item;
+				RecentFilesService.Record(path);
+				RefreshRecentFilesDashboard();
+				return;
+			}
+		}
+		PdfDocumentTab pdfDocumentTab2 = new PdfDocumentTab(path);
+		pdfDocumentTab2.ApplyTheme(_isDarkMode);
+		pdfDocumentTab2.StatusChanged += DocTab_StatusChanged;
+		pdfDocumentTab2.ZoomChanged += DocTab_ZoomChanged;
+		pdfDocumentTab2.PageChanged += DocTab_PageChanged;
+		pdfDocumentTab2.DocumentReloaded += DocTab_DocumentReloaded;
+		pdfDocumentTab2.DocumentOpenRequested += DocTab_DocumentOpenRequested;
+		pdfDocumentTab2.AiSnapshotRequested += DocTab_AiSnapshotRequested;
+		pdfDocumentTab2.ScaleCalibrated += DocTab_ScaleCalibrated;
+		StackPanel stackPanel = new StackPanel
+		{
+			Orientation = Orientation.Horizontal
+		};
+		TextBlock element = new TextBlock
+		{
+			Text = Path.GetFileName(path),
+			Margin = new Thickness(0.0, 0.0, 10.0, 0.0),
+			VerticalAlignment = VerticalAlignment.Center
+		};
+		Button button = new Button
+		{
+			Content = "X",
+			Background = Brushes.Transparent,
+			BorderThickness = new Thickness(0.0),
+			Foreground = Brushes.Red,
+			FontWeight = FontWeights.Bold,
+			Width = 20.0,
+			Height = 20.0,
+			VerticalAlignment = VerticalAlignment.Center,
+			Cursor = Cursors.Hand
+		};
+		stackPanel.Children.Add(element);
+		stackPanel.Children.Add(button);
+		TabItem tabItem2 = new TabItem
+		{
+			Header = stackPanel,
+			Content = pdfDocumentTab2
+		};
+		button.Click += delegate
+		{
+			PdfTabControl.Items.Remove(tabItem2);
+			UpdateTabEmptyState();
+			if (PdfTabControl.Items.Count == 0)
+			{
+				LogStatus("Sẵn sàng");
+				UpdatePageIndicator();
+				UpdateZoomText();
+			}
+		};
+		PdfTabControl.Items.Add(tabItem2);
+		PdfTabControl.SelectedItem = tabItem2;
+		RecentFilesService.Record(path);
+		RefreshRecentFilesDashboard();
+		UpdateTabEmptyState();
+	}
+
+	private void DocTab_DocumentReloaded(object? sender, string newPath)
+	{
+		if (!(sender is PdfDocumentTab pdfDocumentTab))
+		{
+			return;
+		}
+		foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
+		{
+			if (item.Content == pdfDocumentTab)
+			{
+				if (item.Header is StackPanel stackPanel && stackPanel.Children.Count > 0 && stackPanel.Children[0] is TextBlock textBlock)
+				{
+					textBlock.Text = Path.GetFileName(newPath);
+				}
+				break;
+			}
+		}
+		pdfDocumentTab.LoadDocument(newPath);
+	}
+
+	private void DocTab_DocumentOpenRequested(object? sender, string path)
+	{
+		OpenPdfTab(path);
+	}
+
+	private void DocTab_ScaleCalibrated(object? sender, double scale)
+	{
+		if (sender == GetActiveTab())
+		{
+			_mainRibbon.SetCustomScale(scale);
+		}
+	}
+
+	private void PdfTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (e.Source is TabControl)
+		{
+			UpdateStatusBarFromActiveTab();
+		}
+	}
+
+	private void DocTab_PageChanged(object? sender, EventArgs e)
+	{
+		if (sender == GetActiveTab())
+		{
+			UpdatePageIndicator();
+		}
+	}
+
+	private void DocTab_ZoomChanged(object? sender, EventArgs e)
+	{
+		if (sender == GetActiveTab())
+		{
+			UpdateZoomText();
+		}
+	}
+
+	private void DocTab_StatusChanged(object? sender, EventArgs e)
+	{
+		if (sender == GetActiveTab() && sender is PdfDocumentTab pdfDocumentTab)
+		{
+			LogStatus(pdfDocumentTab.LastStatusMessage);
+		}
+	}
+
+	private void UpdateStatusBarFromActiveTab()
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			LogStatus(activeTab.LastStatusMessage);
+			UpdatePageIndicator();
+			UpdateZoomText();
+		}
+	}
+
+	private void UpdatePageIndicator()
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null && activeTab.PageCount > 0)
+		{
+			_updatingStatusControls = true;
+			PageJumpTextBox.Text = activeTab.SelectedPageNumber.ToString();
+			PageTotalText.Text = $"/ {activeTab.PageCount}";
+			_updatingStatusControls = false;
+		}
+		else
+		{
+			_updatingStatusControls = true;
+			PageJumpTextBox.Text = string.Empty;
+			PageTotalText.Text = "/ 0";
+			_updatingStatusControls = false;
+		}
+	}
+
+	private void UpdateZoomText()
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			ZoomIndicator.Text = $"Thu phóng: {Math.Round(activeTab.CurrentZoom * 100.0)}%";
+		}
+		else
+		{
+			ZoomIndicator.Text = "Thu phóng: 100%";
+		}
+		UpdateZoomControls();
+	}
+
+	private void UpdateZoomControls()
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		_updatingStatusControls = true;
+		if (activeTab != null)
+		{
+			double value = Math.Round(activeTab.CurrentZoom * 100.0);
+			ZoomIndicator.Text = $"Thu phóng: {value}%";
+			ZoomSlider.Value = Math.Clamp(value, ZoomSlider.Minimum, ZoomSlider.Maximum);
+		}
+		else
+		{
+			ZoomIndicator.Text = "Thu phóng: 100%";
+			ZoomSlider.Value = 100.0;
+		}
+		_updatingStatusControls = false;
+	}
+
+	private void LogStatus(string message)
+	{
+		StatusMessage.Text = "Status: " + message;
+	}
+
+	private void PageJumpTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+	{
+		if (e.Key == Key.Return)
+		{
+			e.Handled = true;
+			GoToTypedPage();
+		}
+	}
+
+	private void PageJumpTextBox_LostFocus(object sender, RoutedEventArgs e)
+	{
+		GoToTypedPage();
+	}
+
+	private void GoToTypedPage()
+	{
+		if (_updatingStatusControls)
+		{
+			return;
+		}
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null && activeTab.PageCount > 0)
+		{
+			if (int.TryParse(PageJumpTextBox.Text, out var result))
+			{
+				activeTab.GoToPage(result);
+			}
+			UpdatePageIndicator();
+		}
+	}
+
+	private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		if (!_updatingStatusControls && base.IsLoaded)
+		{
+			_pendingZoomSliderPercent = e.NewValue;
+			_zoomSliderTimer.Stop();
+			_zoomSliderTimer.Start();
+		}
+	}
+
+	private async void SavePdf_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			await activeTab.SaveDocumentAsync();
+		}
+		else
+		{
+			MessageBox.Show("Vui lòng mềEmột file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+		}
+	}
+
+	private async void SavePdfAs_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null)
+		{
+			MessageBox.Show("Vui lòng mềEmột file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			return;
+		}
+		SaveFileDialog saveFileDialog = new SaveFileDialog
+		{
+			Filter = "PDF documents (*.pdf)|*.pdf",
+			Title = "Lưu file PDF dưới dạng",
+			FileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_edited.pdf",
+			InitialDirectory = Path.GetDirectoryName(activeTab.CurrentPdfPath)
+		};
+		if (saveFileDialog.ShowDialog() == true)
+		{
+			await activeTab.SaveDocumentAsync(saveFileDialog.FileName);
+		}
+	}
+
+	private void PrintPdf_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.PrintPdf();
+		}
+		else
+		{
+			MessageBox.Show("Vui lòng mềEmột file PDF trước khi in.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+		}
+	}
+
+	private void BatchPrint_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			BatchPrintDialog batchPrintDialog = new BatchPrintDialog();
+			batchPrintDialog.Owner = this;
+			batchPrintDialog.ShowDialog();
+		}
+	}
+
+	private void ToggleSidebar_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.ToggleSidebar();
+	}
+
+	private void ZoomIn_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.ChangeZoom(1.08);
+	}
+
+	private void ZoomOut_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.ChangeZoom(0.9259259259259258);
+	}
+
+	private void FitWidth_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.FitWidth();
+	}
+
+	private void RotateLeft_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.RotateCurrentPageAsync(-90);
+	}
+
+	private void RotateLeftAll_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.RotateAllPagesAsync(-90);
+	}
+
+	private void RotateRight_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.RotateCurrentPageAsync(90);
+	}
+
+	private void RotateRightAll_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.RotateAllPagesAsync(90);
+	}
+
+	private void MovePageUp_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.MoveSelectedPage(-1);
+		}
+	}
+
+	private void MovePageDown_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.MoveSelectedPage(1);
+		}
+	}
+
+	private void ReversePageOrder_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.ReversePageOrder();
+		}
+	}
+
+	private void ResetPageOrder_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.ResetPageOrder();
+		}
+	}
+
+	private void DeletePage_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.DeleteSelectedPageAsync();
+		}
+	}
+
+	private void InsertBlankPage_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.InsertBlankPageAsync();
+		}
+	}
+
+	private void DuplicatePage_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.DuplicateSelectedPageAsync();
+		}
+	}
+
+	private void SplitCurrentPage_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			GetActiveTab()?.SplitCurrentPageAsync();
+		}
+	}
+
+	private void Exit_Click(object sender, RoutedEventArgs e)
+	{
+		Application.Current.Shutdown();
+	}
+
+	private async void MergeFiles_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			await ShowMergeDialogAsync(null, autoStartMerge: false, sortByName: false, openMergedExternally: false);
+		}
+	}
+
+	private async void MergeFromExplorer_Click(object sender, RoutedEventArgs e)
+	{
+		if (!EnsureActivated())
+		{
+			return;
+		}
+		OpenFileDialog openFileDialog = new OpenFileDialog
+		{
+			Filter = "PDF documents (*.pdf)|*.pdf",
+			Title = "Chọn nhiều file PDF đềEgộp",
+			Multiselect = true
+		};
+		if (openFileDialog.ShowDialog() == true)
+		{
+			string[] array = FilterPdfFiles(openFileDialog.FileNames);
+			if (array.Length < 2)
+			{
+				MessageBox.Show("Vui lòng chọn ít nhất 2 file PDF đềEgộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			}
+			else
+			{
+				await ShowMergeDialogAsync(array, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+			}
+		}
+	}
+
+	private async void MainWindow_Drop(object sender, DragEventArgs e)
+	{
+		if (!e.Data.GetDataPresent(DataFormats.FileDrop) || !(e.Data.GetData(DataFormats.FileDrop) is string[] files))
+		{
+			return;
+		}
+		string[] array = FilterPdfFiles(files);
+		if (array.Length == 0)
+		{
+			return;
+		}
+		if (array.Length == 1)
+		{
+			OpenPdfTab(array[0]);
+		}
+		else if (EnsureActivated())
+		{
+			string[] initialFiles = array.OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+			await ShowMergeDialogAsync(initialFiles, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+		}
+	}
+
+	private void MainWindow_DragOver(object sender, DragEventArgs e)
+	{
+		e.Effects = (e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None);
+		e.Handled = true;
+	}
+
+	private void CheckLibraries_Click(object sender, RoutedEventArgs e)
+	{
+		string report = BuildLibraryAuditReport();
+		LogStatus("Library audit complete");
+		ShowReportWindow("Kiểm tra thư viện", report);
+	}
+
+	private void ShowPerformanceTrace_Click(object sender, RoutedEventArgs e)
+	{
+		string report = BuildPerformanceTraceReport();
+		LogStatus("Performance trace opened");
+		ShowReportWindow("Performance Trace", report);
+	}
+
+	private void About_Click(object sender, RoutedEventArgs e)
+	{
+		AboutDialog aboutDialog = new AboutDialog();
+		aboutDialog.Owner = this;
+		aboutDialog.ShowDialog();
+		LogStatus("About dialog opened");
+	}
+
+	private void UserGuide_Click(object sender, RoutedEventArgs e)
+	{
+		string guideText = @"=== HƯỚNG DẪN SỬ DỤNG PDF PRO - HPHAT EDITION ===
+
+1. ĐỌC & XEM FILE PDF
+   - Nhấp đúp chuột vào tệp PDF bất kỳ trong Windows Explorer hoặc kéo thả tệp vào cửa sổ ứng dụng để mở nhanh.
+   - Sử dụng phím tắt [Ctrl + Cuộn chuột] để phóng to / thu nhỏ mượt mà từ 10% đến 1000%.
+   - Chọn chế độ ""Độ Rộng"" để trang tự động giãn vừa khít chiều ngang màn hình.
+   - Nhấn nút ""Tối / Sáng"" trên thanh Ribbon để chuyển đổi giao diện toàn diện (Night Mode bảo vệ mắt ban đêm).
+
+2. BIÊN TẬP & SẮP XẾP TRANG (Thao tác trên Sidebar Trái)
+   - Bật / Ẩn Sidebar trái bằng nút ""Ẩn/Hiện Sidebar"" hoặc phím tắt [F4].
+   - Click chuột phải vào Thumbnail (Hình thu nhỏ) các trang để thực hiện nhanh:
+     + Xoay Trái 90° / Xoay Phải 90° (Hỗ trợ xoay trang hiện tại hoặc xoay toàn bộ trang bản vẽ).
+     + Di chuyển trang Lên / Xuống để thay đổi thứ tự.
+     + Nhân bản trang (Duplicate) hoặc xóa các trang lỗi.
+     + Chèn trang trống ở trước/sau vị trí hiện tại.
+
+3. GHÉP TỆP PDF SIÊU TỐC
+   - Cách 1: Trên thanh Ribbon ""Trang Chủ"" -> chọn ""Ghép Nhiều File"" hoặc ""Chọn Nhiều File & Ghép"".
+   - Cách 2 (Khuyên dùng): Chọn nhiều tệp PDF trong Windows Explorer, click chuột phải và chọn ""Ghép PDF bằng PDF HPhat"". Ứng dụng tự động sắp xếp tên tự nhiên, gộp file nhị phân siêu tốc và mở tệp kết quả.
+
+4. MÁY IN ẢO & IN ẤN BẢN VẼ LỚN (A3/A4)
+   - Khi in từ AutoCAD, Revit, Word, Excel hoặc trình duyệt: Chọn máy in ""PDF Pro - HPhat Edition"" để lưu/xuất file PDF chất lượng cao. Bản vẽ sẽ tự động được mở trực tiếp trên PDF Pro.
+   - In ấn trực tiếp từ ứng dụng: Hỗ trợ in Native Vector sắc nét, không nhòe, tự động xoay khổ giấy nằm ngang/dọc tương ứng với bản vẽ.
+
+5. AI SNAPSHOT (TRỢ LÝ AI)
+   - Chọn công cụ ""AI Snapshot"" tại tab ""Định Dạng Chú Thích"".
+   - Quét chọn vùng bản vẽ/văn bản cần phân tích.
+   - Trợ lý AI (Gemini/OpenAI/Ollama) sẽ giúp bạn tóm tắt, giải thích bản vẽ hoặc dịch nghĩa ngay lập tức.";
+
+		ShowReportWindow("Hướng Dẫn Sử Dụng - PDF Pro", guideText);
+	}
+
+	private void Feedback_Click(object sender, RoutedEventArgs e)
+	{
+		string info = @"=== LIÊN HỆ HỖ TRỢ & BÁO LỖI ===
+
+Cảm ơn bạn đã tin tưởng sử dụng PDF Pro - HPhat Edition!
+
+Mọi thắc mắc, phản hồi hoặc báo cáo sự cố, vui lòng liên hệ:
+- Email hỗ trợ: support@hphatedition.com
+- Hotline kỹ thuật: (+84) 987 654 321
+- Phiên bản hiện tại: v1.0.19
+
+Khi báo lỗi, vui lòng đính kèm file PDF bị lỗi và mô tả các bước thực hiện để chúng tôi hỗ trợ xử lý nhanh nhất.";
+
+		MessageBox.Show(info, "Phản Hồi & Báo Lỗi - PDF Pro", MessageBoxButton.OK, MessageBoxImage.Information);
+	}
+
+	private void VirtualPrinterConfig_Click(object sender, RoutedEventArgs e)
+	{
+		bool printerExists = false;
+		try
+		{
+			using (var server = new System.Printing.LocalPrintServer())
+			{
+				foreach (var queue in server.GetPrintQueues())
+				{
+					if (queue.FullName.Equals("PDF Pro - HPhat Edition", StringComparison.OrdinalIgnoreCase))
+					{
+						printerExists = true;
+						break;
+					}
+				}
+			}
+		}
+		catch { }
+
+		string msg;
+		if (printerExists)
+		{
+			msg = "Máy in ảo 'PDF Pro - HPhat Edition' đã được cài đặt và sẵn sàng hoạt động.\n\nBạn có muốn cài đặt lại / sửa lỗi máy in không?";
+		}
+		else
+		{
+			msg = "Máy in ảo 'PDF Pro - HPhat Edition' chưa được cài đặt.\n\nBạn có muốn tiến hành cài đặt máy in ảo ngay bây giờ không? (Yêu cầu quyền Administrator)";
+		}
+
+		MessageBoxResult result = MessageBox.Show(msg, "Cấu hình Máy in ảo - PDF Pro", MessageBoxButton.YesNo, MessageBoxImage.Question);
+		if (result == MessageBoxResult.Yes)
+		{
+			try
+			{
+				// 1. Write the Registry keys from the current user context
+				using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\PDFPro\VirtualPrinter"))
+				{
+					key.SetValue("PrinterName", "PDF Pro - HPhat Edition");
+					key.SetValue("AppPath", System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "");
+					key.SetValue("AutoOpen", 1, Microsoft.Win32.RegistryValueKind.DWord);
+				}
+
+				// 2. Prepare the PowerShell commands to register printer port & printer (requires elevation)
+				string script = @"
+$printerName = 'PDF Pro - HPhat Edition'
+$portName = 'PDFPro_HPhat_Port:'
+$driverName = 'Microsoft Print To PDF'
+if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
+    Remove-Printer -Name $printerName
+}
+if (Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue) {
+    Remove-PrinterPort -Name $portName
+}
+Add-PrinterPort -Name $portName
+Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
+";
+				string base64Script = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+				
+				System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
+				{
+					FileName = "powershell.exe",
+					Arguments = $"-NoProfile -NonInteractive -EncodedCommand {base64Script}",
+					Verb = "runas", // Triggers UAC elevation
+					UseShellExecute = true,
+					WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+				};
+
+				using (var process = System.Diagnostics.Process.Start(psi))
+				{
+					process?.WaitForExit();
+					if (process != null && process.ExitCode == 0)
+					{
+						MessageBox.Show("Cài đặt máy in ảo thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+					}
+					else
+					{
+						MessageBox.Show("Cài đặt máy in ảo bị hủy hoặc gặp lỗi.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Lỗi khi cài đặt máy in ảo: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
+		}
+	}
+
+	private void MeasureDistanceTool_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "MeasureDistance";
+			activeTab.CurrentMeasurementScale = _mainRibbon.GetMeasurementScale();
+		}
+	}
+
+	private void CalibrateScale_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.EnterCalibrateMode();
+		}
+	}
+
+	private void MeasureAreaTool_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "MeasureArea";
+			activeTab.CurrentMeasurementScale = _mainRibbon.GetMeasurementScale();
+		}
+	}
+
+	private void HandwriteSign_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null) return;
+
+		SignatureInputDialog dialog = new SignatureInputDialog { Owner = this };
+		if (dialog.ShowDialog() == true)
+		{
+			activeTab.StartPlaceSignature(dialog.ResultStrokes, dialog.ResultWidth, dialog.ResultHeight, dialog.ResultColor);
+		}
+	}
+
+	private void StampApprove_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null) return;
+
+		ContextMenu menu = new ContextMenu();
+		string[] stamps = { "ĐÃ DUYỆT", "BẢN NHÁP", "KHẨN", "MẬT", "HỎA TỐC" };
+		foreach (var stamp in stamps)
+		{
+			MenuItem item = new MenuItem { Header = stamp };
+			item.Click += (s, ev) =>
+			{
+				activeTab.StartPlaceStamp(stamp);
+			};
+			menu.Items.Add(item);
+		}
+		menu.IsOpen = true;
+	}
+
+	private void MeasurementScale_Changed(object sender, SelectionChangedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.CurrentMeasurementScale = _mainRibbon.GetMeasurementScale();
+		}
+	}
+
+	private void Settings_Click(object sender, RoutedEventArgs e)
+	{
+		SettingsWindow settingsWindow = new SettingsWindow
+		{
+			Owner = this
+		};
+		settingsWindow.ShowDialog();
+	}
+
+	private void Activation_Click(object sender, RoutedEventArgs e)
+	{
+		ActivationDialog activationDialog = new ActivationDialog();
+		activationDialog.Owner = this;
+		activationDialog.ShowDialog();
+		ApplyAppActivationState();
+	}
+
+	private void ApplyAppActivationState()
+	{
+		ActivationState activationState = ActivationLicense.LoadState();
+		base.Title = (activationState.IsActivated ? (ActivationLicense.AppTitle + " - Activated") : (ActivationLicense.AppTitle + " - Not activated"));
+		if (ActivationWarningBanner != null)
+		{
+			ActivationWarningBanner.Visibility = (activationState.IsActivated ? Visibility.Collapsed : Visibility.Visible);
+		}
+		if (LicenseStatusMessage != null)
+		{
+			if (activationState.IsActivated)
+			{
+				LicenseStatusMessage.Text = "Bản quyền: Đã kích hoạt (Hạn: " + activationState.ExpirationText + ")";
+				LicenseStatusMessage.Foreground = (Brush)new BrushConverter().ConvertFromString("#34D399");
+			}
+			else
+			{
+				LicenseStatusMessage.Text = "Bản quyền: Chưa kích hoạt";
+				LicenseStatusMessage.Foreground = (Brush)new BrushConverter().ConvertFromString("#F87171");
+			}
+		}
+		_mainRibbon?.SetActivationState(activationState.IsActivated);
+	}
+
+	private bool EnsureActivated()
+	{
+		if (ActivationLicense.LoadState().IsActivated)
+		{
+			return true;
+		}
+		MessageBox.Show("Tính năng này yêu cầu kích hoạt bản quyền PRO. Vui lòng kích hoạt bản quyền đềEtiếp tục sử dụng.", "Yêu cầu Bản Quyền PRO", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+		Activation_Click(this, new RoutedEventArgs());
+		return false;
+	}
+
+	private string BuildLibraryAuditReport()
+	{
+		string baseDirectory = AppContext.BaseDirectory;
+		ActivationState activationState = ActivationLicense.LoadState();
+		HashSet<string> loadedAssemblies;
+		try
+		{
+			loadedAssemblies = (from a in AppDomain.CurrentDomain.GetAssemblies()
+				select a.GetName().Name ?? string.Empty into name
+				where !string.IsNullOrWhiteSpace(name)
+				select name).ToHashSet<string>(StringComparer.OrdinalIgnoreCase);
+		}
+		catch
+		{
+			loadedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		}
+		HashSet<string> loadedModules;
+		try
+		{
+			using Process process = Process.GetCurrentProcess();
+			loadedModules = (from ProcessModule m in (IEnumerable)process.Modules
+				select m.ModuleName ?? string.Empty into name
+				where !string.IsNullOrWhiteSpace(name)
+				select name).ToHashSet<string>(StringComparer.OrdinalIgnoreCase);
+		}
+		catch
+		{
+			loadedModules = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		}
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.AppendLine("PDF Pro - Library Audit");
+		StringBuilder stringBuilder2 = stringBuilder;
+		StringBuilder stringBuilder3 = stringBuilder2;
+		StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(9, 1, stringBuilder2);
+		handler.AppendLiteral("Version: ");
+		handler.AppendFormatted(activationState.AppVersion);
+		stringBuilder3.AppendLine(ref handler);
+		stringBuilder2 = stringBuilder;
+		StringBuilder stringBuilder4 = stringBuilder2;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(12, 1, stringBuilder2);
+		handler.AppendLiteral("Activation: ");
+		handler.AppendFormatted(activationState.StatusText);
+		stringBuilder4.AppendLine(ref handler);
+		stringBuilder2 = stringBuilder;
+		StringBuilder stringBuilder5 = stringBuilder2;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(12, 1, stringBuilder2);
+		handler.AppendLiteral("Machine ID: ");
+		handler.AppendFormatted(activationState.MachineId);
+		stringBuilder5.AppendLine(ref handler);
+		stringBuilder2 = stringBuilder;
+		StringBuilder stringBuilder6 = stringBuilder2;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(14, 1, stringBuilder2);
+		handler.AppendLiteral("License file: ");
+		handler.AppendFormatted(activationState.LicensePath);
+		stringBuilder6.AppendLine(ref handler);
+		stringBuilder2 = stringBuilder;
+		StringBuilder stringBuilder7 = stringBuilder2;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(20, 1, stringBuilder2);
+		handler.AppendLiteral("App base directory: ");
+		handler.AppendFormatted(baseDirectory);
+		stringBuilder7.AppendLine(ref handler);
+		stringBuilder.AppendLine();
+		stringBuilder.AppendLine("Managed assemblies:");
+		AppendManagedStatus(stringBuilder, loadedAssemblies, "Fluent", "Fluent.dll", "Used by the Ribbon XAML namespace 'urn:fluent-ribbon'.");
+		AppendManagedStatus(stringBuilder, loadedAssemblies, "ControlzEx", "ControlzEx.dll", "Transitive dependency of Fluent.Ribbon.");
+		AppendManagedStatus(stringBuilder, loadedAssemblies, "Microsoft.Xaml.Behaviors", "Microsoft.Xaml.Behaviors.dll", "Transitive dependency through ControlzEx.");
+		stringBuilder.AppendLine();
+		stringBuilder.AppendLine("Native libraries:");
+		AppendNativeStatus(stringBuilder, loadedModules, "pdf_core.dll", "Used by P/Invoke for merge/rotate/delete/insert blank page operations.");
+		AppendNativeStatus(stringBuilder, loadedModules, "pdfium.dll", "Used by PdfiumEngine for open/render/print.");
+		stringBuilder.AppendLine();
+		stringBuilder.AppendLine("Direct package audit:");
+		stringBuilder.AppendLine("- Fluent.Ribbon: kept. It is used directly in XAML.");
+		stringBuilder.AppendLine("- Microsoft.Xaml.Behaviors.Wpf: removed from the direct PackageReference list. It still arrives transitively through ControlzEx.");
+		stringBuilder.AppendLine();
+		stringBuilder.AppendLine("What you should expect:");
+		stringBuilder.AppendLine("- If a native DLL is missing from the app folder, the feature that depends on it will fail.");
+		stringBuilder.AppendLine("- Native DLLs may still show as not loaded until you actually open, print, or merge a PDF. File presence is the stronger signal.");
+		stringBuilder.AppendLine("- If a managed assembly is listed as transitive, it may still appear in bin even if it is not declared in the csproj.");
+		return stringBuilder.ToString();
+	}
+
+	private string BuildPerformanceTraceReport()
+	{
+		string currentLogPath = PdfPerfLogger.CurrentLogPath;
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.AppendLine("PDF Pro - Performance Trace");
+		StringBuilder stringBuilder2 = stringBuilder;
+		StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(10, 1, stringBuilder2);
+		handler.AppendLiteral("Log file: ");
+		handler.AppendFormatted(currentLogPath);
+		stringBuilder2.AppendLine(ref handler);
+		stringBuilder.AppendLine();
+		stringBuilder.Append(PdfPerfLogger.ReadCurrentLog());
+		return stringBuilder.ToString();
+	}
+
+	private static void AppendManagedStatus(StringBuilder sb, HashSet<string> loadedAssemblies, string assemblyName, string fileName, string note)
+	{
+		bool flag = File.Exists(Path.Combine(AppContext.BaseDirectory, fileName));
+		bool flag2 = loadedAssemblies.Contains(assemblyName);
+		StringBuilder stringBuilder = sb;
+		StringBuilder stringBuilder2 = stringBuilder;
+		StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(7, 3, stringBuilder);
+		handler.AppendLiteral("- ");
+		handler.AppendFormatted(fileName);
+		handler.AppendLiteral(": ");
+		handler.AppendFormatted(flag2 ? "loaded" : "not loaded");
+		handler.AppendLiteral(", ");
+		handler.AppendFormatted(flag ? "file present" : "file missing");
+		handler.AppendLiteral(".");
+		stringBuilder2.AppendLine(ref handler);
+		stringBuilder = sb;
+		StringBuilder stringBuilder3 = stringBuilder;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(2, 1, stringBuilder);
+		handler.AppendLiteral("  ");
+		handler.AppendFormatted(note);
+		stringBuilder3.AppendLine(ref handler);
+	}
+
+	private static void AppendNativeStatus(StringBuilder sb, HashSet<string> loadedModules, string fileName, string note)
+	{
+		bool flag = File.Exists(Path.Combine(AppContext.BaseDirectory, fileName));
+		bool flag2 = loadedModules.Contains(fileName);
+		StringBuilder stringBuilder = sb;
+		StringBuilder stringBuilder2 = stringBuilder;
+		StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(7, 3, stringBuilder);
+		handler.AppendLiteral("- ");
+		handler.AppendFormatted(fileName);
+		handler.AppendLiteral(": ");
+		handler.AppendFormatted(flag2 ? "loaded" : "not loaded");
+		handler.AppendLiteral(", ");
+		handler.AppendFormatted(flag ? "file present" : "file missing");
+		handler.AppendLiteral(".");
+		stringBuilder2.AppendLine(ref handler);
+		stringBuilder = sb;
+		StringBuilder stringBuilder3 = stringBuilder;
+		handler = new StringBuilder.AppendInterpolatedStringHandler(2, 1, stringBuilder);
+		handler.AppendLiteral("  ");
+		handler.AppendFormatted(note);
+		stringBuilder3.AppendLine(ref handler);
+	}
+
+	private void ShowReportWindow(string title, string report)
+	{
+		Window dialog = new Window
+		{
+			Title = title,
+			Width = 960.0,
+			Height = 720.0,
+			Background = Brushes.White
+		};
+		if (base.IsLoaded && base.IsVisible)
+		{
+			dialog.Owner = this;
+			dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+		}
+		else
+		{
+			dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+		}
+		Grid grid = new Grid
+		{
+			Margin = new Thickness(12.0)
+		};
+		grid.RowDefinitions.Add(new RowDefinition
+		{
+			Height = GridLength.Auto
+		});
+		grid.RowDefinitions.Add(new RowDefinition
+		{
+			Height = new GridLength(1.0, GridUnitType.Star)
+		});
+		grid.RowDefinitions.Add(new RowDefinition
+		{
+			Height = GridLength.Auto
+		});
+		TextBlock element = new TextBlock
+		{
+			Text = "Kiểm tra thư viện",
+			FontWeight = FontWeights.SemiBold,
+			FontSize = 16.0,
+			Margin = new Thickness(0.0, 0.0, 0.0, 10.0)
+		};
+		grid.Children.Add(element);
+		TextBox element2 = new TextBox
+		{
+			Text = report,
+			IsReadOnly = true,
+			AcceptsReturn = true,
+			AcceptsTab = true,
+			TextWrapping = TextWrapping.Wrap,
+			VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+			HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+			FontFamily = new FontFamily("Consolas"),
+			FontSize = 13.0,
+			BorderThickness = new Thickness(1.0),
+			Padding = new Thickness(8.0),
+			Background = Brushes.WhiteSmoke
+		};
+		Grid.SetRow(element2, 1);
+		grid.Children.Add(element2);
+		Button button = new Button
+		{
+			Content = "Đóng",
+			Width = 90.0,
+			HorizontalAlignment = HorizontalAlignment.Right,
+			Margin = new Thickness(0.0, 12.0, 0.0, 0.0),
+			IsDefault = true
+		};
+		button.Click += delegate
+		{
+			dialog.Close();
+		};
+		Grid.SetRow(button, 2);
+		grid.Children.Add(button);
+		dialog.Content = grid;
+		dialog.ShowDialog();
+	}
+
+	private async Task ShowMergeDialogAsync(string[]? initialFiles, bool autoStartMerge, bool sortByName, bool openMergedExternally)
+	{
+		MergeDialog mergeDialog = new MergeDialog(initialFiles, autoStartMerge, sortByName);
+		if (base.IsLoaded && base.IsVisible)
+		{
+			mergeDialog.Owner = this;
+		}
+		if (mergeDialog.ShowDialog() != true || string.IsNullOrEmpty(mergeDialog.MergedFilePath))
+		{
+			return;
+		}
+		string mergedFilePath = mergeDialog.MergedFilePath;
+		LogStatus("Đã gộp file: " + Path.GetFileName(mergedFilePath));
+		if (openMergedExternally)
+		{
+			try
+			{
+				Process.Start(new ProcessStartInfo(mergedFilePath)
+				{
+					UseShellExecute = true
+				});
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Không thềEmềEfile sau khi gộp: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+			}
+			Application.Current.Shutdown();
+		}
+		else
+		{
+			MessageBox.Show("Gộp file thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			await OpenPdfTabWhenReadyAsync(mergedFilePath);
+		}
+	}
+
+	private async Task HandleExplorerMergeStartupAsync(string[] initialFiles)
+	{
+		QueueExplorerMergeFiles(initialFiles);
+		if (!TryBecomeExplorerMergeOwner())
+		{
+			Application.Current.Shutdown();
+			return;
+		}
+		bool mergeSuccessful = false;
+		string text = null;
+		try
+		{
+			string[] array = await CollectQueuedExplorerMergeFilesAsync(TimeSpan.FromSeconds(5.0), TimeSpan.FromMilliseconds(600.0));
+			if (array.Length < 2)
+			{
+				Application.Current.Shutdown();
+				return;
+			}
+			string pathsSemicolon = string.Join(";", array);
+			text = MergeDialog.CreateAutoOutputPath(array[0]);
+			if (new MergeProgressWindow(pathsSemicolon, text).ShowDialog() == true)
+			{
+				mergeSuccessful = true;
+			}
+		}
+		finally
+		{
+			ReleaseExplorerMergeOwner();
+			if (!mergeSuccessful)
+			{
+				Application.Current.Shutdown();
+			}
+		}
+
+		if (mergeSuccessful && text != null)
+		{
+			Show();
+			await OpenPdfTabWhenReadyAsync(text);
+		}
+	}
+
+	public static async Task RunExplorerMergeFlowAsync(string[] initialFiles)
+	{
+		QueueExplorerMergeFiles(initialFiles);
+		if (!TryBecomeExplorerMergeOwner())
+		{
+			Environment.Exit(0);
+			return;
+		}
+		string outputPath = null;
+		bool mergeSuccessful = false;
+		try
+		{
+			string[] array = await CollectQueuedExplorerMergeFilesAsync(TimeSpan.FromSeconds(5.0), TimeSpan.FromMilliseconds(600.0));
+			if (array.Length < 2)
+			{
+				Environment.Exit(0);
+				return;
+			}
+			string pathsSemicolon = string.Join(";", array);
+			outputPath = MergeDialog.CreateAutoOutputPath(array[0]);
+			bool? success = null;
+			Application.Current.Dispatcher.Invoke(delegate
+			{
+				MergeProgressWindow mergeProgressWindow = new MergeProgressWindow(pathsSemicolon, outputPath);
+				success = mergeProgressWindow.ShowDialog();
+			});
+			if (success == true)
+			{
+				mergeSuccessful = true;
+			}
+		}
+		finally
+		{
+			ReleaseExplorerMergeOwner();
+			if (!mergeSuccessful)
+			{
+				Environment.Exit(0);
+			}
+		}
+
+		if (mergeSuccessful && outputPath != null)
+		{
+			App.HandlePostMergeOpen(outputPath);
+		}
+	}
+
+	public static bool TryBecomeExplorerMergeOwner()
+	{
+		try
+		{
+			if (_explorerMergeMutex == null)
+			{
+				_explorerMergeMutex = new Mutex(initiallyOwned: false, "Local\\PdfPro.MergeStartupOwner");
+			}
+			try
+			{
+				return _explorerMergeMutex.WaitOne(0);
+			}
+			catch (AbandonedMutexException)
+			{
+				return true;
+			}
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	private static void ReleaseExplorerMergeOwner()
+	{
+		try
+		{
+			_explorerMergeMutex?.ReleaseMutex();
+		}
+		catch
+		{
+		}
+		finally
+		{
+			_explorerMergeMutex?.Dispose();
+			_explorerMergeMutex = null;
+		}
+	}
+
+	public static void QueueExplorerMergeFiles(IEnumerable<string> files)
+	{
+		string explorerMergeQueueDir = GetExplorerMergeQueueDir();
+		Directory.CreateDirectory(explorerMergeQueueDir);
+		foreach (string file in files)
+		{
+			EnqueueExplorerMergeFile(explorerMergeQueueDir, file);
+		}
+	}
+
+	private static async Task<string[]> CollectQueuedExplorerMergeFilesAsync(TimeSpan timeout, TimeSpan quietPeriod)
+	{
+		string queueDir = GetExplorerMergeQueueDir();
+		Directory.CreateDirectory(queueDir);
+		List<string> files = new List<string>();
+		HashSet<string> seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		DateTime startTime = DateTime.UtcNow;
+		DateTime lastChangeTime = startTime;
+		while (DateTime.UtcNow - startTime < timeout)
+		{
+			bool flag = false;
+			foreach (string item in Directory.EnumerateFiles(queueDir, "*.txt").OrderBy((string path) => path, NaturalFilePathComparer.Instance))
+			{
+				try
+				{
+					string[] array = File.ReadAllLines(item);
+					for (int num = 0; num < array.Length; num++)
+					{
+						string text = array[num].Trim();
+						if (!string.IsNullOrWhiteSpace(text) && File.Exists(text) && Path.GetExtension(text).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+						{
+							string fullPath = Path.GetFullPath(text);
+							if (seenFiles.Add(fullPath))
+							{
+								files.Add(fullPath);
+								flag = true;
+								lastChangeTime = DateTime.UtcNow;
+							}
+						}
+					}
+				}
+				catch
+				{
+				}
+				try
+				{
+					File.Delete(item);
+				}
+				catch
+				{
+				}
+			}
+			if (files.Count >= 2 && DateTime.UtcNow - lastChangeTime >= quietPeriod)
+			{
+				break;
+			}
+			if (!flag)
+			{
+				await Task.Delay(150);
+			}
+		}
+		return files.OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+	}
+
+	public static void EnqueueExplorerMergeFile(string queueDir, string filePath)
+	{
+		string[] array = FilterPdfFiles(new string[1] { filePath });
+		if (array.Length == 0)
+		{
+			return;
+		}
+		string path = Path.Combine(queueDir, $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}_{Environment.ProcessId}.txt");
+		try
+		{
+			File.WriteAllLines(path, array);
+		}
+		catch
+		{
+		}
+	}
+
+	public static string GetExplorerMergeQueueDir()
+	{
+		return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfPro", "ExplorerMergeQueue");
+	}
+
+	public static string[] FilterPdfFiles(IEnumerable<string> files)
+	{
+		return files.Where((string path) => !string.IsNullOrWhiteSpace(path) && File.Exists(path) && Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).Distinct<string>(StringComparer.OrdinalIgnoreCase).ToArray();
+	}
+
+	private async Task OpenPdfTabWhenReadyAsync(string path)
+	{
+		for (int attempt = 0; attempt < 20; attempt++)
+		{
+			if (IsReadablePdf(path))
+			{
+				OpenPdfTab(path);
+				return;
+			}
+			await Task.Delay(150);
+		}
+		MessageBox.Show("Đã gộp file nhưng chưa mềEđược file kết quả. Vui lòng mềElại file đã gộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+	}
+
+	private static bool IsReadablePdf(string path)
+	{
+		try
+		{
+			if (!File.Exists(path))
+			{
+				return false;
+			}
+			using FileStream fileStream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			return fileStream.Length > 0;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
+	private void UpdateToolButtonStates()
+	{
+		_mainRibbon?.SetActiveTool(ActiveTool);
+		if (ActiveToolText == null || ActiveToolIndicator == null)
+		{
+			return;
+		}
+		if (ActiveTool == "Select")
+		{
+			ActiveToolStatusBarItem.Visibility = Visibility.Collapsed;
+			ActiveToolSeparator.Visibility = Visibility.Collapsed;
+			ActiveToolOverlay.Visibility = Visibility.Collapsed;
+			return;
+		}
+		string text = ActiveTool switch
+		{
+			"SelectText" => "Chọn chữ (Select Text)", 
+			"EditText" => "Sửa văn bản (Edit Text)", 
+			"Ink" => "Bút vẽ tự do (Ink)", 
+			"ShapeRect" => "Hình chữ nhật (Rectangle)", 
+			"ShapeOval" => "Hình tròn (Oval)", 
+			"ShapeLine" => "Đường thẳng (Line)", 
+			"TextBox" => "Hộp văn bản (Text Box)", 
+			"Callout" => "Mũi tên ghi chú (Callout)", 
+			"StickyNote" => "Ghi chú nhanh (Sticky Note)", 
+			"Snapshot" => "Chụp vùng in (Snapshot)", 
+			"AiSnapshot" => "Chụp hỏi AI (AI Copilot)", 
+			_ => ActiveTool, 
+		};
+		ActiveToolText.Text = "Công cụ: " + text;
+		ActiveToolStatusBarItem.Visibility = Visibility.Visible;
+		ActiveToolSeparator.Visibility = Visibility.Visible;
+		if (OverlayToolNameText != null && ActiveToolOverlay != null)
+		{
+			OverlayToolNameText.Text = "ĐANG SỬ DỤNG: " + text.ToUpper();
+			ActiveToolOverlay.Visibility = Visibility.Visible;
+		}
+	}
+
+	private void CancelMode_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Select";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Select";
+		}
+		LogStatus("Đã hủy chế đềEvẽ/chú thích");
+	}
+
+	private void SelectTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Select";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Select";
+		}
+		LogStatus("Đã chuyển sang công cụ chọn đềEthực hiện kích hoạt");
+	}
+
+	private void InkTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Ink";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Ink";
+		}
+		LogStatus("Đã chuyển sang công cụ Bút vẽ tự do. Hãy kéo chuột đềEvẽ.");
+	}
+
+	private void RectTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "ShapeRect";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "ShapeRect";
+		}
+		LogStatus("Đã chuyển sang công cụ Hình chữ nhật. Hãy kéo chuột đềEvẽ.");
+	}
+
+	private void OvalTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "ShapeOval";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "ShapeOval";
+		}
+		LogStatus("Đã chuyển sang công cụ Hình tròn. Hãy kéo chuột đềEvẽ.");
+	}
+
+	private void LineTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "ShapeLine";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "ShapeLine";
+		}
+		LogStatus("Đã chuyển sang công cụ Đường thẳng. Hãy kéo chuột đềEvẽ.");
+	}
+
+	private void StickyNoteTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "StickyNote";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "StickyNote";
+		}
+		LogStatus("Đã chuyển sang công cụ Ghi chú. Hãy click lên một vềEtrí bất kỳ trên trang đềEtạo.");
+	}
+
+	private void SelectTextTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "SelectText";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "SelectText";
+		}
+		LogStatus("Đã chuyển sang công cụ chọn văn bản. Hãy kéo chuột đềEquét chọn chữ.");
+	}
+
+	private void EditTextTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "EditText";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "EditText";
+		}
+		LogStatus("Đã chuyển sang công cụ sửa chữ trực tiếp. Nhấp đúp vào dòng chữ bất kỳ đềEsửa.");
+	}
+
+	private void TextBoxTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "TextBox";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "TextBox";
+		}
+		LogStatus("Đã chuyển sang công cụ Hộp văn bản đềEthực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ đềEtạo.");
+	}
+
+	private void CalloutTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Callout";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Callout";
+		}
+		LogStatus("Đã chuyển sang công cụ Mũi tên chềEdẫn đềEthực hiện kích hoạt. Nhập chuỗi đềEtạo mũi tên, kéo đềEtạo ghi chú.");
+	}
+
+	private void SnapshotTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Snapshot";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Snapshot";
+		}
+		LogStatus("Đã chuyển sang công cụ Snapshot. Kéo chọn một vùng trên bản vẽ đềEin phóng ra A3.");
+	}
+
+	private void AiSnapshotTool_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			ActiveTool = "AiSnapshot";
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab != null)
+			{
+				activeTab.ActiveTool = "AiSnapshot";
+			}
+			ShowAiPanel();
+			LogStatus("Đã chuyển sang AI Snapshot. Kéo chọn một vùng bản vẽ đềEhỏi AI.");
+		}
+	}
+
+	private async void DocTab_AiSnapshotRequested(object? sender, AiSnapshotRequest request)
+	{
+		ShowAiPanel();
+		string prompt = _aiPanelControl?.PromptText ?? "Hay doc va giai thich vung ban ve nay.";
+		AiSnapshotRequest request2 = request with
+		{
+			Prompt = prompt
+		};
+		if (_aiPanelControl != null)
+		{
+			_aiPanelControl.SetOutput("Provider: " + _aiSnapshotRouter.ActiveProviderName + Environment.NewLine + "Dang phan tich snapshot...");
+		}
+		LogStatus("AI snapshot analyzing...");
+		try
+		{
+			string text = await _aiSnapshotRouter.AskSnapshotAsync(request2, CancellationToken.None);
+			_aiPanelControl?.SetOutput(text);
+			LogStatus("AI snapshot complete");
+		}
+		catch (Exception ex)
+		{
+			_aiPanelControl?.SetOutput("AI snapshot failed: " + ex.Message);
+			LogStatus("AI snapshot failed");
+		}
+	}
+
+	private void ShowAiPanel()
+	{
+		EnsureAiPanelHost();
+		if (_aiPanelControl != null)
+		{
+			_aiPanelControl.ShowPanel();
+			AiPanelColumn.Width = new GridLength(360.0);
+			AiPanelHostContainer.Visibility = Visibility.Visible;
+		}
+	}
+
+	private void CloseAiPanel_Click(object sender, RoutedEventArgs e)
+	{
+		if (_aiPanelControl != null)
+		{
+			_aiPanelControl.HidePanel();
+		}
+		AiPanelColumn.Width = new GridLength(0.0);
+		AiPanelHostContainer.Visibility = Visibility.Collapsed;
+	}
+
+	private static void OpenUrl(string url)
+	{
+		Process.Start(new ProcessStartInfo
+		{
+			FileName = url,
+			UseShellExecute = true
+		});
+	}
+
+	private void OpenGeminiApiKey_Click(object sender, RoutedEventArgs e)
+	{
+		OpenUrl("https://aistudio.google.com/app/apikey");
+	}
+
+	private void OpenOpenAiApiKey_Click(object sender, RoutedEventArgs e)
+	{
+		OpenUrl("https://platform.openai.com/api-keys");
+	}
+
+	private void OpenOllamaDownload_Click(object sender, RoutedEventArgs e)
+	{
+		OpenUrl("https://ollama.com/download");
+	}
+
+	private async void CheckAi_Click(object sender, RoutedEventArgs e)
+	{
+		ShowAiPanel();
+		if (_aiPanelControl != null)
+		{
+			_aiPanelControl.SetOutput("Dang kiem tra AI...");
+			_aiPanelControl.SetOutput(await AiSystemCheckService.BuildReportAsync(ReadAiSettingsFromUi(), CancellationToken.None));
+		}
+	}
+
+	private void SaveAiSettings_Click(object sender, RoutedEventArgs e)
+	{
+		_aiSettings = ReadAiSettingsFromUi();
+		_aiSettings.Save();
+		_aiSnapshotRouter = new AiSnapshotRouter(_aiSettings);
+		_aiPanelControl?.SetOutput("Da luu cau hinh AI: " + AiSettings.SettingsPath);
+	}
+
+	private void ApplyAiSettingsToUi()
+	{
+		_aiPanelControl?.LoadSettings(_aiSettings);
+	}
+
+	private AiSettings ReadAiSettingsFromUi()
+	{
+		return _aiPanelControl?.ReadSettings() ?? _aiSettings;
+	}
+
+	private void UpdateAnnotationSettingsFromRibbon()
+	{
+		if (_mainRibbon == null)
+		{
+			return;
+		}
+
+		(string fontFamily, double fontSize, bool bold, bool italic, bool underline, Color strokeColor, Color backgroundColor, double opacity) = _mainRibbon.ReadAnnotationSettings();
+		ActiveFontFamily = fontFamily;
+		ActiveFontSize = fontSize;
+		ActiveIsBold = bold;
+		ActiveIsItalic = italic;
+		ActiveIsUnderline = underline;
+		ActiveStrokeColor = strokeColor;
+		ActiveBgColor = backgroundColor;
+		ActiveOpacity = opacity;
+		ApplyStylesToActiveTab();
+	}
+
+	private void FontFamilyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void FontSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void BoldToggle_Click(object sender, RoutedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void ItalicToggle_Click(object sender, RoutedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void UnderlineToggle_Click(object sender, RoutedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void StrokeColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void BgColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void OpacitySpinner_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void ApplyStylesToActiveTab()
+	{
+		GetActiveTab()?.ApplyStylesToActiveAnnotation(ActiveFontFamily, ActiveFontSize, ActiveIsBold, ActiveIsItalic, ActiveIsUnderline, ActiveStrokeColor, ActiveBgColor, ActiveOpacity);
+	}
+
+	private Color ParseColor(string colorName)
+	{
+		try
+		{
+			object obj = ColorConverter.ConvertFromString(colorName);
+			if (obj is Color)
+			{
+				return (Color)obj;
+			}
+		}
+		catch
+		{
+		}
+		return Colors.Red;
+	}
+
+	private void UpdateTabEmptyState()
+	{
+		if (TabEmptyState != null && PdfTabControl != null)
+		{
+			TabEmptyState.Visibility = ((PdfTabControl.Items.Count != 0) ? Visibility.Collapsed : Visibility.Visible);
+		}
+		RefreshRecentFilesDashboard();
+	}
+
+	public void ApplyThemeFromPreferences(bool isDark)
+	{
+		SetTheme(isDark);
+	}
+
+	public void ReloadAiSettings()
+	{
+		_aiSettings = AiSettings.Load();
+		_aiSnapshotRouter = new AiSnapshotRouter(_aiSettings);
+		ApplyAiSettingsToUi();
+	}
+
+	public void RefreshRecentFilesDashboard()
+	{
+		_welcomeDashboard?.SetRecentFiles(RecentFilesService.Load());
+	}
+
+	private void HookDashboardEvents()
+	{
+		if (_welcomeDashboard == null)
+		{
+			return;
+		}
+
+		_welcomeDashboard.OpenRequested += WelcomeDashboard_OpenRequested;
+		_welcomeDashboard.MergeRequested += WelcomeDashboard_MergeRequested;
+		_welcomeDashboard.PrintRequested += WelcomeDashboard_PrintRequested;
+		_welcomeDashboard.AiSnapshotRequested += WelcomeDashboard_AiSnapshotRequested;
+		_welcomeDashboard.SettingsRequested += WelcomeDashboard_SettingsRequested;
+		_welcomeDashboard.OpenRecentRequested += WelcomeDashboard_OpenRecentRequested;
+	}
+
+	private void HookMainRibbonEvents()
+	{
+		if (_mainRibbon == null)
+		{
+			return;
+		}
+
+		_mainRibbon.OpenPdfRequested += OpenPdf_Click;
+		_mainRibbon.SavePdfRequested += SavePdf_Click;
+		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
+		_mainRibbon.ExitRequested += Exit_Click;
+		_mainRibbon.PrintPdfRequested += PrintPdf_Click;
+		_mainRibbon.BatchPrintRequested += BatchPrint_Click;
+		_mainRibbon.ZoomInRequested += ZoomIn_Click;
+		_mainRibbon.ZoomOutRequested += ZoomOut_Click;
+		_mainRibbon.FitWidthRequested += FitWidth_Click;
+		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
+		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
+		_mainRibbon.ToggleSidebarRequested += ToggleSidebar_Click;
+		_mainRibbon.ThemeToggleRequested += ThemeToggle_Click;
+		_mainRibbon.SettingsRequested += Settings_Click;
+		_mainRibbon.MergeFilesRequested += MergeFiles_Click;
+		_mainRibbon.MergeFromExplorerRequested += MergeFromExplorer_Click;
+		_mainRibbon.RotateLeftRequested += RotateLeft_Click;
+		_mainRibbon.RotateLeftAllRequested += RotateLeftAll_Click;
+		_mainRibbon.RotateRightRequested += RotateRight_Click;
+		_mainRibbon.RotateRightAllRequested += RotateRightAll_Click;
+		_mainRibbon.MovePageUpRequested += MovePageUp_Click;
+		_mainRibbon.MovePageDownRequested += MovePageDown_Click;
+		_mainRibbon.ReversePageOrderRequested += ReversePageOrder_Click;
+		_mainRibbon.ResetPageOrderRequested += ResetPageOrder_Click;
+		_mainRibbon.DeletePageRequested += DeletePage_Click;
+		_mainRibbon.InsertBlankPageRequested += InsertBlankPage_Click;
+		_mainRibbon.DuplicatePageRequested += DuplicatePage_Click;
+		_mainRibbon.SplitCurrentPageRequested += SplitCurrentPage_Click;
+		_mainRibbon.ExtractPagesRequested += ExtractPages_Click;
+		_mainRibbon.SelectToolRequested += SelectTool_Click;
+		_mainRibbon.InkToolRequested += InkTool_Click;
+		_mainRibbon.RectToolRequested += RectTool_Click;
+		_mainRibbon.OvalToolRequested += OvalTool_Click;
+		_mainRibbon.LineToolRequested += LineTool_Click;
+		_mainRibbon.TextBoxToolRequested += TextBoxTool_Click;
+		_mainRibbon.CalloutToolRequested += CalloutTool_Click;
+		_mainRibbon.StickyNoteToolRequested += StickyNoteTool_Click;
+		_mainRibbon.SnapshotToolRequested += SnapshotTool_Click;
+		_mainRibbon.AiSnapshotToolRequested += AiSnapshotTool_Click;
+		_mainRibbon.ManualUpdateCheckRequested += ManualUpdateCheck_Click;
+		_mainRibbon.CheckLibrariesRequested += CheckLibraries_Click;
+		_mainRibbon.ActivationRequested += Activation_Click;
+		_mainRibbon.ShowPerformanceTraceRequested += ShowPerformanceTrace_Click;
+		_mainRibbon.AboutRequested += About_Click;
+		_mainRibbon.UserGuideRequested += UserGuide_Click;
+		_mainRibbon.FeedbackRequested += Feedback_Click;
+		_mainRibbon.VirtualPrinterConfigRequested += VirtualPrinterConfig_Click;
+		_mainRibbon.MeasureDistanceToolRequested += MeasureDistanceTool_Click;
+		_mainRibbon.MeasureAreaToolRequested += MeasureAreaTool_Click;
+		_mainRibbon.CalibrateScaleRequested += CalibrateScale_Click;
+		_mainRibbon.HandwriteSignRequested += HandwriteSign_Click;
+		_mainRibbon.StampApproveRequested += StampApprove_Click;
+		_mainRibbon.MeasurementScaleChanged += MeasurementScale_Changed;
+		_mainRibbon.SettingsChanged += MainRibbon_SettingsChanged;
+		_mainRibbon.OpenUrlRequested += OpenUrl;
+	}
+
+	private void MainRibbon_SettingsChanged(object? sender, EventArgs e)
+	{
+		UpdateAnnotationSettingsFromRibbon();
+	}
+
+	private void HookAiPanelEvents()
+	{
+		if (_aiPanelControl == null)
+		{
+			return;
+		}
+
+		_aiPanelControl.CloseRequested += AiPanel_CloseRequested;
+		_aiPanelControl.SettingsChanged += AiPanel_SettingsChanged;
+		_aiPanelControl.CheckAiRequested += AiPanel_CheckAiRequested;
+		_aiPanelControl.SaveAiRequested += AiPanel_SaveAiRequested;
+		_aiPanelControl.OpenUrlRequested += (_, url) => OpenUrl(url);
+	}
+
+	private void EnsureWelcomeDashboardHost()
+	{
+		if (_welcomeDashboard != null || DashboardHostContainer == null)
+		{
+			return;
+		}
+
+		_welcomeDashboard = new WelcomeDashboard();
+		_welcomeDashboard.ApplyTheme(_isDarkMode);
+		DashboardHostContainer.Children.Clear();
+		DashboardHostContainer.Children.Add(_welcomeDashboard);
+	}
+
+	private void EnsureAiPanelHost()
+	{
+		if (_aiPanelControl != null || AiPanelHostContainer == null)
+		{
+			return;
+		}
+
+		_aiPanelControl = new AiPanelControl
+		{
+			Visibility = Visibility.Collapsed
+		};
+		AiPanelHostContainer.Children.Clear();
+		AiPanelHostContainer.Children.Add(_aiPanelControl);
+		HookAiPanelEvents();
+	}
+
+	private void EnsureMainRibbonHost()
+	{
+		if (_mainRibbon != null || RibbonHostContainer == null)
+		{
+			return;
+		}
+
+		_mainRibbon = new MainRibbon();
+		RibbonHostContainer.Children.Clear();
+		RibbonHostContainer.Children.Add(_mainRibbon);
+		HookMainRibbonEvents();
+	}
+
+	private void WelcomeDashboard_OpenRequested(object? sender, EventArgs e)
+	{
+		OpenPdf_Click(this, new RoutedEventArgs());
+	}
+
+	private async void WelcomeDashboard_MergeRequested(object? sender, EventArgs e)
+	{
+		await ShowMergeDialogAsync(null, autoStartMerge: false, sortByName: false, openMergedExternally: false);
+	}
+
+	private void WelcomeDashboard_PrintRequested(object? sender, EventArgs e)
+	{
+		PrintPdf_Click(this, new RoutedEventArgs());
+	}
+
+	private void WelcomeDashboard_AiSnapshotRequested(object? sender, EventArgs e)
+	{
+		AiSnapshotTool_Click(this, new RoutedEventArgs());
+	}
+
+	private void WelcomeDashboard_SettingsRequested(object? sender, EventArgs e)
+	{
+		Settings_Click(this, new RoutedEventArgs());
+	}
+
+	private void WelcomeDashboard_OpenRecentRequested(string path)
+	{
+		OpenPdfTab(path);
+	}
+
+	private void AiPanel_CloseRequested(object? sender, EventArgs e)
+	{
+		CloseAiPanel_Click(sender, new RoutedEventArgs());
+	}
+
+	private void AiPanel_SettingsChanged(object? sender, EventArgs e)
+	{
+		_aiSettings = ReadAiSettingsFromUi();
+	}
+
+	private async void AiPanel_CheckAiRequested(object? sender, EventArgs e)
+	{
+		CheckAi_Click(sender, new RoutedEventArgs());
+	}
+
+	private void AiPanel_SaveAiRequested(object? sender, EventArgs e)
+	{
+		SaveAiSettings_Click(sender, new RoutedEventArgs());
+	}
+
+	private async void ExtractPages_Click(object sender, RoutedEventArgs e)
+	{
+		if (!EnsureActivated())
+		{
+			return;
+		}
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath) || activeTab.PageCount <= 0)
+		{
+			MessageBox.Show("Vui lòng mềEmột file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+			return;
+		}
+		List<int> selectedPages = activeTab.SelectedPageNumbers?.Distinct().ToList() ?? new List<int>();
+		List<int> pagesToKeep;
+		if (selectedPages.Count > 1)
+		{
+			pagesToKeep = selectedPages;
+		}
+		else
+		{
+			string instruction = $"Nhập danh sách trang cần trích xuất từ 1 đến {activeTab.PageCount} (ví dụ: 1;3;5-8):";
+			string text = InputDialog.Show("Trích xuất trang PDF", instruction, $"1-{activeTab.PageCount}");
+			if (string.IsNullOrEmpty(text))
+			{
+				return;
+			}
+			pagesToKeep = ParsePageRange(text, activeTab.PageCount);
+		}
+		if (pagesToKeep.Count == 0)
+		{
+			MessageBox.Show("Danh sách trang cần trích xuất không hợp lềE", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+			return;
+		}
+		SaveFileDialog saveFileDialog = new SaveFileDialog
+		{
+			Filter = "PDF documents (*.pdf)|*.pdf",
+			Title = "Lưu file PDF trích xuất",
+			FileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_trich_xuat.pdf"
+		};
+		if (saveFileDialog.ShowDialog() == true)
+		{
+			string outputPath = saveFileDialog.FileName;
+			LogStatus("Đang trích xuất trang...");
+			string pagesSemicolon = string.Join(";", pagesToKeep);
+			string sourcePath = activeTab.CurrentPdfPath;
+			if (await Task.Run(() => extract_pdf_pages(sourcePath, pagesSemicolon, outputPath)))
+			{
+				MessageBox.Show($"Trích xuất {pagesToKeep.Count} trang thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				LogStatus("Đã lưu PDF trích xuất: " + Path.GetFileName(outputPath));
+				OpenPdfTab(outputPath);
+			}
+			else
+			{
+				MessageBox.Show("Không thềEtrích xuất trang PDF. Vui lòng kiểm tra lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				LogStatus("Trích xuất thất bại");
+			}
+		}
+	}
+
+	public static List<int> ParsePageRange(string rangeStr, int maxPage)
+	{
+		HashSet<int> hashSet = new HashSet<int>();
+		string[] array = rangeStr.Split(new char[3] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+		for (int i = 0; i < array.Length; i++)
+		{
+			string text = array[i].Trim();
+			int result3;
+			if (text.Contains('-'))
+			{
+				string[] array2 = text.Split('-');
+				if (array2.Length != 2 || !int.TryParse(array2[0], out var result) || !int.TryParse(array2[1], out var result2))
+				{
+					continue;
+				}
+				int num = Math.Min(result, result2);
+				int num2 = Math.Max(result, result2);
+				for (int j = num; j <= num2; j++)
+				{
+					if (j >= 1 && j <= maxPage)
+					{
+						hashSet.Add(j);
+					}
+				}
+			}
+			else if (int.TryParse(text, out result3) && result3 >= 1 && result3 <= maxPage)
+			{
+				hashSet.Add(result3);
+			}
+		}
+		return hashSet.OrderBy((int p) => p).ToList();
+	}
+}

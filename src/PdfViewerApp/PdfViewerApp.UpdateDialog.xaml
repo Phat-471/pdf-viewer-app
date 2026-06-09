@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="PdfViewerApp.UpdateDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Cập Nhật Phần Mềm PDF Pro" Width="520" Height="400" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma, Helvetica" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
+  <FrameworkElement.Resources>
+    <ResourceDictionary>
+      <Style x:Key="PremiumButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="8" Padding="16,10">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#4F46E5" Offset="0.0" />
+                    <GradientStop Color="#06B6D4" Offset="1.0" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.9" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.8" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                  <Setter TargetName="Border" Property="Border.Background" Value="#334155" />
+                  <Setter Property="Foreground" Value="#64748B" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style x:Key="SecondaryButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#94A3B8" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="8" BorderThickness="1.5" BorderBrush="#334155" Background="#00FFFFFF" Padding="14,8">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="Border.BorderBrush" Value="#475569" />
+                  <Setter Property="Foreground" Value="#F8FAFC" />
+                  <Setter TargetName="Border" Property="Border.Background" Value="#1E293B" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="Border.Background" Value="#0F172A" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                  <Setter TargetName="Border" Property="Border.BorderBrush" Value="#1E293B" />
+                  <Setter Property="Foreground" Value="#475569" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style x:Key="ModernProgressBar" TargetType="{x:Type ProgressBar}">
+        <Setter Property="Foreground" Value="#38BDF8" />
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type ProgressBar}">
+              <Grid Name="TemplateRoot">
+                <Border CornerRadius="6" Background="{TemplateBinding Control.Background}" BorderThickness="{TemplateBinding Control.BorderThickness}" />
+                <Border Name="PART_Indicator" CornerRadius="6" HorizontalAlignment="Left" Background="{TemplateBinding Control.Foreground}" />
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+    </ResourceDictionary>
+  </FrameworkElement.Resources>
+  <Grid>
+    <Panel.Background>
+      <RadialGradientBrush Center="0.5,0" RadiusX="0.8" RadiusY="0.8">
+        <GradientStop Color="#1E1B4B" Offset="0" />
+        <GradientStop Color="#0F172A" Offset="1" />
+      </RadialGradientBrush>
+    </Panel.Background>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <Border Grid.Row="0" Height="4" VerticalAlignment="Top">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+          <GradientStop Color="#4F46E5" Offset="0.0" />
+          <GradientStop Color="#A855F7" Offset="0.5" />
+          <GradientStop Color="#06B6D4" Offset="1.0" />
+        </LinearGradientBrush>
+      </Border.Background>
+    </Border>
+    <StackPanel Grid.Row="0" Margin="24,24,24,12">
+      <TextBlock Text="PHÁT HIỆN BẢN CẬP NHẬT MỚI" FontSize="20" FontWeight="Black" Foreground="#FFFFFFFF">
+        <UIElement.Effect>
+          <DropShadowEffect Color="#38BDF8" BlurRadius="8" Opacity="0.3" ShadowDepth="0" />
+        </UIElement.Effect>
+      </TextBlock>
+      <TextBlock Name="VersionInfoTextBlock" Text="Một phiên bản mới của PDF Pro đã sẵn sàng để tải về." FontSize="13" Foreground="#94A3B8" Margin="0,4,0,0" />
+      <TextBlock Text="Bản hiện tại sẽ được sao lưu trước khi cài để có thể tự động quay lui nếu bản mới không khởi động được." FontSize="12" Foreground="#38BDF8" Margin="0,6,0,0" TextWrapping="Wrap" />
+    </StackPanel>
+    <Grid Row="1" Margin="24,0,24,16">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Border Grid.Row="0" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Padding="12">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="NỘI DUNG CẬP NHẬT" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" Margin="0,0,0,8" />
+          <TextBox Name="ChangelogTextBox" Grid.Row="1" IsReadOnly="True" Background="#00FFFFFF" Foreground="#F1F5F9" BorderThickness="0" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" FontSize="13" />
+        </Grid>
+      </Border>
+      <StackPanel Name="ProgressPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
+        <Grid Margin="0,0,0,6">
+          <TextBlock Name="StatusTextBlock" Text="Đang tải xuống bản cập nhật..." FontSize="12" Foreground="#94A3B8" />
+          <TextBlock Name="PercentTextBlock" Text="0%" FontSize="12" Foreground="#38BDF8" FontWeight="Bold" HorizontalAlignment="Right" />
+        </Grid>
+        <ProgressBar Name="DownloadProgressBar" Style="{StaticResource ModernProgressBar}" Minimum="0" Maximum="100" Value="0" />
+      </StackPanel>
+    </Grid>
+    <Border Grid.Row="2" Background="#0B0F19" BorderBrush="#1E293B" BorderThickness="0,1,0,0" Padding="24,16">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="1" Orientation="Horizontal">
+          <Button Name="LaterButton" Content="Để sau" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,12,0" Click="Later_Click" />
+          <Button Name="UpdateButton" Content="Cập nhật ngay" Style="{StaticResource PremiumButton}" Width="150" IsDefault="True" Click="Update_Click" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

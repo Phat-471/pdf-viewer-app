@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <AssemblyName>PdfViewerApp</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>True</UseWPF>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>11.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="PdfViewerApp.App.xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="assets\hphat_logo_1780279208636.png" />
+    <EmbeddedResource Include="assets\hphat_logo_1780279208636.png" LogicalName="assets/hphat_logo_1780279208636.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Fluent">
+      <HintPath>Fluent.dll</HintPath>
+    </Reference>
+    <Reference Include="ControlzEx">
+      <HintPath>ControlzEx.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
