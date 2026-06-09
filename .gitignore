@@ -30,6 +30,7 @@ publish/
 /releases/
 /backups/
 /crash.log
+/_smoke/
 
 # Compiled libraries (we compile pdf_core.dll from Rust)
 libs/pdf_core.dll
