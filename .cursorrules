@@ -1,0 +1,26 @@
+# Rules for Cursor / VS Code Copilot / AI Assistants on PDF Pro project
+
+You MUST follow these rules at all times. Do not wait for the user to remind you.
+
+## Auto-Update & Git Workflow Rule
+
+Whenever you finish modifying the codebase (adding features, fixing bugs, or updating files):
+1. **Automatically bump the version in VERSION.txt**:
+   - Read the current version from `VERSION.txt`.
+   - By default, bump the Patch version (e.g. `1.2.2` -> `1.2.3`). If it is a major feature/refactoring, bump the Minor version (e.g. `1.2.2` -> `1.3.0`).
+   - Write the new version back to `VERSION.txt`.
+2. **Update CHANGELOG.txt**:
+   - Replace the content of `CHANGELOG.txt` with a clear, bullet-pointed summary of the changes you just made.
+3. **Compile & Package**:
+   - Run the packaging script to verify compile and update `AssemblyInfo.cs` and `update-manifest.json`:
+     `powershell .\package_project.ps1`
+4. **Git Commit & Tag & Push**:
+   - Run git commands to commit all changes, tag the commit with the new version, and push:
+     ```powershell
+     git add .
+     git commit -m "Update: [Brief summary] - Version v[New Version]"
+     git tag "v[New Version]"
+     git push origin master
+     git push origin "v[New Version]"
+     ```
+     *(Pushing the tag is critical because it triggers the GitHub Actions CI/CD to build and publish the release to the update server).*

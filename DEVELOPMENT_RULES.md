@@ -55,3 +55,39 @@ Mỗi khi hoàn thành công việc sửa đổi mã nguồn:
 1.  **Kiểm tra biên dịch:** Chạy file kịch bản `build_project.ps1` để đảm bảo hệ thống không có bất kỳ lỗi biên dịch nào.
 2.  **Chạy thử nghiệm:** Thực hiện chạy kiểm thử thông qua `run_test.bat` để đảm bảo các chức năng hoạt động đúng mong muốn.
 3.  **Tự động đóng gói:** Chạy file kịch bản `package_project.ps1` để biên dịch gói Rust Core dạng Release, xuất bản WPF Client ở dạng tự chạy độc lập (Self-contained win-x64), nén thành file ZIP trong thư mục `releases/` và tự động cập nhật mã hash SHA-256 vào tệp `update-manifest.json`.
+
+---
+
+## 5. Quy trình Tự động Cập nhật Phiên bản và Git (Auto-Update & Git Workflow)
+
+> [!IMPORTANT]
+> **Yêu cầu bắt buộc đối với tất cả Trợ lý Lập trình AI (AI Agents như Codex/Claude Code, Antigravity, Cursor):**
+> Sau khi kết thúc bất kỳ thay đổi nào liên quan đến mã nguồn (tính năng mới hoặc sửa lỗi), AI Agent **PHẢI** tự động thực hiện quy trình sau mà không cần người dùng nhắc nhở:
+>
+> 1. **Tự động tăng số phiên bản (Auto-Bump Version):**
+>    - Đọc file [VERSION.txt](file:///e:/code/pdf/VERSION.txt) hiện tại.
+>    - Tăng số phiên bản Patch (Ví dụ: `1.2.2` -> `1.2.3`). Nếu thay đổi lớn hoặc thêm tính năng mới đáng kể thì tăng Minor version và reset Patch về 0 (Ví dụ: `1.2.2` -> `1.3.0`).
+>    - Ghi phiên bản mới vào [VERSION.txt](file:///e:/code/pdf/VERSION.txt).
+> 
+> 2. **Cập nhật CHANGELOG.txt:**
+>    - Viết nội dung thay đổi chi tiết dưới dạng danh sách gạch đầu dòng vào [CHANGELOG.txt](file:///e:/code/pdf/CHANGELOG.txt). (Lưu ý: Chỉ ghi nội dung thay đổi của phiên bản mới này, ghi đè hoặc ghi đè toàn bộ tệp bằng các thay đổi mới nhất này để công cụ đóng gói đọc chính xác).
+> 
+> 3. **Biên dịch & Đóng gói Thử nghiệm:**
+>    - Chạy kịch bản `.\package_project.ps1` trên PowerShell để tự động đồng bộ phiên bản vào `AssemblyInfo.cs` và đóng gói thử nghiệm nhằm phát hiện lỗi biên dịch.
+> 
+> 4. **Tự động Commit & Push lên Git:**
+>    - Thực hiện lưu trữ tất cả tệp thay đổi và tệp manifest cập nhật:
+>      ```powershell
+>      git add .
+>      git commit -m "Update: [Tóm tắt thay đổi] - Phiên bản v[Phiên bản mới]"
+>      ```
+>    - Tạo thẻ Git Tag mới khớp với phiên bản vừa tăng:
+>      ```powershell
+>      git tag "v[Phiên bản mới]"
+>      ```
+>    - Đẩy mã nguồn và thẻ tag lên kho chứa từ xa (GitHub):
+>      ```powershell
+>      git push origin master
+>      git push origin "v[Phiên bản mới]"
+>      ```
+>      *(Việc đẩy tag `v*` sẽ tự động kích hoạt tiến trình GitHub Actions CI/CD để xây dựng ứng dụng và phát hành bản cập nhật lên máy chủ bản quyền WordPress).*

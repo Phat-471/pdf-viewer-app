@@ -1,6 +1,1 @@
-- Tối ưu hóa giải phóng RAM khi in số lượng lớn trang tài liệu.
-- Thiết kế giao diện trang quản lý tối màu (Dark Mode) đồng bộ.
-- Chống co rút hiển thị các cột bảng trên trang quản lý.
-- Hỗ trợ cơ chế xác thực Bản quyền Ngoại tuyến (Offline) chu kỳ 7-15 ngày.
-- Đặt mặc định cho phép mở nhiều cửa sổ ứng dụng đồng thời.
-- Sửa các lỗi chính tả tiếng Việt trên ứng dụng và bảng điều khiển.
+- Thiết lập cơ chế tự động tăng phiên bản và đẩy git cho AI Agent qua .cursorrules, .clauderules và DEVELOPMENT_RULES.md.
