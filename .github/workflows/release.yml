@@ -66,6 +66,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Notify WordPress Licensing Server
+      continue-on-error: true
       shell: pwsh
       env:
         SITE_URL: ${{ secrets.PDFPRO_UPDATE_SITE_URL }}
@@ -96,17 +97,36 @@ jobs:
         Write-Host "Sending update publish notification to: $apiUrl"
         Write-Host "Download URL will be: $downloadUrl"
         
-        try {
-            $jsonBody = $body | ConvertTo-Json -Depth 4
-            $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $jsonBody -ContentType "application/json" -ErrorAction Stop
-            Write-Host "WordPress Server Response:"
-            $response | ConvertTo-Json | Write-Host
-        } catch {
-            Write-Error "Failed to update WordPress Server: $_"
-            if ($_.Exception.Response) {
-                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-                $responseBody = $reader.ReadToEnd()
-                Write-Error "Server response body: $responseBody"
+        $jsonBody = $body | ConvertTo-Json -Depth 4
+        $maxRetries = 3
+        $success = $false
+        
+        for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
+            Write-Host "Attempt $attempt of $maxRetries..."
+            try {
+                $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $jsonBody -ContentType "application/json" -TimeoutSec 30 -ErrorAction Stop
+                Write-Host "WordPress Server Response:"
+                $response | ConvertTo-Json | Write-Host
+                $success = $true
+                break
+            } catch {
+                Write-Warning "Attempt $attempt failed: $_"
+                if ($_.Exception.Response) {
+                    try {
+                        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                        $responseBody = $reader.ReadToEnd()
+                        Write-Warning "Server response body: $responseBody"
+                    } catch { }
+                }
+                if ($attempt -lt $maxRetries) {
+                    $delay = $attempt * 10
+                    Write-Host "Waiting $delay seconds before retry..."
+                    Start-Sleep -Seconds $delay
+                }
             }
+        }
+        
+        if (-not $success) {
+            Write-Warning "Failed to notify WordPress server after $maxRetries attempts. The GitHub Release was created successfully - you can update the WordPress server manually."
             exit 1
         }
