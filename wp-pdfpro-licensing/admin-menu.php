@@ -825,6 +825,20 @@ function pdfpro_licensing_render_updates_page() {
                                 </td>
                             </tr>
                             <tr>
+                                <th scope="row"><label><strong>Publish Token (GitHub Secret):</strong></label></th>
+                                <td>
+                                    <?php 
+                                    $pub_token = defined('PDFPRO_PUBLISH_TOKEN') ? PDFPRO_PUBLISH_TOKEN : get_option('pdfpro_publish_token', '');
+                                    if (empty($pub_token)) {
+                                        $pub_token = wp_generate_password(32, false);
+                                        update_option('pdfpro_publish_token', $pub_token);
+                                    }
+                                    ?>
+                                    <input type="text" readonly value="<?php echo esc_attr($pub_token); ?>" class="large-text code" style="width: 100%; background: #1a202c; color: #a0aec0; border: 1px solid #4a5568; padding: 8px;" onclick="this.select();">
+                                    <p class="description">Sao chép mã Token này để điền vào biến <code>PDFPRO_PUBLISH_TOKEN</code> trong mục Secrets trên GitHub.</p>
+                                </td>
+                            </tr>
+                            <tr>
                                 <th scope="row"><label for="pdfpro_latest_version"><strong>Phiên bản mới nhất (Latest Version):</strong></label></th>
                                 <td>
                                     <input type="text" id="pdfpro_latest_version" name="pdfpro_latest_version" value="<?php echo esc_attr($latest_version); ?>" class="regular-text" placeholder="Ví dụ: 1.0.2">
