@@ -1537,52 +1537,22 @@ exit 0
 
 	private void UserGuide_Click(object sender, RoutedEventArgs e)
 	{
-		string guideText = @"=== HƯỚNG DẪN SỬ DỤNG PDF PRO - HPHAT EDITION ===
-
-1. ĐỌC & XEM FILE PDF
-   - Nhấp đúp chuột vào tệp PDF bất kỳ trong Windows Explorer hoặc kéo thả tệp vào cửa sổ ứng dụng để mở nhanh.
-   - Sử dụng phím tắt [Ctrl + Cuộn chuột] để phóng to / thu nhỏ mượt mà từ 10% đến 1000%.
-   - Chọn chế độ ""Độ Rộng"" để trang tự động giãn vừa khít chiều ngang màn hình.
-   - Nhấn nút ""Tối / Sáng"" trên thanh Ribbon để chuyển đổi giao diện toàn diện (Night Mode bảo vệ mắt ban đêm).
-
-2. BIÊN TẬP & SẮP XẾP TRANG (Thao tác trên Sidebar Trái)
-   - Bật / Ẩn Sidebar trái bằng nút ""Ẩn/Hiện Sidebar"" hoặc phím tắt [F4].
-   - Click chuột phải vào Thumbnail (Hình thu nhỏ) các trang để thực hiện nhanh:
-     + Xoay Trái 90° / Xoay Phải 90° (Hỗ trợ xoay trang hiện tại hoặc xoay toàn bộ trang bản vẽ).
-     + Di chuyển trang Lên / Xuống để thay đổi thứ tự.
-     + Nhân bản trang (Duplicate) hoặc xóa các trang lỗi.
-     + Chèn trang trống ở trước/sau vị trí hiện tại.
-
-3. GHÉP TỆP PDF SIÊU TỐC
-   - Cách 1: Trên thanh Ribbon ""Trang Chủ"" -> chọn ""Ghép Nhiều File"" hoặc ""Chọn Nhiều File & Ghép"".
-   - Cách 2 (Khuyên dùng): Chọn nhiều tệp PDF trong Windows Explorer, click chuột phải và chọn ""Ghép PDF bằng PDF HPhat"". Ứng dụng tự động sắp xếp tên tự nhiên, gộp file nhị phân siêu tốc và mở tệp kết quả.
-
-4. MÁY IN ẢO & IN ẤN BẢN VẼ LỚN (A3/A4)
-   - Khi in từ AutoCAD, Revit, Word, Excel hoặc trình duyệt: Chọn máy in ""PDF Pro - HPhat Edition"" để lưu/xuất file PDF chất lượng cao. Bản vẽ sẽ tự động được mở trực tiếp trên PDF Pro.
-   - In ấn trực tiếp từ ứng dụng: Hỗ trợ in Native Vector sắc nét, không nhòe, tự động xoay khổ giấy nằm ngang/dọc tương ứng với bản vẽ.
-
-5. AI SNAPSHOT (TRỢ LÝ AI)
-   - Chọn công cụ ""AI Snapshot"" tại tab ""Định Dạng Chú Thích"".
-   - Quét chọn vùng bản vẽ/văn bản cần phân tích.
-   - Trợ lý AI (Gemini/OpenAI/Ollama) sẽ giúp bạn tóm tắt, giải thích bản vẽ hoặc dịch nghĩa ngay lập tức.";
-
-		ShowReportWindow("Hướng Dẫn Sử Dụng - PDF Pro", guideText);
+		SupportGuideWindow supportGuideWindow = new SupportGuideWindow(selectFeedbackTab: false);
+		if (base.IsLoaded && base.IsVisible)
+		{
+			supportGuideWindow.Owner = this;
+		}
+		supportGuideWindow.ShowDialog();
 	}
 
 	private void Feedback_Click(object sender, RoutedEventArgs e)
 	{
-		string info = @"=== LIÊN HỆ HỖ TRỢ & BÁO LỖI ===
-
-Cảm ơn bạn đã tin tưởng sử dụng PDF Pro - HPhat Edition!
-
-Mọi thắc mắc, phản hồi hoặc báo cáo sự cố, vui lòng liên hệ:
-- Email hỗ trợ: [EMAIL_ADDRESS]
-- Hotline kỹ thuật: 0974194305
-- Phiên bản hiện tại: v1.0.19
-
-Khi báo lỗi, vui lòng đính kèm file PDF bị lỗi và mô tả các bước thực hiện để chúng tôi hỗ trợ xử lý nhanh nhất.";
-
-		MessageBox.Show(info, "Phản Hồi & Báo Lỗi - PDF Pro", MessageBoxButton.OK, MessageBoxImage.Information);
+		SupportGuideWindow supportGuideWindow = new SupportGuideWindow(selectFeedbackTab: true);
+		if (base.IsLoaded && base.IsVisible)
+		{
+			supportGuideWindow.Owner = this;
+		}
+		supportGuideWindow.ShowDialog();
 	}
 
 	private void VirtualPrinterConfig_Click(object sender, RoutedEventArgs e)

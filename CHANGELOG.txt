@@ -1,2 +1,2 @@
-- Tối ưu hóa hiệu năng in ấn song song (Parallel Printing) sử dụng Bounded Rendering Queue.
-- Giảm tải đỉnh bộ nhớ RAM bằng cách giải phóng tài liệu PDFium sớm và thu hồi LOH.
+- Thiết kế lại toàn diện giao diện Hướng dẫn sử dụng & Phản hồi báo lỗi thành SupportGuideWindow.
+- Hỗ trợ giao diện tối mắt Radial Gradient sang trọng, liên kết Zalo/Hotline tiện lợi.

@@ -1,0 +1,278 @@
+<Window x:Class="PdfViewerApp.SupportGuideWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Hướng Dẫn &amp; Hỗ Trợ - PDF Pro"
+        Width="750" Height="580"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#0F172A"
+        Foreground="#F8FAFC"
+        FontFamily="Segoe UI, Tahoma, Helvetica">
+    <FrameworkElement.Resources>
+        <ResourceDictionary>
+            <Style x:Key="PrimaryButton" TargetType="{x:Type Button}">
+                <Setter Property="Foreground" Value="#FFFFFFFF" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border Name="Border" CornerRadius="8" Padding="20,10">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#0F766E" Offset="0.0" />
+                                        <GradientStop Color="#06B6D4" Offset="1.0" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.92" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.84" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="SecondaryButton" TargetType="{x:Type Button}">
+                <Setter Property="Foreground" Value="#94A3B8" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border Name="Border" CornerRadius="8" BorderThickness="1.5" BorderBrush="#334155" Background="#00FFFFFF" Padding="14,8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Border.BorderBrush" Value="#475569" />
+                                    <Setter Property="Foreground" Value="#F8FAFC" />
+                                    <Setter TargetName="Border" Property="Border.Background" Value="#1E293B" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="Border.Background" Value="#0F172A" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="CardStyle" TargetType="{x:Type Border}">
+                <Setter Property="Background" Value="#111827" />
+                <Setter Property="BorderBrush" Value="#1E293B" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Margin" Value="0,0,0,14" />
+            </Style>
+
+            <Style x:Key="SectionHeader" TargetType="{x:Type TextBlock}">
+                <Setter Property="Foreground" Value="#38BDF8" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="FontWeight" Value="Bold" />
+                <Setter Property="Margin" Value="0,0,0,10" />
+            </Style>
+
+            <!-- Custom styling for TabControl to fit Dark Mode -->
+            <Style TargetType="{x:Type TabControl}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+
+            <Style TargetType="{x:Type TabItem}">
+                <Setter Property="Foreground" Value="#94A3B8" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="20,10" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type TabItem}">
+                            <Border Name="Border" BorderThickness="0,0,0,3" BorderBrush="Transparent" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Border" Property="BorderBrush" Value="#06B6D4" />
+                                    <Setter Property="Foreground" Value="#F8FAFC" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="#F8FAFC" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </FrameworkElement.Resources>
+
+    <Grid>
+        <Panel.Background>
+            <RadialGradientBrush Center="0.5,0" RadiusX="0.85" RadiusY="0.85">
+                <GradientStop Color="#1E1B4B" Offset="0" />
+                <GradientStop Color="#0F172A" Offset="1" />
+            </RadialGradientBrush>
+        </Panel.Background>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Top visual accent line -->
+        <Border Grid.Row="0" Height="4" VerticalAlignment="Top">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#0F766E" Offset="0.0" />
+                    <GradientStop Color="#06B6D4" Offset="0.5" />
+                    <GradientStop Color="#38BDF8" Offset="1.0" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- Title / Header Area -->
+        <Grid Grid.Row="1" Margin="24,20,24,0">
+            <StackPanel>
+                <TextBlock Text="PDF PRO WORKSPACE" FontSize="26" FontWeight="Black" Foreground="#F8FAFC">
+                    <UIElement.Effect>
+                        <DropShadowEffect Color="#38BDF8" BlurRadius="8" Opacity="0.25" ShadowDepth="0" />
+                    </UIElement.Effect>
+                </TextBlock>
+                <TextBlock Text="Trung tâm Hướng dẫn &amp; Hỗ trợ Khách hàng - HPhat Edition" FontSize="13" Foreground="#94A3B8" Margin="0,4,0,10" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Tab control for Navigation -->
+        <TabControl Name="MainTabControl" Grid.Row="2" Margin="24,0,24,12">
+            <TabItem Name="GuideTab" Header="Hướng Dẫn Sử Dụng">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <StackPanel Margin="0,0,10,0">
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="1. Đọc &amp; Xem File PDF" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="• Nhấp đúp chuột vào tệp PDF bất kỳ trong Windows Explorer hoặc kéo thả tệp vào cửa sổ để mở nhanh.&#x0a;• Sử dụng [Ctrl + Cuộn chuột] hoặc click đúp để phóng to/thu nhỏ mượt mà từ 10% đến 1000%.&#x0a;• Chọn chế độ 'Độ Rộng' để trang giãn vừa khít chiều ngang màn hình.&#x0a;• Nhấn nút 'Tối/Sáng' trên thanh Ribbon để chuyển đổi giao diện Night Mode bảo vệ mắt."
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="2. Biên Tập &amp; Sắp Xếp Trang (Sidebar Trái)" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="• Bật/Ẩn Sidebar bằng nút 'Ẩn/Hiện Sidebar' hoặc nhấn phím [F4].&#x0a;• Click chuột phải vào Thumbnail (Hình thu nhỏ) các trang để:&#x0a;  - Xoay Trái 90° / Xoay Phải 90° (Hỗ trợ xoay trang hiện tại hoặc toàn bộ bản vẽ).&#x0a;  - Di chuyển trang Lên / Xuống để sắp xếp thứ tự.&#x0a;  - Nhân bản trang (Duplicate) hoặc Xóa trang lỗi.&#x0a;  - Chèn trang trống trước/sau vị trí hiện tại."
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="3. Ghép Tệp PDF Siêu Tốc" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="• Cách 1: Trên thanh Ribbon 'Trang Chủ' -> Chọn 'Ghép Nhiều File' hoặc 'Chọn Nhiều File &amp; Ghép'.&#x0a;• Cách 2 (Nhanh nhất): Chọn nhiều tệp PDF trong Windows Explorer, click chuột phải và chọn 'Ghép PDF bằng PDF HPhat'. Ứng dụng tự động sắp xếp tên tự nhiên, ghép file siêu tốc và mở ngay kết quả."
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="4. Máy In Ảo &amp; In Ấn Bản Vẽ Lớn (A3/A4)" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="• Khi in từ AutoCAD, Revit, Word, Excel hoặc trình duyệt: Chọn máy in 'PDF Pro - HPhat Edition' để xuất file PDF chất lượng cao. Bản vẽ tự động mở trực tiếp trên PDF Pro.&#x0a;• In ấn từ ứng dụng: Tách luồng in ngầm (Parallel Printing) hiệu suất cao, tự động xoay khổ ngang/dọc, tự động căn giữa bản vẽ cực kỳ chính xác."
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="5. AI Snapshot (Trợ Lý AI)" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="• Chọn công cụ 'AI Snapshot' tại tab 'Định Dạng Chú Thích'.&#x0a;• Quét chọn vùng bản vẽ hoặc văn bản cần phân tích.&#x0a;• Trợ lý AI (Gemini/OpenAI/Ollama) sẽ tự động nhận diện chữ, tóm tắt, giải thích bản vẽ hoặc dịch nghĩa ngay lập tức."
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Name="FeedbackTab" Header="Phản Hồi &amp; Báo Lỗi">
+                <Grid Margin="0,15,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Hotline Kỹ Thuật &amp; Zalo" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="Để hỗ trợ nhanh nhất qua điện thoại hoặc nhắn tin Zalo, xin vui lòng liên hệ:" Foreground="#CBD5E1" FontSize="13" Margin="0,0,0,10" />
+                                <TextBlock FontSize="15" FontWeight="Bold" Foreground="#38BDF8">
+                                    <Hyperlink NavigateUri="https://zalo.me/0974194305" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#38BDF8" TextDecorations="None">
+                                        📞 Hotline/Zalo: 0974194305
+                                    </Hyperlink>
+                                </TextBlock>
+                                <TextBlock Text="Giờ làm việc: 24/7 (Cả ngày lễ và Chủ Nhật)" Foreground="#64748B" FontSize="11" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="Email Hỗ Trợ" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="Gửi thư đóng góp ý kiến hoặc phản ánh dịch vụ trực tiếp:" Foreground="#CBD5E1" FontSize="13" Margin="0,0,0,10" />
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#A5F3FC">
+                                    <Hyperlink NavigateUri="mailto:cskh@hongmien.vn" RequestNavigate="Hyperlink_RequestNavigate" Foreground="#A5F3FC" TextDecorations="None">
+                                        ✉ Email: cskh@hongmien.vn
+                                    </Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                        <Border Style="{StaticResource CardStyle}" Height="348">
+                            <StackPanel>
+                                <TextBlock Text="Hướng Dẫn Báo Cáo Sự Cố" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Text="Khi gặp lỗi hoặc sự cố kỹ thuật trong quá trình xử lý file PDF, vui lòng thực hiện các bước sau để kỹ thuật hỗ trợ nhanh nhất:" Foreground="#CBD5E1" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                <TextBlock Text="1. Chuẩn bị file PDF bị lỗi (nếu có).&#x0a;2. Chụp màn hình thông báo lỗi hiển thị trên ứng dụng.&#x0a;3. Mô tả ngắn gọn các bước bạn đã thao tác trước khi xảy ra lỗi.&#x0a;4. Gửi các thông tin trên qua Zalo (0974194305) hoặc Email (cskh@hongmien.vn)." 
+                                           Foreground="#CBD5E1" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
+                                <Border Background="#0B1220" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,15,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="Thông tin phiên bản ứng dụng:" Foreground="#94A3B8" FontSize="11" FontWeight="Bold" />
+                                        <TextBlock Name="VersionTextBlock" Text="Phiên bản: v1.2.4 (HPhat Edition)" Foreground="#F8FAFC" FontSize="12" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Bottom Actions Panel -->
+        <Border Grid.Row="3" Background="#0B0F19" BorderBrush="#1E293B" BorderThickness="0,1,0,0" Padding="24,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center" Foreground="#64748B" FontSize="12">
+                    <Run Text="PDF Pro Workspace" />
+                    <Run Text=" · " />
+                    <Run Text="HPhat Edition" />
+                    <Run Text=" · " />
+                    <Run Text="Hỗ trợ khách hàng chuyên nghiệp" />
+                </TextBlock>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="Zalo Hỗ Trợ" Style="{StaticResource SecondaryButton}" Width="130" Margin="0,0,12,0" Click="ZaloSupport_Click" />
+                    <Button Content="Đóng" Style="{StaticResource PrimaryButton}" Width="100" IsDefault="True" IsCancel="True" Click="Close_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
