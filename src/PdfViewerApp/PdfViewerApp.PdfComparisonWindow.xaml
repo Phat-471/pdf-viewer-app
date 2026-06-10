@@ -1,0 +1,171 @@
+<Window x:Class="PdfViewerApp.PdfComparisonWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="So Sánh Hai Tài Liệu PDF" Height="768" Width="1200"
+        WindowStartupLocation="CenterOwner"
+        Background="#0F172A"
+        Loaded="Window_Loaded">
+    <Window.Resources>
+        <!-- Custom Styles for Premium UI -->
+        <Style TargetType="Button" x:Key="ModernButton">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#334155"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ToggleButton" x:Key="ModernToggleButton">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#0EA5E9"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#334155"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Top Toolbar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Main Content Area -->
+            <RowDefinition Height="*"/>
+            <!-- Bottom Status Bar -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Toolbar Panel -->
+        <Border Grid.Row="0" Background="#1E293B" Padding="12,8" BorderBrush="#334155" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Grid.Column="0" VerticalAlignment="Center">
+                    <!-- File A Selector -->
+                    <Button Style="{StaticResource ModernButton}" Content="Chọn File A (Bản Cũ)..." Click="SelectFileA_Click" Background="#312E81"/>
+                    <TextBlock x:Name="FileATextBlock" Text="Chưa chọn file A" Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,24,0" TextTrimming="CharacterEllipsis" MaxWidth="300"/>
+
+                    <!-- File B Selector -->
+                    <Button Style="{StaticResource ModernButton}" Content="Chọn File B (Bản Mới)..." Click="SelectFileB_Click" Background="#065F46"/>
+                    <TextBlock x:Name="FileBTextBlock" Text="Chưa chọn file B" Foreground="#94A3B8" VerticalAlignment="Center" Margin="8,0,24,0" TextTrimming="CharacterEllipsis" MaxWidth="300"/>
+
+                    <!-- Separation -->
+                    <Rectangle Width="1" Height="24" Fill="#334155" Margin="0,0,16,0"/>
+
+                    <!-- Controls -->
+                    <ToggleButton Name="SyncScrollToggle" Style="{StaticResource ModernToggleButton}" Content="Đồng bộ cuộn" IsChecked="True" Checked="SyncScroll_Toggled" Unchecked="SyncScroll_Toggled"/>
+
+                    <TextBlock Text="Chế độ:" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="16,0,8,0" FontWeight="SemiBold"/>
+                    <ComboBox Name="CompareModeCombo" Width="150" Height="30" SelectedIndex="0" SelectionChanged="CompareMode_SelectionChanged" Background="#0F172A" Foreground="#F8FAFC" BorderBrush="#334155">
+                        <ComboBoxItem Content="Song Song (Side-by-Side)"/>
+                        <ComboBoxItem Content="Chồng ảnh (Overlay Diff)"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Page Navigation controls -->
+                <StackPanel Orientation="Horizontal" Grid.Column="1" VerticalAlignment="Center">
+                    <Button Style="{StaticResource ModernButton}" Content="◀" Click="PrevPage_Click" Padding="8,4"/>
+                    <TextBlock Name="PageNumberTextBlock" Text="Trang 1 / 1" Foreground="#F8FAFC" VerticalAlignment="Center" Margin="8,0" FontWeight="Bold"/>
+                    <Button Style="{StaticResource ModernButton}" Content="▶" Click="NextPage_Click" Padding="8,4"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1" Background="#0B0F19">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Name="ColumnA" Width="*"/>
+                <ColumnDefinition Name="ColumnSplitter" Width="Auto"/>
+                <ColumnDefinition Name="ColumnB" Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- File A Viewer -->
+            <ScrollViewer Name="ScrollA" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" ScrollChanged="ScrollA_ScrollChanged">
+                <Grid Background="#1E293B" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Image Name="ImageA" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Name="PlaceholderTextA" Text="Vui lòng chọn File A để bắt đầu" Foreground="#64748B" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40"/>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Column Splitter -->
+            <GridSplitter Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Stretch" Width="4" Background="#334155" ResizeBehavior="PreviousAndNext"/>
+
+            <!-- File B Viewer -->
+            <ScrollViewer Name="ScrollB" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" ScrollChanged="ScrollB_ScrollChanged">
+                <Grid Background="#1E293B" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Image Name="ImageB" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Name="PlaceholderTextB" Text="Vui lòng chọn File B để bắt đầu" Foreground="#64748B" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40"/>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Overlay Viewer (Displays compared diff image, covers the whole viewer when active) -->
+            <ScrollViewer Name="ScrollOverlay" Grid.Column="0" Grid.ColumnSpan="3" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <Grid Background="#1E293B" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Image Name="ImageOverlay" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <!-- Color legend overlay -->
+                    <Border Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="4" Padding="10" Margin="15" HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0.9">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Chú thích sai khác:" Foreground="#F8FAFC" FontWeight="Bold" Margin="0,0,0,6"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <Rectangle Width="14" Height="14" Fill="#E60000" Margin="0,0,6,0"/>
+                                <TextBlock Text="Nét vẽ cũ đã bị XÓA" Foreground="#E2E8F0" FontSize="11"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <Rectangle Width="14" Height="14" Fill="#00B400" Margin="0,0,6,0"/>
+                                <TextBlock Text="Nét vẽ mới được THÊM" Foreground="#E2E8F0" FontSize="11"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <Rectangle Width="14" Height="14" Fill="#0000DC" Margin="0,0,6,0"/>
+                                <TextBlock Text="Thay đổi màu sắc nét" Foreground="#E2E8F0" FontSize="11"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Bottom Status Bar -->
+        <Border Grid.Row="2" Background="#1E293B" Padding="12,4" BorderBrush="#334155" BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock Name="StatusTextBlock" Text="Sẵn sàng. Hãy chọn hai file PDF cần so sánh." Foreground="#94A3B8" FontSize="12"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

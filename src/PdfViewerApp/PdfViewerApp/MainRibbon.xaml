@@ -97,6 +97,11 @@
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
+        <fluent:Button Name="ComparePdfsBtn" Header="So Sánh PDF" Margin="8,0,8,0" Click="ComparePdfs_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#8B5CF6" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Quản Lý Trang">

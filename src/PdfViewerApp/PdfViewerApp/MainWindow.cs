@@ -1483,6 +1483,21 @@ exit 0
 		}
 	}
 
+	private void ComparePdfs_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfComparisonWindow comparisonWindow = new PdfComparisonWindow();
+			var activeTab = GetActiveTab();
+			if (activeTab != null && !string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				comparisonWindow.SetInitialFileA(activeTab.CurrentPdfPath);
+			}
+			comparisonWindow.Owner = this;
+			comparisonWindow.Show();
+		}
+	}
+
 	private void Exit_Click(object sender, RoutedEventArgs e)
 	{
 		Application.Current.Shutdown();
@@ -2738,6 +2753,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.OpenPdfRequested += OpenPdf_Click;
 		_mainRibbon.SavePdfRequested += SavePdf_Click;
 		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
+		_mainRibbon.ComparePdfsRequested += ComparePdfs_Click;
 		_mainRibbon.ExitRequested += Exit_Click;
 		_mainRibbon.PrintPdfRequested += PrintPdf_Click;
 		_mainRibbon.BatchPrintRequested += BatchPrint_Click;
