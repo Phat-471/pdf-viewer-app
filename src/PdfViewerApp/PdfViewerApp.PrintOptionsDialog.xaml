@@ -345,9 +345,10 @@
         <Border Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
             <TextBlock Text="Chế độ in" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8" />
-            <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
+             <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
               <ComboBoxItem Content="Native PDFium - khuyên dùng" Tag="NativePdfium" />
               <ComboBoxItem Content="WPF Bitmap - tương thích" Tag="WpfBitmap" />
+              <ComboBoxItem Content="In trực tiếp PDF (Siêu nhanh - Cần máy hỗ trợ)" Tag="PdfDirect" />
             </ComboBox>
             <CheckBox Name="NativeSeparateJobsCheckBox" Content="Native: gửi từng trang" IsChecked="False" Margin="0,8,0,0" />
             <CheckBox Name="OptimizeCadCheckBox" Content="Tối ưu bản vẽ CAD/Revit" IsChecked="False" Margin="0,8,0,0" />

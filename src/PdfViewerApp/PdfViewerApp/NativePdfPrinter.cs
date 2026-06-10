@@ -358,8 +358,23 @@ internal static class NativePdfPrinter
 				num2 = PdfiumEngine.FPDF_GetPageWidth(num);
 				num3 = PdfiumEngine.FPDF_GetPageHeight(num);
 			}
-			double num4 = num2 / 72.0 * (double)dpiX;
-			double num5 = num3 / 72.0 * (double)dpiY;
+			
+			double targetDpiX = dpiX;
+			double targetDpiY = dpiY;
+			
+			// Adaptive DPI: Giới hạn độ phân giải tối đa cho các trang in có kích thước điểm ảnh quá lớn để tránh spool file khổng lồ
+			double maxPrintPixels = 16000000.0; // Giới hạn ở 16 Megapixels (đủ nét cho A3 ở ~300 DPI hoặc A4 ở ~400 DPI)
+			double currentPrintPixels = (num2 / 72.0 * targetDpiX) * (num3 / 72.0 * targetDpiY);
+			if (currentPrintPixels > maxPrintPixels)
+			{
+				double scale = Math.Sqrt(maxPrintPixels / currentPrintPixels);
+				targetDpiX *= scale;
+				targetDpiY *= scale;
+				PdfPerfLogger.Log($"Native print page {pageIndex + 1} - Adaptive DPI active: scaled down resolution by {scale:F2}x (Target DPI: {targetDpiX:F1}x{targetDpiY:F1})");
+			}
+
+			double num4 = num2 / 72.0 * targetDpiX;
+			double num5 = num3 / 72.0 * targetDpiY;
 			if (fitToPrintableArea)
 			{
 				double num6 = Math.Min((double)safeWidth / num4, (double)safeHeight / num5);
@@ -401,15 +416,32 @@ internal static class NativePdfPrinter
 				gCHandle.Free();
 			}
 
+			// Chuyển đổi từ BGRA 32-bit (4 bytes/pixel) sang BGR 24-bit (3 bytes/pixel) để giảm 25% dung lượng spool
+			int stride24 = ((num7 * 3 + 3) / 4) * 4; // Căn chỉnh stride 4-byte cho Windows GDI
+			byte[] array24 = new byte[stride24 * num8];
+			for (int y = 0; y < num8; y++)
+			{
+				int srcRowOffset = y * stride;
+				int destRowOffset = y * stride24;
+				for (int x = 0; x < num7; x++)
+				{
+					int srcIndex = srcRowOffset + x * 4;
+					int destIndex = destRowOffset + x * 3;
+					array24[destIndex] = array[srcIndex];       // B
+					array24[destIndex + 1] = array[srcIndex + 1]; // G
+					array24[destIndex + 2] = array[srcIndex + 2]; // R
+				}
+			}
+
 			return new PreRenderedPage
 			{
 				PageIndex = pageIndex,
 				Copy = copy,
 				IsRasterized = true,
-				BitmapBuffer = array,
+				BitmapBuffer = array24,
 				Width = num7,
 				Height = num8,
-				Stride = stride,
+				Stride = stride24,
 				DrawX = num9,
 				DrawY = num10
 			};
@@ -466,7 +498,7 @@ internal static class NativePdfPrinter
 						bmi.bmiHeader.biWidth = rendered.Width;
 						bmi.bmiHeader.biHeight = -rendered.Height;
 						bmi.bmiHeader.biPlanes = 1;
-						bmi.bmiHeader.biBitCount = 32;
+						bmi.bmiHeader.biBitCount = 24;
 						bmi.bmiHeader.biCompression = 0; // BI_RGB
 						bmi.bmiHeader.biSizeImage = (uint)(rendered.Stride * rendered.Height);
 
@@ -685,4 +717,101 @@ internal static class NativePdfPrinter
 		uint iUsage,
 		uint dwRop
 	);
+
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+	private class DOC_INFO_1
+	{
+		[MarshalAs(UnmanagedType.LPWStr)]
+		public string? pDocName;
+		[MarshalAs(UnmanagedType.LPWStr)]
+		public string? pOutputFile;
+		[MarshalAs(UnmanagedType.LPWStr)]
+		public string? pDataType;
+	}
+
+	[DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern bool OpenPrinter(string szPrinter, out nint hPrinter, nint pd);
+
+	[DllImport("winspool.drv", SetLastError = true)]
+	private static extern bool ClosePrinter(nint hPrinter);
+
+	[DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern bool StartDocPrinter(nint hPrinter, int level, [In] DOC_INFO_1 di);
+
+	[DllImport("winspool.drv", SetLastError = true)]
+	private static extern bool EndDocPrinter(nint hPrinter);
+
+	[DllImport("winspool.drv", SetLastError = true)]
+	private static extern bool StartPagePrinter(nint hPrinter);
+
+	[DllImport("winspool.drv", SetLastError = true)]
+	private static extern bool EndPagePrinter(nint hPrinter);
+
+	[DllImport("winspool.drv", SetLastError = true)]
+	private static extern bool WritePrinter(nint hPrinter, nint pBytes, int dwCount, out int dwWritten);
+
+	public static void PrintPdfDirect(string pdfPath, string printQueueName, string docName, CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		byte[] pdfBytes = File.ReadAllBytes(pdfPath);
+		
+		nint hPrinter = IntPtr.Zero;
+		var di = new DOC_INFO_1
+		{
+			pDocName = docName,
+			pDataType = "RAW",
+			pOutputFile = null
+		};
+
+		if (!OpenPrinter(printQueueName, out hPrinter, IntPtr.Zero))
+		{
+			throw new InvalidOperationException($"Cannot open printer {printQueueName}. Win32 Error: {Marshal.GetLastWin32Error()}");
+		}
+
+		try
+		{
+			if (!StartDocPrinter(hPrinter, 1, di))
+			{
+				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+			}
+
+			try
+			{
+				if (!StartPagePrinter(hPrinter))
+				{
+					throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+				}
+
+				try
+				{
+					nint pBytes = Marshal.AllocCoTaskMem(pdfBytes.Length);
+					Marshal.Copy(pdfBytes, 0, pBytes, pdfBytes.Length);
+					try
+					{
+						int bytesWritten = 0;
+						if (!WritePrinter(hPrinter, pBytes, pdfBytes.Length, out bytesWritten))
+						{
+							throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+						}
+					}
+					finally
+					{
+						Marshal.FreeCoTaskMem(pBytes);
+					}
+				}
+				finally
+				{
+					EndPagePrinter(hPrinter);
+				}
+			}
+			finally
+			{
+				EndDocPrinter(hPrinter);
+			}
+		}
+		finally
+		{
+			ClosePrinter(hPrinter);
+		}
+	}
 }

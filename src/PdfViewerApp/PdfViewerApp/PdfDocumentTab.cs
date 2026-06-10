@@ -2019,6 +2019,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				progressDialog.MarkCompleted("Da gui lenh in vao may in.");
 				LogStatus("Print job sent");
 			}
+			else if (optionsDialog.PrintEngineMode == "PdfDirect")
+			{
+				string queueName = printDialog.PrintQueue.FullName;
+				string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
+				progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
+				await Task.Run(delegate
+				{
+					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
+				});
+				progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
+				LogStatus("Print job sent");
+			}
 			else
 			{
 				PdfPerfLogger.Log("Using WPF Bitmap print pipeline.");
