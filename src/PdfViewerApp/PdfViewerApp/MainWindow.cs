@@ -1439,8 +1439,8 @@ exit 0
 Cảm ơn bạn đã tin tưởng sử dụng PDF Pro - HPhat Edition!
 
 Mọi thắc mắc, phản hồi hoặc báo cáo sự cố, vui lòng liên hệ:
-- Email hỗ trợ: support@hphatedition.com
-- Hotline kỹ thuật: (+84) 987 654 321
+- Email hỗ trợ: [EMAIL_ADDRESS]
+- Hotline kỹ thuật: 0974194305
 - Phiên bản hiện tại: v1.0.19
 
 Khi báo lỗi, vui lòng đính kèm file PDF bị lỗi và mô tả các bước thực hiện để chúng tôi hỗ trợ xử lý nhanh nhất.";
