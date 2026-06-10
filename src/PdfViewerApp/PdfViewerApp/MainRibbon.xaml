@@ -117,6 +117,11 @@
         </fluent:SplitButton>
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Biên Tập">
+        <fluent:Button Name="PageOrganizerBtn" Header="Bố Cục Trang" Margin="8,0,8,0" Click="PageOrganizer_Click">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0EA5E9" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
         <fluent:Button Name="MovePageUpBtn" Header="Lên" Margin="8,0,8,0" Click="MovePageUp_Click">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />

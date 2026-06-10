@@ -34,6 +34,10 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? OcrTextRequested;
 
+	public event RoutedEventHandler? ExportOcrTextRequested;
+
+	public event RoutedEventHandler? ExportSearchablePdfRequested;
+
 	public event RoutedEventHandler? ToggleSidebarRequested;
 
 	public event RoutedEventHandler? ThemeToggleRequested;
@@ -51,6 +55,8 @@ public partial class MainRibbon : UserControl
 	public event RoutedEventHandler? RotateRightRequested;
 
 	public event RoutedEventHandler? RotateRightAllRequested;
+
+	public event RoutedEventHandler? PageOrganizerRequested;
 
 	public event RoutedEventHandler? MovePageUpRequested;
 
@@ -282,6 +288,10 @@ public partial class MainRibbon : UserControl
 
 	private void OcrText_Click(object sender, RoutedEventArgs e) => OcrTextRequested?.Invoke(this, e);
 
+	private void ExportOcrText_Click(object sender, RoutedEventArgs e) => ExportOcrTextRequested?.Invoke(this, e);
+
+	private void ExportSearchablePdf_Click(object sender, RoutedEventArgs e) => ExportSearchablePdfRequested?.Invoke(this, e);
+
 	private void ToggleSidebar_Click(object sender, RoutedEventArgs e) => ToggleSidebarRequested?.Invoke(this, e);
 
 	private void ThemeToggle_Click(object sender, RoutedEventArgs e) => ThemeToggleRequested?.Invoke(this, e);
@@ -299,6 +309,8 @@ public partial class MainRibbon : UserControl
 	private void RotateRight_Click(object sender, RoutedEventArgs e) => RotateRightRequested?.Invoke(this, e);
 
 	private void RotateRightAll_Click(object sender, RoutedEventArgs e) => RotateRightAllRequested?.Invoke(this, e);
+
+	private void PageOrganizer_Click(object sender, RoutedEventArgs e) => PageOrganizerRequested?.Invoke(this, e);
 
 	private void MovePageUp_Click(object sender, RoutedEventArgs e) => MovePageUpRequested?.Invoke(this, e);
 
@@ -443,6 +455,8 @@ public partial class MainRibbon : UserControl
 		group.Items.Add(CreateEditTextButton("Select Text", "T", SelectTextTool_Click, "#106EBE"));
 		group.Items.Add(CreateEditTextButton("Edit Text", "E", EditTextTool_Click, "#0F766E"));
 		group.Items.Add(CreateEditTextButton("OCR", "OCR", OcrText_Click, "#D13438"));
+		group.Items.Add(CreateEditTextButton("Xuất văn bản OCR", "TXT", ExportOcrText_Click, "#D13438"));
+		group.Items.Add(CreateEditTextButton("Tạo Searchable PDF", "PDF", ExportSearchablePdf_Click, "#38BDF8"));
 		group.Items.Add(CreateEditTextButton("Save", "S", SavePdf_Click, "#0F766E"));
 		group.Items.Add(CreateEditTextButton("Exit", "X", SelectTool_Click, "#64748B"));
 		homeTab.Groups.Add(group);

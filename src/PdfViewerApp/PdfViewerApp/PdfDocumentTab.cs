@@ -1636,13 +1636,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		return pdfAnnotation;
 	}
 
-	private static string BuildPageCacheKey(int pageNumber, int width, int height, bool isThumbnail)
+	private string BuildPageCacheKey(int pageNumber, int width, int height, bool isThumbnail)
 	{
+		string suffix = _isReverseView ? ":dark" : "";
 		if (!isThumbnail)
 		{
-			return $"page:{pageNumber}:{width}x{height}";
+			return $"page:{pageNumber}:{width}x{height}{suffix}";
 		}
-		return $"thumb:{pageNumber}:{width}x{height}";
+		return $"thumb:{pageNumber}:{width}x{height}{suffix}";
 	}
 
 	private bool TryGetCachedBitmap(string key, out BitmapSource? bitmap)
@@ -1832,6 +1833,39 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		RotateSelectedPageAsync(90);
 	}
 
+	private void ForceRedrawAllPages()
+	{
+		_renderGeneration++;
+		ClearRenderQueue();
+
+		// Clear main pages
+		if (PagesHost.Children.Count > 0 && PagesHost.Children[0] is StackPanel stackPanel)
+		{
+			foreach (UIElement child in stackPanel.Children)
+			{
+				if (child is Border border && border.Child is Grid grid)
+				{
+					Image image = grid.Children.OfType<Image>().FirstOrDefault();
+					if (image != null)
+					{
+						image.Source = null;
+					}
+				}
+			}
+		}
+
+		// Clear thumbnails
+		foreach (UIElement child in ThumbnailContainer.Children)
+		{
+			if (child is Border border && border.Child is Image image)
+			{
+				image.Source = null;
+			}
+		}
+
+		UpdateSelectedPageFromViewport();
+	}
+
 	private void ContextReverseView_Click(object sender, RoutedEventArgs e)
 	{
 		_isReverseView = !_isReverseView;
@@ -1846,6 +1880,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			PagesHost.Background = Brushes.Transparent;
 			LogStatus("Tắt xem đảo ngược");
 		}
+		ForceRedrawAllPages();
 	}
 
 	private void ContextPrint_Click(object sender, RoutedEventArgs e)
@@ -2717,6 +2752,239 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
+	public async Task ExportOcrTextAsync()
+	{
+		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
+		{
+			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		MessageBoxResult scopeChoice = MessageBox.Show(
+			"Bạn có muốn chạy OCR và xuất toàn bộ tài liệu không?\n\n- Click YES để xuất TOÀN BỘ tài liệu.\n- Click NO để chỉ xuất TRANG HIỆN TẠI.\n- Click CANCEL để hủy.",
+			"Phạm vi xuất OCR",
+			MessageBoxButton.YesNoCancel,
+			MessageBoxImage.Question
+		);
+
+		if (scopeChoice == MessageBoxResult.Cancel)
+		{
+			return;
+		}
+
+		SaveFileDialog saveFileDialog = new SaveFileDialog
+		{
+			Filter = "Text Files (*.txt)|*.txt|Word Documents (*.docx)|*.docx",
+			Title = "Lưu kết quả OCR",
+			FileName = System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath) + "_OCR"
+		};
+
+		if (saveFileDialog.ShowDialog() != true)
+		{
+			return;
+		}
+
+		string outputPath = saveFileDialog.FileName;
+		bool isDocx = System.IO.Path.GetExtension(outputPath).Equals(".docx", StringComparison.OrdinalIgnoreCase);
+
+		LogStatus("Đang chạy nhận diện OCR...");
+
+		try
+		{
+			StringBuilder fullTextBuilder = new StringBuilder();
+			List<int> pagesToProcess = new List<int>();
+
+			if (scopeChoice == MessageBoxResult.Yes)
+			{
+				for (int i = 1; i <= PageCount; i++) pagesToProcess.Add(i);
+			}
+			else
+			{
+				pagesToProcess.Add(Math.Clamp(SelectedPageNumber, 1, PageCount));
+			}
+
+			await Task.Run(async () =>
+			{
+				for (int idx = 0; idx < pagesToProcess.Count; idx++)
+				{
+					int pageNum = pagesToProcess[idx];
+					base.Dispatcher.Invoke(() => LogStatus($"Đang chạy OCR trang {pageNum}/{PageCount}..."));
+
+					List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNum);
+					if (regions != null && regions.Count > 0)
+					{
+						string pageText = string.Join(" ", regions.Select(r => r.Text));
+						
+						lock (fullTextBuilder)
+						{
+							if (scopeChoice == MessageBoxResult.Yes)
+							{
+								fullTextBuilder.AppendLine($"--- Trang {pageNum} ---");
+							}
+							fullTextBuilder.AppendLine(pageText);
+							fullTextBuilder.AppendLine();
+						}
+					}
+				}
+			});
+
+			string resultText = fullTextBuilder.ToString();
+			if (string.IsNullOrWhiteSpace(resultText))
+			{
+				MessageBox.Show("Không nhận diện được văn bản nào trong phạm vi đã chọn.", "Không có kết quả", MessageBoxButton.OK, MessageBoxImage.Warning);
+				LogStatus("Nhận diện OCR không có kết quả");
+				return;
+			}
+
+			if (isDocx)
+			{
+				SaveAsDocx(outputPath, resultText);
+			}
+			else
+			{
+				File.WriteAllText(outputPath, resultText, Encoding.UTF8);
+			}
+
+			MessageBox.Show("Xuất kết quả OCR thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+			LogStatus("Đã lưu kết quả OCR tại: " + System.IO.Path.GetFileName(outputPath));
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show("Có lỗi xảy ra khi xuất kết quả OCR: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+			LogStatus("Lỗi xuất OCR: " + ex.Message);
+		}
+	}
+
+	private static void SaveAsDocx(string filePath, string text)
+	{
+		using (var fileStream = new FileStream(filePath, FileMode.Create))
+		using (var archive = new System.IO.Compression.ZipArchive(fileStream, System.IO.Compression.ZipArchiveMode.Create))
+		{
+			var contentTypesEntry = archive.CreateEntry("[Content_Types].xml");
+			using (var writer = new StreamWriter(contentTypesEntry.Open(), Encoding.UTF8))
+			{
+				writer.Write(@"<?xml version=""1.0"" encoding=""utf-8""?>
+<Types xmlns=""http://schemas.openxmlformats.org/package/2006/content-types"">
+  <Default Extension=""xml"" ContentType=""application/xml"" />
+  <Default Extension=""rels"" ContentType=""application/vnd.openxmlformats-package.relationships+xml"" />
+  <Override PartName=""/word/document.xml"" ContentType=""application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"" />
+</Types>");
+			}
+
+			var relsEntry = archive.CreateEntry("_rels/.rels");
+			using (var writer = new StreamWriter(relsEntry.Open(), Encoding.UTF8))
+			{
+				writer.Write(@"<?xml version=""1.0"" encoding=""utf-8""?>
+<Relationships xmlns=""http://schemas.openxmlformats.org/package/2006/relationships"">
+  <Relationship Id=""rId1"" Type=""http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"" Target=""word/document.xml"" />
+</Relationships>");
+			}
+
+			var documentEntry = archive.CreateEntry("word/document.xml");
+			using (var writer = new StreamWriter(documentEntry.Open(), Encoding.UTF8))
+			{
+				string cleanedText = System.Security.SecurityElement.Escape(text)
+					.Replace("\r\n", "\n")
+					.Replace("\r", "\n");
+				
+				var bodyBuilder = new StringBuilder();
+				foreach (var line in cleanedText.Split('\n'))
+				{
+					bodyBuilder.Append("<w:p><w:r><w:t>").Append(line).Append("</w:t></w:r></w:p>");
+				}
+
+				writer.Write($@"<?xml version=""1.0"" encoding=""utf-8""?>
+<w:document xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"">
+  <w:body>
+    {bodyBuilder}
+  </w:body>
+</w:document>");
+			}
+		}
+	}
+
+	public async Task ExportSearchablePdfAsync()
+	{
+		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
+		{
+			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		SaveFileDialog saveFileDialog = new SaveFileDialog
+		{
+			Filter = "PDF Documents (*.pdf)|*.pdf",
+			Title = "Lưu Searchable PDF",
+			FileName = System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath) + "_Searchable"
+		};
+
+		if (saveFileDialog.ShowDialog() != true)
+		{
+			return;
+		}
+
+		string outputPath = saveFileDialog.FileName;
+		if (IsSamePath(CurrentPdfPath, outputPath))
+		{
+			MessageBox.Show("Tên file đích phải khác với file nguồn.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Warning);
+			return;
+		}
+
+		LogStatus("Đang chuyển đổi thành Searchable PDF...");
+
+		try
+		{
+			StringBuilder ocrDataBuilder = new StringBuilder();
+
+			await Task.Run(async () =>
+			{
+				for (int pageNum = 1; pageNum <= PageCount; pageNum++)
+				{
+					base.Dispatcher.Invoke(() => LogStatus($"Đang nhận diện văn bản trang {pageNum}/{PageCount}..."));
+
+					List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNum);
+					if (regions != null && regions.Count > 0)
+					{
+						foreach (var region in regions)
+						{
+							string line = $"{pageNum}|{region.Left:F2}|{region.Bottom:F2}|{region.Width:F2}|{region.Height:F2}|{region.Text}";
+							lock (ocrDataBuilder)
+							{
+								ocrDataBuilder.AppendLine(line);
+							}
+						}
+					}
+				}
+			});
+
+			string ocrRawData = ocrDataBuilder.ToString();
+			if (string.IsNullOrWhiteSpace(ocrRawData))
+			{
+				MessageBox.Show("Không tìm thấy văn bản nào để tạo lớp tìm kiếm. PDF sẽ chỉ lưu lại như cũ.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+			}
+
+			LogStatus("Đang ghép lớp văn bản vào file PDF...");
+			bool success = await Task.Run(() => make_pdf_searchable(CurrentPdfPath, ocrRawData, outputPath));
+
+			if (success)
+			{
+				MessageBox.Show("Tạo Searchable PDF thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+				LogStatus("Đã lưu Searchable PDF tại: " + System.IO.Path.GetFileName(outputPath));
+				this.DocumentOpenRequested?.Invoke(this, outputPath);
+			}
+			else
+			{
+				MessageBox.Show("Không thể tạo Searchable PDF. Kiểm tra lại tệp PDF nguồn.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+				LogStatus("Lỗi tạo Searchable PDF");
+			}
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show("Có lỗi xảy ra: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+			LogStatus("Lỗi tạo Searchable PDF: " + ex.Message);
+		}
+	}
+
 	private async void TryShowOcrTextEditOverlayAsync(Canvas canvas, Point clickPoint, int pageNumber)
 	{
 		if (!TryCanvasToPdfPoint(canvas, clickPoint, pageNumber, out Point pdfPoint))
@@ -2815,7 +3083,22 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				encoder.Save(fileStream);
 			}
-			OcrEngine? engine = OcrEngine.TryCreateFromUserProfileLanguages() ?? OcrEngine.TryCreateFromLanguage(new Language("en"));
+			AppPreferences preferences = AppPreferences.Load();
+			OcrEngine? engine = null;
+			if (!string.IsNullOrEmpty(preferences.OcrLanguage))
+			{
+				try
+				{
+					engine = OcrEngine.TryCreateFromLanguage(new Language(preferences.OcrLanguage));
+				}
+				catch
+				{
+				}
+			}
+			if (engine == null)
+			{
+				engine = OcrEngine.TryCreateFromUserProfileLanguages() ?? OcrEngine.TryCreateFromLanguage(new Language("en"));
+			}
 			if (engine == null)
 			{
 				return null;
@@ -3238,6 +3521,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
 	public static extern bool overlay_pdf_image([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, int pageNumber, [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath, double x, double y, double width, double height, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
+	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+	public static extern bool make_pdf_searchable([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, [MarshalAs(UnmanagedType.LPUTF8Str)] string ocrDataRaw, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
 	public PdfDocumentTab(string path)
 	{
@@ -4308,6 +4594,33 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
+	public async Task OpenPageOrganizerAsync()
+	{
+		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
+		{
+			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		PageOrganizerWindow organizer = new PageOrganizerWindow(CurrentPdfPath, _documentHandle);
+		organizer.Owner = Window.GetWindow(this);
+		if (organizer.ShowDialog() == true && !string.IsNullOrEmpty(organizer.SavedPdfPath))
+		{
+			try
+			{
+				string originalPath = CurrentPdfPath;
+				CloseActiveDocument();
+				File.Copy(organizer.SavedPdfPath, originalPath, true);
+				LoadDocument(originalPath);
+				LogStatus("Đã cập nhật cấu trúc trang tài liệu.");
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show("Không thể lưu thay đổi vào file gốc: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
+		}
+	}
+
 	public async Task InsertBlankPageAsync()
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath))
@@ -4629,9 +4942,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					if (_documentHandle != IntPtr.Zero)
 					{
-						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, renderWidth, renderHeight);
+						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, renderWidth, renderHeight, _isReverseView);
 					}
-					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, renderWidth, renderHeight);
+					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, renderWidth, renderHeight, _isReverseView);
 				}
 				catch (Exception ex2)
 				{
@@ -4706,9 +5019,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					if (_documentHandle != IntPtr.Zero)
 					{
-						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, thumbWidth, thumbHeight);
+						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, thumbWidth, thumbHeight, _isReverseView);
 					}
-					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, thumbWidth, thumbHeight);
+					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, thumbWidth, thumbHeight, _isReverseView);
 				}
 				catch (Exception ex2)
 				{

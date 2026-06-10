@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media;
@@ -121,12 +121,12 @@ public static class PdfiumEngine
 		}
 	}
 
-	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight)
+	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight, bool invertColors = false)
 	{
-		return RenderPageToBitmap(filePath, pageIndex, targetWidth, targetHeight, 24000000L);
+		return RenderPageToBitmap(filePath, pageIndex, targetWidth, targetHeight, 24000000L, invertColors);
 	}
 
-	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight, long maxPixels)
+	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight, long maxPixels, bool invertColors = false)
 	{
 		Initialize();
 		lock (RenderLock)
@@ -138,7 +138,7 @@ public static class PdfiumEngine
 			}
 			try
 			{
-				return RenderPageToBitmap(num, pageIndex, targetWidth, targetHeight, maxPixels);
+				return RenderPageToBitmap(num, pageIndex, targetWidth, targetHeight, maxPixels, invertColors);
 			}
 			finally
 			{
@@ -147,12 +147,12 @@ public static class PdfiumEngine
 		}
 	}
 
-	public static BitmapSource? RenderPageToBitmap(nint document, int pageIndex, int targetWidth, int targetHeight)
+	public static BitmapSource? RenderPageToBitmap(nint document, int pageIndex, int targetWidth, int targetHeight, bool invertColors = false)
 	{
-		return RenderPageToBitmap(document, pageIndex, targetWidth, targetHeight, 24000000L);
+		return RenderPageToBitmap(document, pageIndex, targetWidth, targetHeight, 24000000L, invertColors);
 	}
 
-	public static BitmapSource? RenderPageToBitmap(nint document, int pageIndex, int targetWidth, int targetHeight, long maxPixels)
+	public static BitmapSource? RenderPageToBitmap(nint document, int pageIndex, int targetWidth, int targetHeight, long maxPixels, bool invertColors = false)
 	{
 		Initialize();
 		targetWidth = Math.Max(1, Math.Min(targetWidth, 40000));
@@ -199,6 +199,17 @@ public static class PdfiumEngine
 				{
 					gCHandle.Free();
 				}
+
+				if (invertColors)
+				{
+					for (int i = 0; i < array.Length; i += 4)
+					{
+						array[i] = (byte)(255 - array[i]);       // B
+						array[i + 1] = (byte)(255 - array[i + 1]); // G
+						array[i + 2] = (byte)(255 - array[i + 2]); // R
+					}
+				}
+
 				BitmapSource bitmapSource = BitmapSource.Create(targetWidth, targetHeight, 96.0, 96.0, PixelFormats.Bgra32, null, array, num4);
 				bitmapSource.Freeze();
 				return bitmapSource;
@@ -210,7 +221,7 @@ public static class PdfiumEngine
 		}
 	}
 
-	public static BitmapSource? RenderPageTileToBitmap(nint document, int pageIndex, int fullWidth, int fullHeight, int tileX, int tileY, int tileWidth, int tileHeight)
+	public static BitmapSource? RenderPageTileToBitmap(nint document, int pageIndex, int fullWidth, int fullHeight, int tileX, int tileY, int tileWidth, int tileHeight, bool invertColors = false)
 	{
 		Initialize();
 		fullWidth = Math.Max(1, Math.Min(fullWidth, 40000));
@@ -254,6 +265,17 @@ public static class PdfiumEngine
 				{
 					gCHandle.Free();
 				}
+
+				if (invertColors)
+				{
+					for (int i = 0; i < array.Length; i += 4)
+					{
+						array[i] = (byte)(255 - array[i]);       // B
+						array[i + 1] = (byte)(255 - array[i + 1]); // G
+						array[i + 2] = (byte)(255 - array[i + 2]); // R
+					}
+				}
+
 				BitmapSource bitmapSource = BitmapSource.Create(tileWidth, tileHeight, 96.0, 96.0, PixelFormats.Bgra32, null, array, num2);
 				bitmapSource.Freeze();
 				return bitmapSource;

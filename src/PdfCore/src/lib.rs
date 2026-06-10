@@ -542,3 +542,184 @@ pub extern "C" fn extract_pdf_pages(
     let _ = doc.prune_objects();
     doc.save(output_str).is_ok()
 }
+
+#[no_mangle]
+pub extern "C" fn make_pdf_searchable(
+    pdf_path: *const c_char,
+    ocr_data_raw: *const c_char,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let ocr_str = match to_str(ocr_data_raw) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // Group OCR words by page
+    // Format: "page_number|x|y|w|h|text"
+    let mut page_words: BTreeMap<u32, Vec<(f64, f64, f64, f64, String)>> = BTreeMap::new();
+    for line in ocr_str.split('\n') {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() < 6 {
+            continue;
+        }
+        let page_num = match parts[0].parse::<u32>() {
+            Ok(n) => n,
+            Err(_) => continue,
+        };
+        let x = parts[1].parse::<f64>().unwrap_or(0.0);
+        let y = parts[2].parse::<f64>().unwrap_or(0.0);
+        let w = parts[3].parse::<f64>().unwrap_or(0.0);
+        let h = parts[4].parse::<f64>().unwrap_or(12.0);
+        let text = parts[5..].join("|"); // in case the text itself contains '|'
+
+        page_words.entry(page_num).or_default().push((x, y, w, h, text));
+    }
+
+    let pages = doc.get_pages();
+
+    for (page_num, words) in page_words {
+        let page_id = match pages.get(&page_num) {
+            Some(&id) => id,
+            None => continue,
+        };
+
+        // Create the Font resource first
+        let mut font_dict = Dictionary::new();
+        font_dict.set("Type", Object::Name("Font".as_bytes().to_vec()));
+        font_dict.set("Subtype", Object::Name("Type1".as_bytes().to_vec()));
+        font_dict.set("BaseFont", Object::Name("Helvetica".as_bytes().to_vec()));
+        let font_id = doc.add_object(Object::Dictionary(font_dict));
+
+        // Create the stream first (so we don't borrow doc while building it)
+        let mut stream_content = Vec::new();
+        stream_content.extend_from_slice(b"BT\n/F_OcrHelper 10 Tf\n3 Tr\n");
+        for (x, y, w, h, text) in words {
+            let escaped_text = text.replace('(', "\\(").replace(')', "\\)");
+            let L = escaped_text.len().max(1) as f64;
+            let h_scaled = h;
+            let tz = ((w / (L * 0.6 * h_scaled)) * 100.0).clamp(20.0, 300.0);
+            
+            let word_stream = format!(
+                "1 0 0 1 {:.2} {:.2} Tm\n{:.1} Tf\n{:.1} Tz\n({}) Tj\n",
+                x, y, h_scaled, tz, escaped_text
+            );
+            stream_content.extend_from_slice(word_stream.as_bytes());
+        }
+        stream_content.extend_from_slice(b"ET\n");
+        let stream_obj = lopdf::Stream::new(Dictionary::new(), stream_content);
+        let stream_id = doc.add_object(Object::Stream(stream_obj));
+
+        // Now update the page object
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            // Ensure Resources dictionary exists
+            if !page_dict.has(b"Resources") {
+                page_dict.set("Resources", Object::Dictionary(Dictionary::new()));
+            }
+        }
+
+        // Check if Resources is a reference
+        let mut resources_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Resources") {
+                resources_ref_id = Some(*ref_id);
+            }
+        }
+
+        let resources_target_id = resources_ref_id.unwrap_or(page_id);
+
+        if let Ok(Object::Dictionary(ref mut res_dict)) = doc.get_object_mut(resources_target_id) {
+            let dict = if resources_ref_id.is_some() {
+                res_dict
+            } else {
+                res_dict.get_mut(b"Resources").unwrap().as_dict_mut().unwrap()
+            };
+
+            // Ensure Font dictionary exists in Resources
+            if !dict.has(b"Font") {
+                dict.set("Font", Object::Dictionary(Dictionary::new()));
+            }
+        }
+
+        // Check if Font is a reference
+        let mut font_ref_id = None;
+        if let Ok(Object::Dictionary(res_dict)) = doc.get_object(resources_target_id) {
+            let dict = if resources_ref_id.is_some() {
+                res_dict
+            } else {
+                res_dict.get(b"Resources").unwrap().as_dict().unwrap()
+            };
+            if let Ok(Object::Reference(ref_id)) = dict.get(b"Font") {
+                font_ref_id = Some(*ref_id);
+            }
+        }
+
+        let font_target_id = font_ref_id.or(resources_ref_id);
+
+        if let Some(target_id) = font_target_id {
+            if let Ok(Object::Dictionary(ref mut target_dict)) = doc.get_object_mut(target_id) {
+                let dict = if font_ref_id.is_some() {
+                    target_dict
+                } else {
+                    target_dict.get_mut(b"Font").unwrap().as_dict_mut().unwrap()
+                };
+                dict.set("F_OcrHelper", Object::Reference(font_id));
+            }
+        } else {
+            // Both Resources and Font are inline dictionaries on the page object
+            if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+                if let Ok(ref mut res_dict) = page_dict.get_mut(b"Resources").and_then(|o| o.as_dict_mut()) {
+                    if let Ok(ref mut font_dict) = res_dict.get_mut(b"Font").and_then(|o| o.as_dict_mut()) {
+                        font_dict.set("F_OcrHelper", Object::Reference(font_id));
+                    }
+                }
+            }
+        }
+
+        // Update Contents of the page
+        let mut contents_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Contents") {
+                contents_ref_id = Some(*ref_id);
+            }
+        }
+
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            match page_dict.get(b"Contents") {
+                Ok(Object::Array(arr)) => {
+                    let mut new_arr = arr.clone();
+                    new_arr.push(Object::Reference(stream_id));
+                    page_dict.set("Contents", Object::Array(new_arr));
+                }
+                Ok(Object::Reference(_)) => {
+                    if let Some(ref_id) = contents_ref_id {
+                        page_dict.set("Contents", Object::Array(vec![
+                            Object::Reference(ref_id),
+                            Object::Reference(stream_id),
+                        ]));
+                    }
+                }
+                _ => {
+                    page_dict.set("Contents", Object::Reference(stream_id));
+                }
+            }
+        }
+    }
+
+    doc.save(output_str).is_ok()
+}

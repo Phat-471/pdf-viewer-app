@@ -30,6 +30,28 @@ public partial class SettingsWindow : Window, IComponentConnector
 		DarkThemeRadio.IsChecked = _preferences.IsDarkTheme;
 		LightThemeRadio.IsChecked = !_preferences.IsDarkTheme;
 		AllowMultipleInstancesCheckBox.IsChecked = _preferences.AllowMultipleInstances;
+
+		OcrLanguageComboBox.Items.Clear();
+		ComboBoxItem defaultItem = new ComboBoxItem { Content = "Mặc định hệ thống", Tag = "" };
+		OcrLanguageComboBox.Items.Add(defaultItem);
+		OcrLanguageComboBox.SelectedItem = defaultItem;
+
+		try
+		{
+			foreach (var lang in Windows.Media.Ocr.OcrEngine.AvailableRecognizerLanguages)
+			{
+				ComboBoxItem item = new ComboBoxItem { Content = $"{lang.DisplayName} ({lang.LanguageTag})", Tag = lang.LanguageTag };
+				OcrLanguageComboBox.Items.Add(item);
+				if (string.Equals(lang.LanguageTag, _preferences.OcrLanguage, StringComparison.OrdinalIgnoreCase))
+				{
+					OcrLanguageComboBox.SelectedItem = item;
+				}
+			}
+		}
+		catch
+		{
+		}
+
 		AiAllowOnlineCheckBox.IsChecked = _aiSettings.AllowOnlineSnapshot;
 		AiEnableTelemetryCheckBox.IsChecked = _aiSettings.EnableTelemetry;
 		AiEnableUpdateCheckCheckBox.IsChecked = _aiSettings.EnableUpdateCheck;
@@ -58,6 +80,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 	{
 		_preferences.IsDarkTheme = DarkThemeRadio.IsChecked == true;
 		_preferences.AllowMultipleInstances = AllowMultipleInstancesCheckBox.IsChecked == true;
+		_preferences.OcrLanguage = (OcrLanguageComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
 		_preferences.Save();
 
 		_aiSettings.ProviderMode = (AiProviderModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Auto";

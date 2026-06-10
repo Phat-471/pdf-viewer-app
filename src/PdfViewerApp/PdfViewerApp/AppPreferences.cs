@@ -10,6 +10,8 @@ internal sealed class AppPreferences
 
 	public bool AllowMultipleInstances { get; set; } = true;
 
+	public string OcrLanguage { get; set; } = "";
+
 	public static string PreferencesPath
 	{
 		get

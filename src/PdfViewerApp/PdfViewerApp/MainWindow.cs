@@ -1446,6 +1446,43 @@ exit 0
 		}
 	}
 
+	private async void PageOrganizer_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			var activeTab = GetActiveTab();
+			if (activeTab != null)
+			{
+				await activeTab.OpenPageOrganizerAsync();
+			}
+		}
+	}
+
+
+	private async void ExportOcrText_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			var tab = GetActiveTab();
+			if (tab != null)
+			{
+				await tab.ExportOcrTextAsync();
+			}
+		}
+	}
+
+	private async void ExportSearchablePdf_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			var tab = GetActiveTab();
+			if (tab != null)
+			{
+				await tab.ExportSearchablePdfAsync();
+			}
+		}
+	}
+
 	private void Exit_Click(object sender, RoutedEventArgs e)
 	{
 		Application.Current.Shutdown();
@@ -2709,6 +2746,8 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.FitWidthRequested += FitWidth_Click;
 		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
 		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
+		_mainRibbon.ExportOcrTextRequested += ExportOcrText_Click;
+		_mainRibbon.ExportSearchablePdfRequested += ExportSearchablePdf_Click;
 		_mainRibbon.ToggleSidebarRequested += ToggleSidebar_Click;
 		_mainRibbon.ThemeToggleRequested += ThemeToggle_Click;
 		_mainRibbon.SettingsRequested += Settings_Click;
@@ -2753,6 +2792,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.MeasurementScaleChanged += MeasurementScale_Changed;
 		_mainRibbon.SettingsChanged += MainRibbon_SettingsChanged;
 		_mainRibbon.OpenUrlRequested += OpenUrl;
+		_mainRibbon.PageOrganizerRequested += PageOrganizer_Click;
 	}
 
 	private void MainRibbon_SettingsChanged(object? sender, EventArgs e)
