@@ -31,6 +31,9 @@ jobs:
         # Run the existing packaging script
         .\package_project.ps1
         
+        # Return to repository root directory to ensure paths are correct
+        Set-Location $env:GITHUB_WORKSPACE
+        
         # Parse update-manifest.json to set outputs for release action
         $manifestPath = "releases/update-manifest.json"
         if (Test-Path $manifestPath) {
