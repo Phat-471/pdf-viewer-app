@@ -37,9 +37,15 @@ Hệ thống cập nhật phiên bản mới đã được tự động hóa ho�
   *Khi đẩy Tag lên, GitHub Actions sẽ tự động kích hoạt tiến trình Build, tải file đóng gói lên mục Release của GitHub, và gọi API gửi thông tin tải trực tiếp về trang WordPress của bạn.*
 
 ### 2. Các tính năng mới của hệ thống Auto-Update
+* **Lịch sử cập nhật dạng bảng (Database Table):** Các bản cập nhật phần mềm được lưu trữ có cấu trúc trong bảng cơ sở dữ liệu `wp_pdfpro_updates`, cho phép xem lại toàn bộ lịch sử phát hành (phiên bản, ngày phát hành, dung lượng, link tải, SHA256, changelog) trực tiếp từ giao diện trang quản trị WordPress thay vì chỉ lưu phiên bản mới nhất đè lên các tùy chọn cũ.
 * **Tự động đồng bộ link tải:** Không cần phải upload thủ công lên Google Drive và copy paste. Link tải trực tiếp từ GitHub Releases sẽ tự động được đồng bộ về WordPress.
 * **Xác thực mã băm SHA256 và kích thước tệp:** Ứng dụng Client sẽ tự động tải file về, đối chiếu SHA256 để đảm bảo tệp tải về toàn vẹn trước khi tiến hành cài đặt đè.
 * **Cơ chế chịu lỗi (Failover & Retry):** Quy trình gọi API WordPress có sẵn bộ đếm thử lại (3 lần) khi có sự cố mạng và được cấu hình `continue-on-error` để không làm gián đoạn bản phát hành chính trên GitHub.
+
+### 3. Nhật ký lỗi ứng dụng (Telemetry Error Logs)
+* **Thu thập lỗi Runtime/Crash:** Khi ứng dụng WPF trên máy khách gặp sự cố ngoài ý muốn, nó sẽ tự động gửi báo cáo lỗi (App Version, OS version, Machine ID, nội dung lỗi, và đặc biệt là chi tiết các dòng Stack Trace) về API `/wp-json/pdfpro/v1/report-error`.
+* **Quản lý tập trung trong Admin:** Lập trình viên có thể truy cập menu **PDF Pro Licensing** -> **Nhật ký lỗi** để kiểm tra danh sách lỗi theo thời gian, xem chi tiết Stack Trace thông qua cửa sổ hiển thị Modal Popup, và dọn dẹp nhật ký khi đã sửa xong.
+
 
 ---
 

@@ -1,7 +1,7 @@
 <?php
 /**
  * Admin Panel GUI for PDF Pro Licensing (Submenu-style dashboard)
- * Version: 1.0.2
+ * Version: 1.0.4
  */
 
 if (!defined('ABSPATH')) {
@@ -486,6 +486,20 @@ function pdfpro_licensing_handle_admin_actions() {
         update_option('pdfpro_update_release_date', $release_date);
         update_option('pdfpro_update_mandatory', $mandatory ? '1' : '0');
         update_option('pdfpro_changelog', wp_kses_post($changelog));
+
+        // Lưu thông tin cập nhật vào bảng lịch sử CSDL
+        $table_updates = $wpdb->prefix . 'pdfpro_updates';
+        $wpdb->insert($table_updates, array(
+            'version'      => $latest_version,
+            'download_url' => $download_url,
+            'sha256'       => strtolower(preg_replace('/[^a-fA-F0-9]/', '', $sha256)),
+            'file_size'    => absint($file_size),
+            'release_date' => $release_date,
+            'mandatory'    => $mandatory ? 1 : 0,
+            'changelog'    => $changelog,
+            'published_at' => current_time('mysql')
+        ));
+
         $updates_url = admin_url('admin.php?page=pdfpro-updates');
         wp_safe_redirect(add_query_arg('pdfpro_msg', 'settings_saved', $updates_url));
         exit;
@@ -493,10 +507,15 @@ function pdfpro_licensing_handle_admin_actions() {
 
     // H. Xử lý xóa nhật ký lỗi
     if (isset($_POST['pdfpro_action']) && $_POST['pdfpro_action'] === 'clear_error_logs') {
+        // 1. Xóa file txt dự phòng
         $log_file = PDFPRO_LICENSING_DIR . 'error_logs.txt';
         if (file_exists($log_file)) {
-            unlink($log_file);
+            @unlink($log_file);
         }
+        // 2. Xóa bảng CSDL
+        $table_errors = $wpdb->prefix . 'pdfpro_errors';
+        $wpdb->query("TRUNCATE TABLE $table_errors");
+
         $errors_url = admin_url('admin.php?page=pdfpro-errors');
         wp_safe_redirect(add_query_arg('pdfpro_msg', 'logs_cleared', $errors_url));
         exit;
@@ -897,6 +916,58 @@ function pdfpro_licensing_render_updates_page() {
                     </p>
                 </form>
             </div>
+            
+            <div class="card" style="padding: 20px; margin-top: 30px; max-width: 100%;">
+                <h2>Lịch Sử Các Bản Cập Nhật Đã Phát Hành</h2>
+                <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
+                    Danh sách các phiên bản cập nhật đã được phát hành tự động qua CI/CD hoặc lưu cấu hình thủ công.
+                </p>
+                <?php
+                global $wpdb;
+                $table_updates = $wpdb->prefix . 'pdfpro_updates';
+                $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_updates'") === $table_updates;
+                $updates = $table_exists ? $wpdb->get_results("SELECT * FROM $table_updates ORDER BY published_at DESC LIMIT 50") : array();
+                
+                if (empty($updates)) :
+                    echo '<p>Chưa có bản ghi lịch sử cập nhật nào.</p>';
+                else :
+                ?>
+                <table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Phiên bản</th>
+                            <th style="width: 130px;">Ngày phát hành</th>
+                            <th style="width: 100px;">Kích thước</th>
+                            <th>Đường dẫn tải về</th>
+                            <th style="width: 180px;">SHA256</th>
+                            <th style="width: 95px;">Bắt buộc</th>
+                            <th>Nhật ký thay đổi (Changelog)</th>
+                            <th style="width: 150px;">Thời gian phát hành</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($updates as $up) : ?>
+                            <tr>
+                                <td><strong>v<?php echo esc_html($up->version); ?></strong></td>
+                                <td><?php echo esc_html($up->release_date); ?></td>
+                                <td><?php echo esc_html(round($up->file_size / 1024 / 1024, 2)); ?> MB</td>
+                                <td><a href="<?php echo esc_url($up->download_url); ?>" target="_blank" style="word-break: break-all;"><?php echo esc_html($up->download_url); ?></a></td>
+                                <td><code style="font-size: 11px;"><?php echo esc_html(substr($up->sha256, 0, 8)); ?>...<?php echo esc_html(substr($up->sha256, -8)); ?></code></td>
+                                <td>
+                                    <?php if ($up->mandatory) : ?>
+                                        <span class="badge" style="background: #d9534f; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px;">Bắt buộc</span>
+                                    <?php else : ?>
+                                        <span class="badge" style="background: #5cb85c; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px;">Tùy chọn</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><span style="font-size: 12px; display: block; max-height: 50px; overflow-y: auto; white-space: pre-wrap;"><?php echo esc_html($up->changelog); ?></span></td>
+                                <td><?php echo esc_html(date_i18n('d/m/Y H:i:s', strtotime($up->published_at))); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     <?php
@@ -906,38 +977,94 @@ function pdfpro_licensing_render_updates_page() {
  * SUBMENU 3: Hiển thềEgiao diện Nhật Ký Lỗi Khách Hàng (Telemetry)
  */
 function pdfpro_licensing_render_errors_page() {
+    global $wpdb;
     // Hiển thềEthông báo kết quả hành động
     pdfpro_licensing_render_notices();
 
-    $log_file = PDFPRO_LICENSING_DIR . 'error_logs.txt';
-    $error_logs = '';
-    if (file_exists($log_file)) {
-        $error_logs = file_get_contents($log_file);
-    }
+    $table_errors = $wpdb->prefix . 'pdfpro_errors';
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_errors'") === $table_errors;
+    $errors = $table_exists ? $wpdb->get_results("SELECT * FROM $table_errors ORDER BY reported_at DESC LIMIT 100") : array();
     ?>
     <div class="wrap pdfpro-admin-wrap">
-        <h1 class="wp-heading-inline">PDF Pro Licensing Server - Nhật Ký Lỗi Khách Hàng</h1>
+        <h1 class="wp-heading-inline">PDF Pro Licensing Server - Nhật Ký Lỗi Telemetry</h1>
         <hr class="wp-header-end">
 
-        <div style="margin-top: 20px; max-width: 1000px;">
+        <div style="margin-top: 20px; max-width: 100%;">
             <div class="card" style="padding: 20px;">
-                <h2>Telemetry Error Logs</h2>
+                <h2>Telemetry Crash & Runtime Error Logs</h2>
                 <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
-                    Nhật ký các lỗi runtime/crash được tự động báo cáo vềEtừ ứng dụng Desktop của khách hàng đềElập trình viên theo dõi và gỡ lỗi (debug).
+                    Nhật ký các lỗi runtime/crash được tự động báo cáo về từ ứng dụng Desktop của khách hàng để lập trình viên theo dõi và gỡ lỗi (debug).
                 </p>
 
-                <textarea readonly style="width: 100%; height: 450px; font-family: monospace; font-size: 12px; background: #fafafa; padding: 15px; border: 1px solid #ccd0d4; border-radius: 4px;" placeholder="Chưa có nhật ký lỗi nào được ghi nhận từ phía khách hàng."><?php echo esc_textarea($error_logs); ?></textarea>
-                
-                <?php if (!empty($error_logs)) : ?>
+                <?php if (empty($errors)) : ?>
+                    <p>Chưa có nhật ký lỗi nào được ghi nhận từ phía khách hàng.</p>
+                <?php else : ?>
+                    <table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 150px;">Thời gian</th>
+                                <th style="width: 90px;">App Version</th>
+                                <th style="width: 110px;">Thiết bị (Machine)</th>
+                                <th style="width: 160px;">Hệ điều hành</th>
+                                <th>Thông báo lỗi</th>
+                                <th style="width: 100px;">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($errors as $err) : ?>
+                                <tr>
+                                    <td><?php echo esc_html(date_i18n('d/m/Y H:i:s', strtotime($err->reported_at))); ?></td>
+                                    <td><span style="background: #e7e7e7; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size:11px;">v<?php echo esc_html($err->app_version); ?></span></td>
+                                    <td><code><?php echo esc_html($err->machine_id); ?></code></td>
+                                    <td><?php echo esc_html($err->os_version); ?></td>
+                                    <td><strong style="color: #c9302c;"><?php echo esc_html($err->error_message); ?></strong></td>
+                                    <td>
+                                        <button type="button" class="button button-small button-secondary" onclick="showStackTrace('<?php echo esc_js('Lỗi thiết bị ' . $err->machine_id . ' (v' . $err->app_version . ')'); ?>', '<?php echo esc_js($err->stack_trace); ?>')">
+                                            Xem chi tiết
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+
                     <form method="post" style="margin-top: 20px;" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sạch hoàn toàn nhật ký lỗi trên máy chủ?');">
                         <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
                         <input type="hidden" name="pdfpro_action" value="clear_error_logs">
-                        <input type="submit" class="button button-secondary" value="Xóa Sạch Toàn BềENhật Ký Lỗi">
+                        <input type="submit" class="button button-secondary" value="Xóa Sạch Toàn Bộ Nhật Ký Lỗi">
                     </form>
                 <?php endif; ?>
             </div>
         </div>
     </div>
+
+    <!-- Modal hiển thị Stack Trace chi tiết -->
+    <div id="pdfpro-trace-modal" style="display:none; position:fixed; z-index:99999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5);">
+        <div style="background-color:#fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 900px; border-radius: 4px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); position: relative;">
+            <span onclick="closeModal()" style="color:#aaa; position: absolute; right: 15px; top: 10px; font-size:28px; font-weight:bold; cursor:pointer;">&times;</span>
+            <h3 id="pdfpro-modal-title" style="margin-top:0; padding-right: 30px;">Chi tiết lỗi</h3>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            <pre id="pdfpro-modal-body" style="background:#1e1e1e; color: #d4d4d4; border:1px solid #333; padding:15px; overflow-x:auto; max-height:500px; font-size:12px; font-family:Consolas, Monaco, monospace; white-space:pre-wrap; border-radius: 4px;"></pre>
+        </div>
+    </div>
+
+    <script>
+    function showStackTrace(title, trace) {
+        document.getElementById('pdfpro-modal-title').innerText = title;
+        document.getElementById('pdfpro-modal-body').innerText = trace;
+        document.getElementById('pdfpro-trace-modal').style.display = 'block';
+    }
+    function closeModal() {
+        document.getElementById('pdfpro-trace-modal').style.display = 'none';
+    }
+    // Đóng modal khi bấm ra ngoài vùng nội dung modal
+    window.onclick = function(event) {
+        var modal = document.getElementById('pdfpro-trace-modal');
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+    </script>
     <?php
 }
 

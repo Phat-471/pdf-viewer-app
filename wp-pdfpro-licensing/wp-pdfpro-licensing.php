@@ -28,6 +28,8 @@ function pdfpro_licensing_activate_plugin() {
 
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
+    $table_updates = $wpdb->prefix . 'pdfpro_updates';
+    $table_errors = $wpdb->prefix . 'pdfpro_errors';
 
     $sql1 = "CREATE TABLE $table_licenses (
         id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -50,9 +52,38 @@ function pdfpro_licensing_activate_plugin() {
         KEY license_id (license_id)
     ) $charset_collate;";
 
+    $sql3 = "CREATE TABLE $table_updates (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        version varchar(50) NOT NULL,
+        download_url varchar(255) NOT NULL,
+        sha256 varchar(64) NOT NULL,
+        file_size bigint(20) NOT NULL,
+        release_date varchar(50) DEFAULT '' NOT NULL,
+        mandatory tinyint(1) DEFAULT 0 NOT NULL,
+        changelog text DEFAULT '',
+        published_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+
+    $sql4 = "CREATE TABLE $table_errors (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        app_version varchar(50) NOT NULL,
+        machine_id varchar(100) NOT NULL,
+        os_version varchar(255) DEFAULT '' NOT NULL,
+        error_message text NOT NULL,
+        stack_trace text,
+        reported_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql1);
     dbDelta($sql2);
+    dbDelta($sql3);
+    dbDelta($sql4);
+
+    // Lưu phiên bản database mới
+    update_option('pdfpro_db_version', '1.0.1');
 
     // B. Tạo thư mục keys và sinh cặp khóa RSA nếu chưa tồn tại
     if (!file_exists(PDFPRO_KEYS_DIR)) {
@@ -63,6 +94,16 @@ function pdfpro_licensing_activate_plugin() {
 
     pdfpro_licensing_ensure_rsa_keypair();
 }
+
+// Tự động kiểm tra và nâng cấp CSDL khi admin truy cập
+add_action('admin_init', 'pdfpro_licensing_check_db_upgrade');
+function pdfpro_licensing_check_db_upgrade() {
+    $current_db_version = get_option('pdfpro_db_version', '1.0.0');
+    if ($current_db_version !== '1.0.1') {
+        pdfpro_licensing_activate_plugin();
+    }
+}
+
 
 /**
  * Tự động tạo cặp khóa RSA 2048-bit bằng OpenSSL

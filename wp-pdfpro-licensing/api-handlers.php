@@ -314,9 +314,10 @@ function pdfpro_licensing_api_update_check(WP_REST_Request $request) {
 }
 
 /**
- * Xử lý báo cáo lỗi từ ứng dụng Desktop
+ * Xử lý báo cáo lỗi từ ứng dụng Desktop (Telemetry)
  */
 function pdfpro_licensing_api_report_error(WP_REST_Request $request) {
+    global $wpdb;
     $params = $request->get_json_params();
     $app_version = sanitize_text_field($params['app_version'] ?? 'unknown');
     $machine_id = sanitize_text_field($params['machine_id'] ?? 'unknown');
@@ -325,17 +326,29 @@ function pdfpro_licensing_api_report_error(WP_REST_Request $request) {
     $os_version = sanitize_text_field($params['os_version'] ?? 'unknown');
     $timestamp = isset($params['timestamp']) ? intval($params['timestamp']) : time();
 
+    // 1. Ghi vào file error_logs.txt làm dự phòng
     $log_time = date('Y-m-d H:i:s', $timestamp);
     $log_entry = "=========================================\n";
     $log_entry .= "THỜI GIAN: $log_time\n";
     $log_entry .= "PHIÊN BẢN APP: $app_version\n";
-    $log_entry .= "HềEĐIỀU HÀNH: $os_version\n";
-    $log_entry .= "MÁETHIẾT BềE $machine_id\n";
+    $log_entry .= "HỆ ĐIỀU HÀNH: $os_version\n";
+    $log_entry .= "MÃ THIẾT BỊ: $machine_id\n";
     $log_entry .= "THÔNG BÁO LỖI: $error_message\n";
     $log_entry .= "STACK TRACE:\n$stack_trace\n\n";
 
     $log_file = PDFPRO_LICENSING_DIR . 'error_logs.txt';
-    file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+    @file_put_contents($log_file, $log_entry, FILE_APPEND | LOCK_EX);
+
+    // 2. Ghi vào bảng wp_pdfpro_errors
+    $table_errors = $wpdb->prefix . 'pdfpro_errors';
+    $wpdb->insert($table_errors, array(
+        'app_version'   => $app_version,
+        'machine_id'    => $machine_id,
+        'os_version'    => $os_version,
+        'error_message' => $error_message,
+        'stack_trace'   => $stack_trace,
+        'reported_at'   => date('Y-m-d H:i:s', $timestamp)
+    ));
 
     return array(
         'success' => true,
@@ -347,6 +360,7 @@ function pdfpro_licensing_api_report_error(WP_REST_Request $request) {
  * Xử lý yêu cầu Phát hành bản cập nhật mới
  */
 function pdfpro_licensing_api_update_publish(WP_REST_Request $request) {
+    global $wpdb;
     $params = $request->get_json_params();
     $token = sanitize_text_field($params['token'] ?? '');
     
@@ -375,11 +389,24 @@ function pdfpro_licensing_api_update_publish(WP_REST_Request $request) {
     
     update_option('pdfpro_latest_version', $latest_version);
     update_option('pdfpro_download_url', $download_url);
-    update_option('pdfpro_update_sha256', $sha256);
+    update_option('pdfpro_update_sha256', strtolower(preg_replace('/[^a-fA-F0-9]/', '', $sha256)));
     update_option('pdfpro_update_file_size', $file_size);
     update_option('pdfpro_update_release_date', $release_date);
     update_option('pdfpro_update_mandatory', $mandatory);
     update_option('pdfpro_changelog', $changelog);
+
+    // Lưu thông tin vào bảng lịch sử updates
+    $table_updates = $wpdb->prefix . 'pdfpro_updates';
+    $wpdb->insert($table_updates, array(
+        'version'      => $latest_version,
+        'download_url' => $download_url,
+        'sha256'       => strtolower(preg_replace('/[^a-fA-F0-9]/', '', $sha256)),
+        'file_size'    => $file_size,
+        'release_date' => $release_date,
+        'mandatory'    => $mandatory === '1' ? 1 : 0,
+        'changelog'    => $changelog,
+        'published_at' => current_time('mysql')
+    ));
     
     return array(
         'success' => true,
