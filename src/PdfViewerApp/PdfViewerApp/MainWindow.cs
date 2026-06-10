@@ -109,6 +109,20 @@ public partial class MainWindow : Window, IComponentConnector
 		HookDashboardEvents();
 		base.Loaded += delegate
 		{
+			// Check license heartbeat check online ngầm
+			Task.Run(async delegate
+			{
+				try
+				{
+					await ActivationLicense.CheckHeartbeatOnlineAsync();
+					await base.Dispatcher.InvokeAsync(delegate
+					{
+						ApplyAppActivationState();
+					});
+				}
+				catch {}
+			});
+
 			HandleStartupPdfArguments();
 			UpdateTabEmptyState();
 			EnsureDiagnosticsButtons();
@@ -315,7 +329,7 @@ public partial class MainWindow : Window, IComponentConnector
 			{
 				if (string.IsNullOrEmpty(result.Response.DownloadUrl))
 				{
-					MessageBox.Show(this, "Phát hiện phiên bản mới v" + result.LatestVersion + " trên máy chủ, nhưng quản trềEviên chưa cấu hình \"Link tải bản cập nhật (Download URL)\" trong trang quản trềEWordPress.", "Kiểm tra cập nhật", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+					MessageBox.Show(this, "Phát hiện phiên bản mới v" + result.LatestVersion + " trên máy chủ, nhưng quản trị viên chưa cấu hình \"Link tải bản cập nhật (Download URL)\" trong trang quản trị WordPress.", "Kiểm tra cập nhật", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 				}
 				else
 				{
@@ -458,7 +472,7 @@ public partial class MainWindow : Window, IComponentConnector
 
 			string currentVersion = string.IsNullOrWhiteSpace(state.TargetVersion) ? "unknown" : state.TargetVersion;
 			string previousVersion = string.IsNullOrWhiteSpace(state.CurrentVersion) ? "unknown" : state.CurrentVersion;
-			string confirmMessage = $"Khôi phục từ v{currentVersion} vềEv{previousVersion}?\n\nỨng dụng hiện tại sẽ đóng trước khi quá trình restore bắt đầu.";
+			string confirmMessage = $"Khôi phục từ v{currentVersion} về v{previousVersion}?\n\nỨng dụng hiện tại sẽ đóng trước khi quá trình restore bắt đầu.";
 			if (MessageBox.Show(this, confirmMessage, "Khôi phục bản trước", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
 			{
 				return;
@@ -481,7 +495,7 @@ public partial class MainWindow : Window, IComponentConnector
 		catch (Exception ex)
 		{
 			App.SendCrashTelemetry(ex);
-			MessageBox.Show(this, "Không thềEkhôi phục bản trước: " + ex.Message, "Khôi phục bản trước", MessageBoxButton.OK, MessageBoxImage.Error);
+			MessageBox.Show(this, "Không thể khôi phục bản trước: " + ex.Message, "Khôi phục bản trước", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
 
@@ -679,7 +693,7 @@ exit 0
 			{
 				activeTab.ActiveTool = "Select";
 			}
-			LogStatus("Đã hủy chế đềEvẽ/chú thích");
+			LogStatus("Đã hủy chế độ vẽ/chú thích");
 			e.Handled = true;
 		}
 		else if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
@@ -1017,7 +1031,7 @@ exit 0
 		OpenFileDialog openFileDialog = new OpenFileDialog
 		{
 			Filter = "PDF documents (*.pdf)|*.pdf",
-			Title = "MềEFile PDF",
+			Title = "MởFile PDF",
 			Multiselect = true
 		};
 		if (openFileDialog.ShowDialog() == true)
@@ -1280,7 +1294,7 @@ exit 0
 		}
 		else
 		{
-			MessageBox.Show("Vui lòng mềEmột file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Vui lòng mở một file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 		}
 	}
 
@@ -1289,7 +1303,7 @@ exit 0
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab == null)
 		{
-			MessageBox.Show("Vui lòng mềEmột file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Vui lòng mở một file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
 		SaveFileDialog saveFileDialog = new SaveFileDialog
@@ -1314,7 +1328,7 @@ exit 0
 		}
 		else
 		{
-			MessageBox.Show("Vui lòng mềEmột file PDF trước khi in.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Vui lòng mở một file PDF trước khi in.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 		}
 	}
 
@@ -1454,7 +1468,7 @@ exit 0
 		OpenFileDialog openFileDialog = new OpenFileDialog
 		{
 			Filter = "PDF documents (*.pdf)|*.pdf",
-			Title = "Chọn nhiều file PDF đềEgộp",
+			Title = "Chọn nhiều file PDF để gộp",
 			Multiselect = true
 		};
 		if (openFileDialog.ShowDialog() == true)
@@ -1462,7 +1476,7 @@ exit 0
 			string[] array = FilterPdfFiles(openFileDialog.FileNames);
 			if (array.Length < 2)
 			{
-				MessageBox.Show("Vui lòng chọn ít nhất 2 file PDF đềEgộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				MessageBox.Show("Vui lòng chọn ít nhất 2 file PDF để gộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			}
 			else
 			{
@@ -1750,7 +1764,26 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		base.Title = (activationState.IsActivated ? (ActivationLicense.AppTitle + " - Activated") : (ActivationLicense.AppTitle + " - Not activated"));
 		if (ActivationWarningBanner != null)
 		{
-			ActivationWarningBanner.Visibility = (activationState.IsActivated ? Visibility.Collapsed : Visibility.Visible);
+			if (!activationState.IsActivated)
+			{
+				ActivationWarningBanner.Visibility = Visibility.Visible;
+				if (ActivationWarningText != null)
+				{
+					ActivationWarningText.Text = "Ứng dụng chưa được kích hoạt bản quyền. Vui lòng kích hoạt để sử dụng đầy đủ các tính năng nâng cao.";
+				}
+			}
+			else if (activationState.NeedsOnlineVerification)
+			{
+				ActivationWarningBanner.Visibility = Visibility.Visible;
+				if (ActivationWarningText != null)
+				{
+					ActivationWarningText.Text = activationState.OfflineWarningMessage;
+				}
+			}
+			else
+			{
+				ActivationWarningBanner.Visibility = Visibility.Collapsed;
+			}
 		}
 		if (LicenseStatusMessage != null)
 		{
@@ -1774,7 +1807,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			return true;
 		}
-		MessageBox.Show("Tính năng này yêu cầu kích hoạt bản quyền PRO. Vui lòng kích hoạt bản quyền đềEtiếp tục sử dụng.", "Yêu cầu Bản Quyền PRO", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+		MessageBox.Show("Tính năng này yêu cầu kích hoạt bản quyền PRO. Vui lòng kích hoạt bản quyền để tiếp tục sử dụng.", "Yêu cầu Bản Quyền PRO", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 		Activation_Click(this, new RoutedEventArgs());
 		return false;
 	}
@@ -2023,7 +2056,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("Không thềEmềEfile sau khi gộp: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+				MessageBox.Show("Không thể mở file sau khi gộp: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 			}
 			Application.Current.Shutdown();
 		}
@@ -2262,7 +2295,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			}
 			await Task.Delay(150);
 		}
-		MessageBox.Show("Đã gộp file nhưng chưa mềEđược file kết quả. Vui lòng mềElại file đã gộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+		MessageBox.Show("Đã gộp file nhưng chưa mở được file kết quả. Vui lòng mở lại file đã gộp.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 	}
 
 	private static bool IsReadablePdf(string path)
@@ -2329,7 +2362,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Select";
 		}
-		LogStatus("Đã hủy chế đềEvẽ/chú thích");
+		LogStatus("Đã hủy chế độ vẽ/chú thích");
 	}
 
 	private void SelectTool_Click(object sender, RoutedEventArgs e)
@@ -2340,7 +2373,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Select";
 		}
-		LogStatus("Đã chuyển sang công cụ chọn đềEthực hiện kích hoạt");
+		LogStatus("Đã chuyển sang công cụ chọn để thực hiện kích hoạt");
 	}
 
 	private void InkTool_Click(object sender, RoutedEventArgs e)
@@ -2351,7 +2384,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Ink";
 		}
-		LogStatus("Đã chuyển sang công cụ Bút vẽ tự do. Hãy kéo chuột đềEvẽ.");
+		LogStatus("Đã chuyển sang công cụ Bút vẽ tự do. Hãy kéo chuột để vẽ.");
 	}
 
 	private void RectTool_Click(object sender, RoutedEventArgs e)
@@ -2362,7 +2395,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "ShapeRect";
 		}
-		LogStatus("Đã chuyển sang công cụ Hình chữ nhật. Hãy kéo chuột đềEvẽ.");
+		LogStatus("Đã chuyển sang công cụ Hình chữ nhật. Hãy kéo chuột để vẽ.");
 	}
 
 	private void OvalTool_Click(object sender, RoutedEventArgs e)
@@ -2373,7 +2406,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "ShapeOval";
 		}
-		LogStatus("Đã chuyển sang công cụ Hình tròn. Hãy kéo chuột đềEvẽ.");
+		LogStatus("Đã chuyển sang công cụ Hình tròn. Hãy kéo chuột để vẽ.");
 	}
 
 	private void LineTool_Click(object sender, RoutedEventArgs e)
@@ -2384,7 +2417,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "ShapeLine";
 		}
-		LogStatus("Đã chuyển sang công cụ Đường thẳng. Hãy kéo chuột đềEvẽ.");
+		LogStatus("Đã chuyển sang công cụ Đường thẳng. Hãy kéo chuột để vẽ.");
 	}
 
 	private void StickyNoteTool_Click(object sender, RoutedEventArgs e)
@@ -2395,7 +2428,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "StickyNote";
 		}
-		LogStatus("Đã chuyển sang công cụ Ghi chú. Hãy click lên một vềEtrí bất kỳ trên trang đềEtạo.");
+		LogStatus("Đã chuyển sang công cụ Ghi chú. Hãy click lên một vị trí bất kỳ trên trang để tạo.");
 	}
 
 	private void SelectTextTool_Click(object sender, RoutedEventArgs e)
@@ -2406,7 +2439,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "SelectText";
 		}
-		LogStatus("Đã chuyển sang công cụ chọn văn bản. Hãy kéo chuột đềEquét chọn chữ.");
+		LogStatus("Đã chuyển sang công cụ chọn văn bản. Hãy kéo chuột đểquét chọn chữ.");
 	}
 
 	private void EditTextTool_Click(object sender, RoutedEventArgs e)
@@ -2417,7 +2450,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "EditText";
 		}
-		LogStatus("Đã chuyển sang công cụ sửa chữ trực tiếp. Nhấp đúp vào dòng chữ bất kỳ đềEsửa.");
+		LogStatus("Đã chuyển sang công cụ sửa chữ trực tiếp. Nhấp đúp vào dòng chữ bất kỳ để sửa.");
 	}
 
 	private void TextBoxTool_Click(object sender, RoutedEventArgs e)
@@ -2428,7 +2461,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "TextBox";
 		}
-		LogStatus("Đã chuyển sang công cụ Hộp văn bản đềEthực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ đềEtạo.");
+		LogStatus("Đã chuyển sang công cụ Hộp văn bản để thực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ để tạo.");
 	}
 
 	private void CalloutTool_Click(object sender, RoutedEventArgs e)
@@ -2439,7 +2472,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Callout";
 		}
-		LogStatus("Đã chuyển sang công cụ Mũi tên chềEdẫn đềEthực hiện kích hoạt. Nhập chuỗi đềEtạo mũi tên, kéo đềEtạo ghi chú.");
+		LogStatus("Đã chuyển sang công cụ Mũi tên chệdẫn để thực hiện kích hoạt. Nhập chuỗi để tạo mũi tên, kéo để tạo ghi chú.");
 	}
 
 	private void SnapshotTool_Click(object sender, RoutedEventArgs e)
@@ -2450,7 +2483,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Snapshot";
 		}
-		LogStatus("Đã chuyển sang công cụ Snapshot. Kéo chọn một vùng trên bản vẽ đềEin phóng ra A3.");
+		LogStatus("Đã chuyển sang công cụ Snapshot. Kéo chọn một vùng trên bản vẽ đểin phóng ra A3.");
 	}
 
 	private void AiSnapshotTool_Click(object sender, RoutedEventArgs e)
@@ -2464,7 +2497,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 				activeTab.ActiveTool = "AiSnapshot";
 			}
 			ShowAiPanel();
-			LogStatus("Đã chuyển sang AI Snapshot. Kéo chọn một vùng bản vẽ đềEhỏi AI.");
+			LogStatus("Đã chuyển sang AI Snapshot. Kéo chọn một vùng bản vẽ đểhỏi AI.");
 		}
 	}
 
@@ -2872,7 +2905,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath) || activeTab.PageCount <= 0)
 		{
-			MessageBox.Show("Vui lòng mềEmột file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
 			return;
 		}
 		List<int> selectedPages = activeTab.SelectedPageNumbers?.Distinct().ToList() ?? new List<int>();
@@ -2893,7 +2926,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 		if (pagesToKeep.Count == 0)
 		{
-			MessageBox.Show("Danh sách trang cần trích xuất không hợp lềE", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+			MessageBox.Show("Danh sách trang cần trích xuất không hợp lệ", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
 			return;
 		}
 		SaveFileDialog saveFileDialog = new SaveFileDialog
@@ -2916,7 +2949,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			}
 			else
 			{
-				MessageBox.Show("Không thềEtrích xuất trang PDF. Vui lòng kiểm tra lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				MessageBox.Show("Không thể trích xuất trang PDF. Vui lòng kiểm tra lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
 				LogStatus("Trích xuất thất bại");
 			}
 		}

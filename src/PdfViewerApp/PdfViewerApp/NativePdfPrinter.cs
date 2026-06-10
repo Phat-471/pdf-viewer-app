@@ -142,6 +142,9 @@ internal static class NativePdfPrinter
 					}
 					num5++;
 					progress?.Report(new PrintProgressInfo($"Da gui trang {j + 1} ({num5}/{num4})", num5, num4));
+
+					GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+					GC.WaitForPendingFinalizers();
 				}
 			}
 			if (!separatePageJobs)

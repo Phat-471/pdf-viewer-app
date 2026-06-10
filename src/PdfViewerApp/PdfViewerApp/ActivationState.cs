@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PdfViewerApp;
 
@@ -21,4 +21,8 @@ internal sealed class ActivationState
 	public DateTimeOffset? ExpiresAt { get; init; }
 
 	public string ExpirationText { get; init; } = string.Empty;
+
+	public bool NeedsOnlineVerification { get; init; }
+
+	public string OfflineWarningMessage { get; init; } = string.Empty;
 }

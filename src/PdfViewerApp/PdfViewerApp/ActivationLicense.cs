@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -112,6 +112,25 @@ internal static class ActivationLicense
 		{
 			SaveCachedPublicKeyPem(verifiedPublicKey);
 		}
+
+		bool needsOnlineVerification = false;
+		string offlineWarningMessage = string.Empty;
+		if (flag && activationRecord != null)
+		{
+			double daysSinceCheck = (DateTimeOffset.Now - activationRecord.LastOnlineCheckTime).TotalDays;
+			if (daysSinceCheck >= 15.0)
+			{
+				flag = false;
+				LastVerifyError = "Vượt quá thời hạn xác thực ngoại tuyến (15 ngày). Vui lòng kết nối Internet.";
+			}
+			else if (daysSinceCheck >= 7.0)
+			{
+				needsOnlineVerification = true;
+				int remainingDays = (int)Math.Max(1, Math.Ceiling(15.0 - daysSinceCheck));
+				offlineWarningMessage = $"Ứng dụng đang chạy ngoại tuyến. Vui lòng kết nối Internet trong {remainingDays} ngày tới để xác thực bản quyền.";
+			}
+		}
+
 		return new ActivationState
 		{
 			AppVersion = AppVersion,
@@ -122,7 +141,9 @@ internal static class ActivationLicense
 			LicensePath = LicensePath,
 			StatusText = (flag ? "Activated" : "Not activated"),
 			ExpiresAt = expiresAt,
-			ExpirationText = expirationText
+			ExpirationText = expirationText,
+			NeedsOnlineVerification = needsOnlineVerification,
+			OfflineWarningMessage = offlineWarningMessage
 		};
 	}
 
@@ -176,7 +197,8 @@ internal static class ActivationLicense
 					PublicKey = publicKeyPem,
 					MachineId = MachineId,
 					Edition = "HPhat Edition",
-					ActivatedAt = DateTimeOffset.Now
+					ActivatedAt = DateTimeOffset.Now,
+					LastOnlineCheckTime = DateTimeOffset.Now
 				};
 				File.WriteAllText(LicensePath, JsonSerializer.Serialize(value2, new JsonSerializerOptions
 				{
@@ -523,5 +545,62 @@ internal static class ActivationLicense
 		{
 		}
 		return false;
+	}
+
+	public static async Task CheckHeartbeatOnlineAsync()
+	{
+		ActivationRecord record = LoadRecord();
+		if (record == null || string.IsNullOrEmpty(record.ActivationKey))
+		{
+			return;
+		}
+
+		double daysSinceCheck = (DateTimeOffset.Now - record.LastOnlineCheckTime).TotalDays;
+		if (daysSinceCheck < 7.0)
+		{
+			return;
+		}
+
+		try
+		{
+			using HttpClient client = new HttpClient();
+			client.Timeout = TimeSpan.FromSeconds(10.0);
+			StringContent content = new StringContent(JsonSerializer.Serialize(new
+			{
+				license_key = NormalizeKey(record.ActivationKey),
+				machine_id = MachineId
+			}), Encoding.UTF8, "application/json");
+
+			HttpResponseMessage response = await client.PostAsync("https://hongmien.vn/wp-json/pdfpro/v1/check", content);
+			if (response.IsSuccessStatusCode)
+			{
+				string json = await response.Content.ReadAsStringAsync();
+				using JsonDocument doc = JsonDocument.Parse(json);
+				bool success = doc.RootElement.GetProperty("success").GetBoolean();
+				string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+
+				if (success && status == "activated")
+				{
+					record.LastOnlineCheckTime = DateTimeOffset.Now;
+					if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
+					{
+						record.Payload = payloadVal.GetString() ?? record.Payload;
+						record.Signature = sigVal.GetString() ?? record.Signature;
+					}
+					
+					File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
+					{
+						WriteIndented = true
+					}), Encoding.UTF8);
+				}
+				else
+				{
+					Deactivate();
+				}
+			}
+		}
+		catch
+		{
+		}
 	}
 }

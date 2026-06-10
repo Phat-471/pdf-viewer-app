@@ -8,7 +8,7 @@ internal sealed class AppPreferences
 {
 	public bool IsDarkTheme { get; set; } = true;
 
-	public bool AllowMultipleInstances { get; set; } = false;
+	public bool AllowMultipleInstances { get; set; } = true;
 
 	public static string PreferencesPath
 	{

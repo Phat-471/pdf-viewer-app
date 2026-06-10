@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Thêm Menu và các Submenu vào trang quản trềEWordPress Admin
+// Thêm Menu và các Submenu vào trang quản trị WordPress Admin
 add_action('admin_menu', 'pdfpro_licensing_add_admin_menu');
 
 // Hook xử lý các hành động POST trước khi render HTML
@@ -143,19 +143,25 @@ function pdfpro_licensing_admin_styles() {
             border-bottom: 2px solid #334155 !important;
             padding: 12px 16px !important;
         }
+        .pdfpro-admin-wrap table.wp-list-table tr {
+            background: #0F172A !important;
+        }
         .pdfpro-admin-wrap table.wp-list-table td {
+            background: transparent !important;
             color: #CBD5E1 !important;
             border-bottom: 1px solid #1E293B !important;
             padding: 14px 16px !important;
             vertical-align: middle !important;
         }
-        .pdfpro-admin-wrap table.wp-list-table tr:hover {
+        .pdfpro-admin-wrap table.wp-list-table tr:hover,
+        .pdfpro-admin-wrap table.wp-list-table tr:hover td {
             background: #1E293B !important;
         }
         .pdfpro-admin-wrap table.wp-list-table tr.alternate {
             background: #111827 !important;
         }
-        .pdfpro-admin-wrap table.wp-list-table tr.alternate:hover {
+        .pdfpro-admin-wrap table.wp-list-table tr.alternate:hover,
+        .pdfpro-admin-wrap table.wp-list-table tr.alternate:hover td {
             background: #1E293B !important;
         }
         /* Code blocks & monospace */
@@ -284,7 +290,7 @@ function pdfpro_licensing_add_admin_menu() {
         80
     );
 
-    // Submenu 1: Quản lý Licenses (ghi đè slug của menu cha đềElàm trang mặc định)
+    // Submenu 1: Quản lý Licenses (ghi đè slug của menu cha để làm trang mặc định)
     add_submenu_page(
         'pdfpro-licensing',
         'Quản lý Licenses',
@@ -326,7 +332,7 @@ function pdfpro_licensing_add_admin_menu() {
 }
 
 /**
- * Xử lý dữ liệu form (POST requests) trong trang quản trềEtrước khi xuất HTML
+ * Xử lý dữ liệu form (POST requests) trong trang quản trịtrước khi xuất HTML
  */
 function pdfpro_licensing_handle_admin_actions() {
     if (!isset($_POST['pdfpro_license_nonce']) || !wp_verify_nonce($_POST['pdfpro_license_nonce'], 'pdfpro_license_action')) {
@@ -350,7 +356,7 @@ function pdfpro_licensing_handle_admin_actions() {
         $expires_at = sanitize_text_field($_POST['expires_at'] ?? '');
         $status = sanitize_text_field($_POST['status'] ?? 'active');
 
-        // Tự tạo key ngẫu nhiên nếu bềEtrống
+        // Tự tạo key ngẫu nhiên nếu bị trống
         if (empty($license_key)) {
             $license_key = 'PDFPRO-' . strtoupper(wp_generate_password(4, false, false)) . '-' . 
                            strtoupper(wp_generate_password(4, false, false)) . '-' . 
@@ -523,7 +529,7 @@ function pdfpro_licensing_handle_admin_actions() {
 }
 
 /**
- * Hiển thềEthông báo (Notices) động dựa trên query parameter
+ * Hiển thị thông báo (Notices) động dựa trên query parameter
  */
 function pdfpro_licensing_render_notices() {
     if (!isset($_GET['pdfpro_msg'])) {
@@ -541,7 +547,7 @@ function pdfpro_licensing_render_notices() {
             echo '<div class="notice notice-warning is-dismissible"><p>Đã xóa thành công License Key.</p></div>';
             break;
         case 'device_reset':
-            echo '<div class="notice notice-success is-dismissible"><p>Đã thu hồi kích hoạt của thiết bềEthành công.</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>Đã thu hồi kích hoạt của thiết bị thành công.</p></div>';
             break;
         case 'status_toggled':
             echo '<div class="notice notice-success is-dismissible"><p>Đã chuyển đổi trạng thái license thành công.</p></div>';
@@ -559,25 +565,25 @@ function pdfpro_licensing_render_notices() {
 }
 
 /**
- * SUBMENU 1: Hiển thềEgiao diện quản lý Licenses & Khóa RSA
+ * SUBMENU 1: Hiển thị giao diện quản lý Licenses & Khóa RSA
  */
 function pdfpro_licensing_render_licenses_page() {
     global $wpdb;
     
-    // Hiển thềEthông báo kết quả hành động
+    // Hiển thị thông báo kết quả hành động
     pdfpro_licensing_render_notices();
 
-    // Hiển thềEcảnh báo hềEthống nếu có lỗi cấu hình
+    // Hiển thị cảnh báo hệ thống nếu có lỗi cấu hình
     if (!extension_loaded('openssl')) {
         echo '<div class="notice notice-error"><p><strong>Cảnh báo:</strong> Thư viện <strong>OpenSSL</strong> của PHP chưa được kích hoạt. Cơ chế ký bản quyền RSA sẽ không hoạt động!</p></div>';
     } elseif (!file_exists(PDFPRO_PUBLIC_KEY_PATH) || !file_exists(PDFPRO_PRIVATE_KEY_PATH)) {
-        echo '<div class="notice notice-warning"><p><strong>Lưu ý:</strong> Cặp khóa bảo mật RSA chưa được khởi tạo. Vui lòng bấm nút <strong>Sinh Khóa RSA</strong> ềEcột bên phải đềEtiếp tục.</p></div>';
+        echo '<div class="notice notice-warning"><p><strong>Lưu ý:</strong> Cặp khóa bảo mật RSA chưa được khởi tạo. Vui lòng bấm nút <strong>Sinh Khóa RSA</strong> ở cột bên phải để tiếp tục.</p></div>';
     }
 
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
 
-    // Truy vấn danh sách Licenses kèm sềEmáy đã active
+    // Truy vấn danh sách Licenses kèm số máy đã active
     $licenses = $wpdb->get_results("
         SELECT l.*, COUNT(a.id) as active_count 
         FROM $table_licenses l
@@ -604,17 +610,18 @@ function pdfpro_licensing_render_licenses_page() {
                     <h2 style="margin: 0;">Danh sách các mã kích hoạt (License Keys)</h2>
                     <a href="<?php echo esc_url(admin_url('admin.php?page=pdfpro-create-license')); ?>" class="button button-primary">Tạo Key Mới</a>
                 </div>
-                <table class="wp-list-table widefat fixed striped table-view-list">
-                    <thead>
-                        <tr>
-                            <th style="width: 5%;">STT</th>
-                            <th style="width: 35%;">License Key / Thiết bềEkích hoạt</th>
-                            <th style="width: 15%;">SềEmáy kích hoạt</th>
-                            <th style="width: 10%;">Trạng thái</th>
-                            <th style="width: 15%;">Hạn dùng</th>
-                            <th style="width: 20%;">Hành động</th>
-                        </tr>
-                    </thead>
+                <div style="overflow-x: auto; width: 100%; border-radius: 8px;">
+                    <table class="wp-list-table widefat striped table-view-list" style="table-layout: auto !important; min-width: 900px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">STT</th>
+                                <th style="width: 35%;">License Key / Thiết bị kích hoạt</th>
+                                <th style="width: 15%;">Số máy kích hoạt</th>
+                                <th style="width: 10%;">Trạng thái</th>
+                                <th style="width: 15%;">Hạn dùng</th>
+                                <th style="width: 20%;">Hành động</th>
+                            </tr>
+                        </thead>
                     <tbody>
                         <?php if (empty($licenses)) : ?>
                             <tr>
@@ -723,13 +730,14 @@ function pdfpro_licensing_render_licenses_page() {
                         <?php endif; ?>
                     </tbody>
                 </table>
+                </div>
             </div>
 
             <!-- Hộp thông tin RSA -->
             <div class="card" style="padding: 20px; max-width: 800px; margin-top: 20px;">
                 <h2>Thông tin mã khóa RSA</h2>
                 <p style="font-size: 13px; color: #555;">
-                    Sao chép mã khóa công khai (Public Key) dưới đây và nhúng vào mã nguồn ứng dụng <strong>C# WPF Client</strong> đềExác minh Token bản quyền được gửi từ server.
+                    Sao chép mã khóa công khai (Public Key) dưới đây và nhúng vào mã nguồn ứng dụng <strong>C# WPF Client</strong> để xác minh Token bản quyền được gửi từ server.
                 </p>
                 
                 <?php if (empty($public_key)) : ?>
@@ -805,10 +813,10 @@ function pdfpro_licensing_render_licenses_page() {
 }
 
 /**
- * SUBMENU 2: Hiển thềEgiao diện cấu hình Cập Nhật Phần Mềm
+ * SUBMENU 2: Hiển thị giao diện cấu hình Cập Nhật Phần Mềm
  */
 function pdfpro_licensing_render_updates_page() {
-    // Hiển thềEthông báo kết quả hành động
+    // Hiển thị thông báo kết quả hành động
     pdfpro_licensing_render_notices();
 
     $latest_version = get_option('pdfpro_latest_version', '1.0.0');
@@ -827,7 +835,7 @@ function pdfpro_licensing_render_updates_page() {
             <div class="card" style="padding: 20px;">
                 <h2>Thông Tin Bản Cập Nhật Ứng Dụng</h2>
                 <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
-                    Cấu hình phiên bản mới nhất đềEứng dụng Desktop khách hàng tự động kiểm tra và thông báo tải vềEkhi mềEapp.
+                    Cấu hình phiên bản mới nhất để ứng dụng Desktop khách hàng tự động kiểm tra và thông báo tải về khi mở app.
                 </p>
 
                 <form method="post">
@@ -868,7 +876,7 @@ function pdfpro_licensing_render_updates_page() {
                                 <th scope="row"><label for="pdfpro_download_url"><strong>Đường dẫn tải bản cập nhật (Download URL):</strong></label></th>
                                 <td>
                                     <input type="url" id="pdfpro_download_url" name="pdfpro_download_url" value="<?php echo esc_url($download_url); ?>" class="large-text" placeholder="Ví dụ: https://link-tai-google-drive/file.zip" style="width: 100%;">
-                                    <p class="description">Đường dẫn tệp ZIP hoặc tệp cài đặt (ví dụ: Google Drive link dạng trực tiếp hoặc chia sẻ mềE.</p>
+                                    <p class="description">Đường dẫn tệp ZIP hoặc tệp cài đặt (ví dụ: Google Drive link dạng trực tiếp hoặc chia sẻ mở.</p>
                                 </td>
                             </tr>
                             <tr>
@@ -905,7 +913,7 @@ function pdfpro_licensing_render_updates_page() {
                                 <th scope="row"><label for="pdfpro_changelog"><strong>Thông tin cập nhật (Changelog):</strong></label></th>
                                 <td>
                                     <textarea id="pdfpro_changelog" name="pdfpro_changelog" rows="8" class="large-text" placeholder="Nhập các thay đổi trong phiên bản mới..." style="width: 100%;"><?php echo esc_textarea($changelog); ?></textarea>
-                                    <p class="description">Nhập các cải tiến, sửa lỗi trong phiên bản này đềEhiển thềEtrên thông báo ứng dụng.</p>
+                                    <p class="description">Nhập các cải tiến, sửa lỗi trong phiên bản này để hiển thị trên thông báo ứng dụng.</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -932,19 +940,20 @@ function pdfpro_licensing_render_updates_page() {
                     echo '<p>Chưa có bản ghi lịch sử cập nhật nào.</p>';
                 else :
                 ?>
-                <table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 80px;">Phiên bản</th>
-                            <th style="width: 130px;">Ngày phát hành</th>
-                            <th style="width: 100px;">Kích thước</th>
-                            <th>Đường dẫn tải về</th>
-                            <th style="width: 180px;">SHA256</th>
-                            <th style="width: 95px;">Bắt buộc</th>
-                            <th>Nhật ký thay đổi (Changelog)</th>
-                            <th style="width: 150px;">Thời gian phát hành</th>
-                        </tr>
-                    </thead>
+                <div style="overflow-x: auto; width: 100%; border-radius: 8px;">
+                    <table class="wp-list-table widefat striped" style="margin-top: 10px; table-layout: auto !important; min-width: 1100px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Phiên bản</th>
+                                <th style="width: 130px;">Ngày phát hành</th>
+                                <th style="width: 100px;">Kích thước</th>
+                                <th style="min-width: 280px;">Đường dẫn tải về</th>
+                                <th style="width: 180px;">SHA256</th>
+                                <th style="width: 95px;">Bắt buộc</th>
+                                <th style="min-width: 250px;">Nhật ký thay đổi (Changelog)</th>
+                                <th style="width: 150px;">Thời gian phát hành</th>
+                            </tr>
+                        </thead>
                     <tbody>
                         <?php foreach ($updates as $up) : ?>
                             <tr>
@@ -966,6 +975,7 @@ function pdfpro_licensing_render_updates_page() {
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+                </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -974,11 +984,11 @@ function pdfpro_licensing_render_updates_page() {
 }
 
 /**
- * SUBMENU 3: Hiển thềEgiao diện Nhật Ký Lỗi Khách Hàng (Telemetry)
+ * SUBMENU 3: Hiển thị giao diện Nhật Ký Lỗi Khách Hàng (Telemetry)
  */
 function pdfpro_licensing_render_errors_page() {
     global $wpdb;
-    // Hiển thềEthông báo kết quả hành động
+    // Hiển thị thông báo kết quả hành động
     pdfpro_licensing_render_notices();
 
     $table_errors = $wpdb->prefix . 'pdfpro_errors';
@@ -999,17 +1009,18 @@ function pdfpro_licensing_render_errors_page() {
                 <?php if (empty($errors)) : ?>
                     <p>Chưa có nhật ký lỗi nào được ghi nhận từ phía khách hàng.</p>
                 <?php else : ?>
-                    <table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">
-                        <thead>
-                            <tr>
-                                <th style="width: 150px;">Thời gian</th>
-                                <th style="width: 90px;">App Version</th>
-                                <th style="width: 110px;">Thiết bị (Machine)</th>
-                                <th style="width: 160px;">Hệ điều hành</th>
-                                <th>Thông báo lỗi</th>
-                                <th style="width: 100px;">Hành động</th>
-                            </tr>
-                        </thead>
+                    <div style="overflow-x: auto; width: 100%; border-radius: 8px;">
+                        <table class="wp-list-table widefat striped" style="margin-top: 10px; table-layout: auto !important; min-width: 900px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 150px;">Thời gian</th>
+                                    <th style="width: 90px;">App Version</th>
+                                    <th style="width: 110px;">Thiết bị (Machine)</th>
+                                    <th style="width: 160px;">Hệ điều hành</th>
+                                    <th>Thông báo lỗi</th>
+                                    <th style="width: 100px;">Hành động</th>
+                                </tr>
+                            </thead>
                         <tbody>
                             <?php foreach ($errors as $err) : ?>
                                 <tr>
@@ -1027,6 +1038,7 @@ function pdfpro_licensing_render_errors_page() {
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    </div>
 
                     <form method="post" style="margin-top: 20px;" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sạch hoàn toàn nhật ký lỗi trên máy chủ?');">
                         <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
@@ -1074,12 +1086,12 @@ function pdfpro_licensing_render_errors_page() {
 function pdfpro_licensing_render_create_page() {
     global $wpdb;
     
-    // Hiển thềEthông báo notices
+    // Hiển thị thông báo notices
     pdfpro_licensing_render_notices();
 
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
 
-    // Kiểm tra chế đềESửa (Edit)
+    // Kiểm tra chế độ Sửa (Edit)
     $edit_license = null;
     if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) {
         $edit_id = intval($_GET['id']);
@@ -1104,7 +1116,7 @@ function pdfpro_licensing_render_create_page() {
                             <input type="text" name="license_key" value="<?php echo esc_attr($edit_license->license_key); ?>" style="width: 100%; margin-top: 5px;" required class="regular-text">
                         </p>
                         <p>
-                            <label><strong>SềEmáy kích hoạt tối đa:</strong></label><br>
+                            <label><strong>Số máy kích hoạt tối đa:</strong></label><br>
                             <input type="number" name="max_devices" value="<?php echo esc_attr($edit_license->max_devices); ?>" min="1" style="width: 100%; margin-top: 5px;" required class="small-text">
                         </p>
                         <p>

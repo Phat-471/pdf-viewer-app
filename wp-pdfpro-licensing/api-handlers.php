@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 
 add_action('rest_api_init', 'pdfpro_licensing_register_routes');
 
-// HềEtrợ bềEqua yêu cầu đăng nhập đối với các API endpoint của PDF Pro
+// Hỗ trợ bỏ qua yêu cầu đăng nhập đối với các API endpoint của PDF Pro
 add_filter('rest_authentication_errors', 'pdfpro_licensing_bypass_rest_auth', 9999);
 
 function pdfpro_licensing_bypass_rest_auth($result) {
@@ -20,13 +20,13 @@ function pdfpro_licensing_bypass_rest_auth($result) {
         $is_pdfpro_api = true;
     }
     
-    // 2. Kiểm tra qua tham sềE?rest_route=/pdfpro/v1/... (nếu web dùng url dạng cũ)
+    // 2. Kiểm tra qua tham số?rest_route=/pdfpro/v1/... (nếu web dùng url dạng cũ)
     if (isset($_GET['rest_route']) && strpos($_GET['rest_route'], 'pdfpro/v1') !== false) {
         $is_pdfpro_api = true;
     }
 
     if ($is_pdfpro_api) {
-        return null; // Trả vềEnull đềExóa lỗi WP_Error từ các plugin bảo mật khác, cho phép tiếp tục truy cập
+        return null; // Trả vịnull để xóa lỗi WP_Error từ các plugin bảo mật khác, cho phép tiếp tục truy cập
     }
     
     return $result;
@@ -96,7 +96,7 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
 
-    // Tìm kiếm License (Chuẩn hóa key loại bềEdấu gạch ngang)
+    // Tìm kiếm License (Chuẩn hóa key loại bịdấu gạch ngang)
     $normalized_key = preg_replace('/[^A-Za-z0-9]/', '', $license_key);
     $license = $wpdb->get_row($wpdb->prepare(
         "SELECT * FROM $table_licenses WHERE REPLACE(license_key, '-', '') = %s",
@@ -108,14 +108,14 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     }
 
     if ($license->status !== 'active') {
-        return new WP_Error('license_suspended', 'Mã bản quyền này đã bềEkhóa hoặc tạm dừng.', array('status' => 403));
+        return new WP_Error('license_suspended', 'Mã bản quyền này đã bị khóa hoặc tạm dừng.', array('status' => 403));
     }
 
     if ($license->expires_at && strtotime($license->expires_at) < time()) {
         return new WP_Error('license_expired', 'Mã bản quyền này đã hết hạn sử dụng.', array('status' => 403));
     }
 
-    // Lấy danh sách thiết bềEđã kích hoạt
+    // Lấy danh sách thiết bịđã kích hoạt
     $activations = $wpdb->get_results($wpdb->prepare(
         "SELECT * FROM $table_activations WHERE license_id = %d",
         $license->id
@@ -130,9 +130,9 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     }
 
     if (!$is_activated_on_this_machine) {
-        // Kiểm tra xem có vượt quá giới hạn thiết bềEkhông
+        // Kiểm tra xem có vượt quá giới hạn thiết bịkhông
         if (count($activations) >= (int)$license->max_devices) {
-            return new WP_Error('limit_exceeded', 'Mã bản quyền này đã vượt quá sềElượng máy cho phép kích hoạt.', array('status' => 403));
+            return new WP_Error('limit_exceeded', 'Mã bản quyền này đã vượt quá số lượng máy cho phép kích hoạt.', array('status' => 403));
         }
 
         // Lưu thông tin kích hoạt mới
@@ -181,7 +181,7 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
 
-    // Tìm kiếm License và bản ghi kích hoạt (Chuẩn hóa key loại bềEdấu gạch ngang)
+    // Tìm kiếm License và bản ghi kích hoạt (Chuẩn hóa key loại bịdấu gạch ngang)
     $normalized_key = preg_replace('/[^A-Za-z0-9]/', '', $license_key);
     $license = $wpdb->get_row($wpdb->prepare(
         "SELECT l.*, a.id as activation_id FROM $table_licenses l 
@@ -240,7 +240,7 @@ function pdfpro_licensing_api_deactivate(WP_REST_Request $request) {
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
 
-    // Chuẩn hóa key loại bềEdấu gạch ngang
+    // Chuẩn hóa key loại bịdấu gạch ngang
     $normalized_key = preg_replace('/[^A-Za-z0-9]/', '', $license_key);
     $license = $wpdb->get_row($wpdb->prepare(
         "SELECT id FROM $table_licenses WHERE REPLACE(license_key, '-', '') = %s",
@@ -256,12 +256,12 @@ function pdfpro_licensing_api_deactivate(WP_REST_Request $request) {
 
     return array(
         'success' => true,
-        'message' => 'Đã hủy kích hoạt thiết bềEthành công.'
+        'message' => 'Đã hủy kích hoạt thiết bị thành công.'
     );
 }
 
 /**
- * Tạo chữ ký sềERSA SHA-256 từ chuỗi Payload bằng Private Key
+ * Tạo chữ ký số RSA SHA-256 từ chuỗi Payload bằng Private Key
  */
 function pdfpro_licensing_sign_payload($payload) {
     if (function_exists('pdfpro_licensing_ensure_rsa_keypair')) {

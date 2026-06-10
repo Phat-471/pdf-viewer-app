@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PdfViewerApp;
 
@@ -17,4 +17,6 @@ internal sealed class ActivationRecord
 	public string Edition { get; set; } = string.Empty;
 
 	public DateTimeOffset ActivatedAt { get; set; }
+
+	public DateTimeOffset LastOnlineCheckTime { get; set; } = DateTimeOffset.Now;
 }
