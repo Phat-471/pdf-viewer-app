@@ -43,210 +43,219 @@ internal static class NativePdfPrinter
 		PdfPerfLogger.Log("Native PDFium print start");
 		progress?.Report(new PrintProgressInfo("Dang chuan bi PDFium...", 0, 0, IsIndeterminate: true));
 		PdfiumEngine.Initialize();
+		
+		cancellationToken.ThrowIfCancellationRequested();
+		nint num = IntPtr.Zero;
 		lock (PdfiumEngine.SyncRoot)
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-			nint num = PdfiumEngine.FPDF_LoadDocument(pdfPath, null);
-			if (num == IntPtr.Zero)
+			num = PdfiumEngine.FPDF_LoadDocument(pdfPath, null);
+		}
+		if (num == IntPtr.Zero)
+		{
+			throw new InvalidOperationException("Unable to load PDF for native printing.");
+		}
+		nint num2 = IntPtr.Zero;
+		bool flag = false;
+		try
+		{
+			int num3 = 0;
+			lock (PdfiumEngine.SyncRoot)
 			{
-				throw new InvalidOperationException("Unable to load PDF for native printing.");
+				num3 = PdfiumEngine.FPDF_GetPageCount(num);
 			}
-			nint num2 = IntPtr.Zero;
-			bool flag = false;
-			try
+			if (num3 <= 0)
 			{
-				int num3 = PdfiumEngine.FPDF_GetPageCount(num);
-				if (num3 <= 0)
+				throw new InvalidOperationException("PDF has no printable pages.");
+			}
+			startPageIndex = Math.Clamp(startPageIndex, 0, num3 - 1);
+			endPageIndex = Math.Clamp(endPageIndex, startPageIndex, num3 - 1);
+			copies = Math.Clamp(copies, 1, 999);
+			int num4 = Math.Max(1, endPageIndex - startPageIndex + 1) * copies;
+			int num5 = 0;
+			progress?.Report(new PrintProgressInfo("Dang tao ket noi may in...", 0, num4, IsIndeterminate: true));
+			num2 = CreatePrinterDc(printQueueName, devMode);
+			if (num2 == IntPtr.Zero)
+			{
+				throw new InvalidOperationException("Cannot create printer DC for " + printQueueName + ".");
+			}
+			int num6 = Math.Max(1, GetDeviceCaps(num2, 8));
+			int num7 = Math.Max(1, GetDeviceCaps(num2, 10));
+			int num8 = Math.Max(72, GetDeviceCaps(num2, 88));
+			int num9 = Math.Max(72, GetDeviceCaps(num2, 90));
+			int num10 = Math.Max(0, GetDeviceCaps(num2, 112));
+			int num11 = Math.Max(0, GetDeviceCaps(num2, 113));
+			int num12 = DipsToDevicePixels(rightSafetyPaddingDips, num8);
+			int num13 = DipsToDevicePixels(bottomSafetyPaddingDips, num9);
+			int num14 = Math.Max(1, num6 - num12);
+			int num15 = Math.Max(1, num7 - num13);
+			PdfPerfLogger.Log($"Native printer DC: printable={num6}x{num7}, dpi={num8}x{num9}, physicalOffset={num10},{num11}");
+			PdfPerfLogger.Log($"Native safe area: {num14}x{num15}, rightPaddingPx={num12}, bottomPaddingPx={num13}");
+			int flags = 2049;
+			if (!separatePageJobs)
+			{
+				DOCINFO lpdi = CreateDocInfo(pdfPath, null);
+				Stopwatch stopwatch2 = Stopwatch.StartNew();
+				progress?.Report(new PrintProgressInfo("Dang mo lenh in...", num5, num4, IsIndeterminate: true));
+				if (StartDoc(num2, ref lpdi) <= 0)
 				{
-					throw new InvalidOperationException("PDF has no printable pages.");
+					throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
 				}
-				startPageIndex = Math.Clamp(startPageIndex, 0, num3 - 1);
-				endPageIndex = Math.Clamp(endPageIndex, startPageIndex, num3 - 1);
-				copies = Math.Clamp(copies, 1, 999);
-				int num4 = Math.Max(1, endPageIndex - startPageIndex + 1) * copies;
-				int num5 = 0;
-				progress?.Report(new PrintProgressInfo("Dang tao ket noi may in...", 0, num4, IsIndeterminate: true));
-				num2 = CreatePrinterDc(printQueueName, devMode);
-				if (num2 == IntPtr.Zero)
-				{
-					throw new InvalidOperationException("Cannot create printer DC for " + printQueueName + ".");
-				}
-				int num6 = Math.Max(1, GetDeviceCaps(num2, 8));
-				int num7 = Math.Max(1, GetDeviceCaps(num2, 10));
-				int num8 = Math.Max(72, GetDeviceCaps(num2, 88));
-				int num9 = Math.Max(72, GetDeviceCaps(num2, 90));
-				int num10 = Math.Max(0, GetDeviceCaps(num2, 112));
-				int num11 = Math.Max(0, GetDeviceCaps(num2, 113));
-				int num12 = DipsToDevicePixels(rightSafetyPaddingDips, num8);
-				int num13 = DipsToDevicePixels(bottomSafetyPaddingDips, num9);
-				int num14 = Math.Max(1, num6 - num12);
-				int num15 = Math.Max(1, num7 - num13);
-				PdfPerfLogger.Log($"Native printer DC: printable={num6}x{num7}, dpi={num8}x{num9}, physicalOffset={num10},{num11}");
-				PdfPerfLogger.Log($"Native safe area: {num14}x{num15}, rightPaddingPx={num12}, bottomPaddingPx={num13}");
-				int flags = 2049;
-				if (!separatePageJobs)
-				{
-					DOCINFO lpdi = CreateDocInfo(pdfPath, null);
-					Stopwatch stopwatch2 = Stopwatch.StartNew();
-					progress?.Report(new PrintProgressInfo("Dang mo lenh in...", num5, num4, IsIndeterminate: true));
-					if (StartDoc(num2, ref lpdi) <= 0)
-					{
-						throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
-					}
-					flag = true;
-					stopwatch2.Stop();
-					PdfPerfLogger.Log($"Native StartDoc: {stopwatch2.ElapsedMilliseconds} ms");
-				}
-				for (int i = 1; i <= copies; i++)
+				flag = true;
+				stopwatch2.Stop();
+				PdfPerfLogger.Log($"Native StartDoc: {stopwatch2.ElapsedMilliseconds} ms");
+			}
+			for (int i = 1; i <= copies; i++)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				int num16 = ((!reversePageOrder) ? 1 : (-1));
+				int num17 = (reversePageOrder ? endPageIndex : startPageIndex);
+				int num18 = (reversePageOrder ? startPageIndex : endPageIndex);
+				for (int j = num17; reversePageOrder ? (j >= num18) : (j <= num18); j += num16)
 				{
 					cancellationToken.ThrowIfCancellationRequested();
-					int num16 = ((!reversePageOrder) ? 1 : (-1));
-					int num17 = (reversePageOrder ? endPageIndex : startPageIndex);
-					int num18 = (reversePageOrder ? startPageIndex : endPageIndex);
-					for (int j = num17; reversePageOrder ? (j >= num18) : (j <= num18); j += num16)
+					progress?.Report(new PrintProgressInfo($"Dang render trang {j + 1}, ban {i}...", num5, num4));
+					if (separatePageJobs)
 					{
-						cancellationToken.ThrowIfCancellationRequested();
-						progress?.Report(new PrintProgressInfo($"Dang render trang {j + 1}, ban {i}...", num5, num4));
-						if (separatePageJobs)
+						DOCINFO lpdi2 = CreateDocInfo(pdfPath, j + 1);
+						Stopwatch stopwatch3 = Stopwatch.StartNew();
+						progress?.Report(new PrintProgressInfo($"Dang mo job trang {j + 1}...", num5, num4));
+						if (StartDoc(num2, ref lpdi2) <= 0)
 						{
-							DOCINFO lpdi2 = CreateDocInfo(pdfPath, j + 1);
-							Stopwatch stopwatch3 = Stopwatch.StartNew();
-							progress?.Report(new PrintProgressInfo($"Dang mo job trang {j + 1}...", num5, num4));
-							if (StartDoc(num2, ref lpdi2) <= 0)
-							{
-								throw new InvalidOperationException($"StartDoc failed on page {j + 1}: {GetLastErrorMessage()}");
-							}
-							flag = true;
-							stopwatch3.Stop();
-							PdfPerfLogger.Log($"Native StartDoc page-job {j + 1}: {stopwatch3.ElapsedMilliseconds} ms");
+							throw new InvalidOperationException($"StartDoc failed on page {j + 1}: {GetLastErrorMessage()}");
 						}
-						PrintPage(num2, num, j, i, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, forceRasterize, progress, num5, num4, cancellationToken);
-						if (separatePageJobs)
-						{
-							Stopwatch stopwatch4 = Stopwatch.StartNew();
-							progress?.Report(new PrintProgressInfo($"Dang spool trang {j + 1}...", num5, num4));
-							if (EndDoc(num2) <= 0)
-							{
-								throw new InvalidOperationException($"EndDoc failed on page {j + 1}: {GetLastErrorMessage()}");
-							}
-							flag = false;
-							stopwatch4.Stop();
-							PdfPerfLogger.Log($"Native EndDoc page-job {j + 1} spool: {stopwatch4.ElapsedMilliseconds} ms");
-						}
-						num5++;
-						progress?.Report(new PrintProgressInfo($"Da gui trang {j + 1} ({num5}/{num4})", num5, num4));
+						flag = true;
+						stopwatch3.Stop();
+						PdfPerfLogger.Log($"Native StartDoc page-job {j + 1}: {stopwatch3.ElapsedMilliseconds} ms");
 					}
+					PrintPage(num2, num, j, i, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, forceRasterize, progress, num5, num4, cancellationToken);
+					if (separatePageJobs)
+					{
+						Stopwatch stopwatch4 = Stopwatch.StartNew();
+						progress?.Report(new PrintProgressInfo($"Dang spool trang {j + 1}...", num5, num4));
+						if (EndDoc(num2) <= 0)
+						{
+							throw new InvalidOperationException($"EndDoc failed on page {j + 1}: {GetLastErrorMessage()}");
+						}
+						flag = false;
+						stopwatch4.Stop();
+						PdfPerfLogger.Log($"Native EndDoc page-job {j + 1} spool: {stopwatch4.ElapsedMilliseconds} ms");
+					}
+					num5++;
+					progress?.Report(new PrintProgressInfo($"Da gui trang {j + 1} ({num5}/{num4})", num5, num4));
 				}
-				if (!separatePageJobs)
+			}
+			if (!separatePageJobs)
+			{
+				Stopwatch stopwatch5 = Stopwatch.StartNew();
+				progress?.Report(new PrintProgressInfo("Dang ket thuc va spool lenh in...", num5, num4, IsIndeterminate: true));
+				if (EndDoc(num2) <= 0)
 				{
-					Stopwatch stopwatch5 = Stopwatch.StartNew();
-					progress?.Report(new PrintProgressInfo("Dang ket thuc va spool lenh in...", num5, num4, IsIndeterminate: true));
-					if (EndDoc(num2) <= 0)
-					{
-						throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
-					}
-					flag = false;
-					stopwatch5.Stop();
-					PdfPerfLogger.Log($"Native EndDoc spool: {stopwatch5.ElapsedMilliseconds} ms");
+					throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
 				}
+				flag = false;
+				stopwatch5.Stop();
+				PdfPerfLogger.Log($"Native EndDoc spool: {stopwatch5.ElapsedMilliseconds} ms");
+			}
 
-				// Advanced Print Spooling Status Monitoring
-				try
+			// Advanced Print Spooling Status Monitoring
+			try
+			{
+				progress?.Report(new PrintProgressInfo("Dang theo doi trang thai may in...", num4, num4, IsIndeterminate: true));
+				using (var localServer = new System.Printing.LocalPrintServer())
 				{
-					progress?.Report(new PrintProgressInfo("Dang theo doi trang thai may in...", num4, num4, IsIndeterminate: true));
-					using (var localServer = new System.Printing.LocalPrintServer())
+					using (var queue = localServer.GetPrintQueue(printQueueName))
 					{
-						using (var queue = localServer.GetPrintQueue(printQueueName))
+						queue.Refresh();
+						int watchTimeoutMs = 15000;
+						int elapsedMs = 0;
+						int pollIntervalMs = 500;
+
+						while (elapsedMs < watchTimeoutMs && !cancellationToken.IsCancellationRequested)
 						{
 							queue.Refresh();
-							int watchTimeoutMs = 15000;
-							int elapsedMs = 0;
-							int pollIntervalMs = 500;
-
-							while (elapsedMs < watchTimeoutMs && !cancellationToken.IsCancellationRequested)
+							var jobs = queue.GetPrintJobInfoCollection();
+							System.Printing.PrintSystemJobInfo? activeJob = null;
+							
+							// Duyệt qua danh sách để tìm job tương ứng
+							foreach (System.Printing.PrintSystemJobInfo job in jobs)
 							{
-								queue.Refresh();
-								var jobs = queue.GetPrintJobInfoCollection();
-								System.Printing.PrintSystemJobInfo? activeJob = null;
-								
-								// Duyệt qua danh sách để tìm job tương ứng
-								foreach (System.Printing.PrintSystemJobInfo job in jobs)
+								if (job.Name.Contains(Path.GetFileName(pdfPath)) || job.Name.Contains("PDF Pro"))
 								{
-									if (job.Name.Contains(Path.GetFileName(pdfPath)) || job.Name.Contains("PDF Pro"))
-									{
-										activeJob = job;
-										break;
-									}
-								}
-
-								if (activeJob == null)
-								{
-									// Nếu không tìm thấy job trong hàng đợi nữa, có nghĩa là đã in thành công xong
+									activeJob = job;
 									break;
 								}
-
-								// Nhận trạng thái chi tiết của job in
-								string statusMsg = "Dang truyen lenh in...";
-								var status = activeJob.JobStatus;
-								
-								// Lấy số trang bằng Reflection để tương thích tối đa với WPF Target Framework
-								int pagesPrinted = 0;
-								try
-								{
-									var prop = activeJob.GetType().GetProperty("PagesPrinted");
-									if (prop != null)
-									{
-										pagesPrinted = (int)(prop.GetValue(activeJob) ?? 0);
-									}
-								}
-								catch {}
-
-								if ((status & System.Printing.PrintJobStatus.Printing) != 0)
-								{
-									statusMsg = $"May in dang in (Trang {pagesPrinted}/{num4})...";
-								}
-								else if ((status & System.Printing.PrintJobStatus.Spooling) != 0)
-								{
-									statusMsg = $"Spooler dang chuan bi du lieu ({pagesPrinted}/{num4})...";
-								}
-								else if ((status & System.Printing.PrintJobStatus.Error) != 0 || 
-								         (status & System.Printing.PrintJobStatus.PaperOut) != 0)
-								{
-									statusMsg = $"Loi may in: {status}. Vui long kiem tra giay/muc.";
-								}
-								else if ((status & System.Printing.PrintJobStatus.Paused) != 0)
-								{
-									statusMsg = "Lenh in bi tam dung.";
-								}
-
-								progress?.Report(new PrintProgressInfo(statusMsg, pagesPrinted, num4, IsIndeterminate: false));
-								Thread.Sleep(pollIntervalMs);
-								elapsedMs += pollIntervalMs;
 							}
+
+							if (activeJob == null)
+							{
+								// Nếu không tìm thấy job trong hàng đợi nữa, có nghĩa là đã in thành công xong
+								break;
+							}
+
+							// Nhận trạng thái chi tiết của job in
+							string statusMsg = "Dang truyen lenh in...";
+							var status = activeJob.JobStatus;
+							
+							// Lấy số trang bằng Reflection để tương thích tối đa với WPF Target Framework
+							int pagesPrinted = 0;
+							try
+							{
+								var prop = activeJob.GetType().GetProperty("PagesPrinted");
+								if (prop != null)
+								{
+									pagesPrinted = (int)(prop.GetValue(activeJob) ?? 0);
+								}
+							}
+							catch {}
+
+							if ((status & System.Printing.PrintJobStatus.Printing) != 0)
+							{
+								statusMsg = $"May in dang in (Trang {pagesPrinted}/{num4})...";
+							}
+							else if ((status & System.Printing.PrintJobStatus.Spooling) != 0)
+							{
+								statusMsg = $"Spooler dang chuan bi du lieu ({pagesPrinted}/{num4})...";
+							}
+							else if ((status & System.Printing.PrintJobStatus.Error) != 0 || 
+									 (status & System.Printing.PrintJobStatus.PaperOut) != 0)
+							{
+								statusMsg = $"Loi may in: {status}. Vui long kiem tra giay/muc.";
+							}
+							else if ((status & System.Printing.PrintJobStatus.Paused) != 0)
+							{
+								statusMsg = "Lenh in bi tam dung.";
+							}
+
+							progress?.Report(new PrintProgressInfo(statusMsg, pagesPrinted, num4, IsIndeterminate: false));
+							Thread.Sleep(pollIntervalMs);
+							elapsedMs += pollIntervalMs;
 						}
 					}
 				}
-				catch (Exception ex)
-				{
-					PdfPerfLogger.Log($"Warning: Spooler status monitor skipped: {ex.Message}");
-				}
-
-				progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
 			}
-			finally
+			catch (Exception ex)
 			{
-				if (flag && num2 != IntPtr.Zero)
-				{
-					AbortDoc(num2);
-				}
-				if (num2 != IntPtr.Zero)
-				{
-					DeleteDC(num2);
-				}
-				PdfiumEngine.FPDF_CloseDocument(num);
-				stopwatch.Stop();
-				PdfPerfLogger.Log($"Native PDFium print total: {stopwatch.ElapsedMilliseconds} ms");
+				PdfPerfLogger.Log($"Warning: Spooler status monitor skipped: {ex.Message}");
 			}
+
+			progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
+		}
+		finally
+		{
+			if (flag && num2 != IntPtr.Zero)
+			{
+				AbortDoc(num2);
+			}
+			if (num2 != IntPtr.Zero)
+			{
+				DeleteDC(num2);
+			}
+			lock (PdfiumEngine.SyncRoot)
+			{
+				PdfiumEngine.FPDF_CloseDocument(num);
+			}
+			stopwatch.Stop();
+			PdfPerfLogger.Log($"Native PDFium print total: {stopwatch.ElapsedMilliseconds} ms");
 		}
 	}
 
@@ -254,7 +263,12 @@ internal static class NativePdfPrinter
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		cancellationToken.ThrowIfCancellationRequested();
-		nint num = PdfiumEngine.FPDF_LoadPage(document, pageIndex);
+		
+		nint num = IntPtr.Zero;
+		lock (PdfiumEngine.SyncRoot)
+		{
+			num = PdfiumEngine.FPDF_LoadPage(document, pageIndex);
+		}
 		if (num == IntPtr.Zero)
 		{
 			PdfPerfLogger.Log($"Native print page {pageIndex + 1}: skipped, FPDF_LoadPage failed.");
@@ -274,8 +288,13 @@ internal static class NativePdfPrinter
 			try
 			{
 				PatBlt(hdc, 0, 0, printableWidth, printableHeight, 16711778);
-				double num2 = PdfiumEngine.FPDF_GetPageWidth(num);
-				double num3 = PdfiumEngine.FPDF_GetPageHeight(num);
+				double num2 = 0;
+				double num3 = 0;
+				lock (PdfiumEngine.SyncRoot)
+				{
+					num2 = PdfiumEngine.FPDF_GetPageWidth(num);
+					num3 = PdfiumEngine.FPDF_GetPageHeight(num);
+				}
 				double num4 = num2 / 72.0 * (double)dpiX;
 				double num5 = num3 / 72.0 * (double)dpiY;
 				if (fitToPrintableArea)
@@ -307,12 +326,16 @@ internal static class NativePdfPrinter
 					try
 					{
 						nint first_scan = gCHandle.AddrOfPinnedObject();
-						nint num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(num7, num8, 4, first_scan, stride);
-						if (num5_bmp != IntPtr.Zero)
+						nint num5_bmp = IntPtr.Zero;
+						lock (PdfiumEngine.SyncRoot)
 						{
-							PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, num7, num8, uint.MaxValue);
-							PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num, 0, 0, num7, num8, 0, flags);
-							PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
+							num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(num7, num8, 4, first_scan, stride);
+							if (num5_bmp != IntPtr.Zero)
+							{
+								PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, num7, num8, uint.MaxValue);
+								PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num, 0, 0, num7, num8, 0, flags);
+								PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
+							}
 						}
 						
 						BITMAPINFO bmi = default(BITMAPINFO);
@@ -351,7 +374,10 @@ internal static class NativePdfPrinter
 				}
 				else
 				{
-					PdfiumEngine.FPDF_RenderPage(hdc, num, num9, num10, num7, num8, 0, flags);
+					lock (PdfiumEngine.SyncRoot)
+					{
+						PdfiumEngine.FPDF_RenderPage(hdc, num, num9, num10, num7, num8, 0, flags);
+					}
 				}
 				stopwatch3.Stop();
 				PdfPerfLogger.Log($"Native draw {pageIndex + 1} done: {stopwatch3.ElapsedMilliseconds} ms");
@@ -375,7 +401,10 @@ internal static class NativePdfPrinter
 		}
 		finally
 		{
-			PdfiumEngine.FPDF_ClosePage(num);
+			lock (PdfiumEngine.SyncRoot)
+			{
+				PdfiumEngine.FPDF_ClosePage(num);
+			}
 			stopwatch.Stop();
 			PdfPerfLogger.Log($"Native print page {pageIndex + 1} total: {stopwatch.ElapsedMilliseconds} ms");
 		}

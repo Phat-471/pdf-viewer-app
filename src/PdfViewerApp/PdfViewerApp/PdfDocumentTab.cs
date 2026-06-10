@@ -3469,22 +3469,38 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		List<Size> list = new List<Size>(pageCount);
 		for (int i = 0; i < pageCount; i++)
 		{
-			if (PdfiumEngine.TryGetPageSizeByIndex(document, i, out var width, out var height))
+			double width = 0;
+			double height = 0;
+			bool success = false;
+			lock (PdfiumEngine.SyncRoot)
+			{
+				success = PdfiumEngine.TryGetPageSizeByIndex(document, i, out width, out height);
+			}
+			if (success)
 			{
 				list.Add(new Size(width, height));
 				continue;
 			}
-			nint num = PdfiumEngine.FPDF_LoadPage(document, i);
+			nint num = IntPtr.Zero;
+			lock (PdfiumEngine.SyncRoot)
+			{
+				num = PdfiumEngine.FPDF_LoadPage(document, i);
+				if (num != IntPtr.Zero)
+				{
+					try
+					{
+						width = PdfiumEngine.FPDF_GetPageWidth(num);
+						height = PdfiumEngine.FPDF_GetPageHeight(num);
+					}
+					finally
+					{
+						PdfiumEngine.FPDF_ClosePage(num);
+					}
+				}
+			}
 			if (num != IntPtr.Zero)
 			{
-				try
-				{
-					list.Add(new Size(PdfiumEngine.FPDF_GetPageWidth(num), PdfiumEngine.FPDF_GetPageHeight(num)));
-				}
-				finally
-				{
-					PdfiumEngine.FPDF_ClosePage(num);
-				}
+				list.Add(new Size(width, height));
 			}
 			else
 			{

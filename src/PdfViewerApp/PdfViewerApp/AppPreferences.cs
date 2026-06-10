@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text.Json;
 
@@ -7,6 +7,8 @@ namespace PdfViewerApp;
 internal sealed class AppPreferences
 {
 	public bool IsDarkTheme { get; set; } = true;
+
+	public bool AllowMultipleInstances { get; set; } = false;
 
 	public static string PreferencesPath
 	{

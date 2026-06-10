@@ -53,15 +53,36 @@ public partial class App : Application
 			}
 			else
 			{
-				_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
-				if (!createdNew)
+				AppPreferences appPreferences = AppPreferences.Load();
+				bool launchNewInstance = false;
+
+				if (appPreferences.AllowMultipleInstances)
 				{
-					SendArgsToExistingInstance(args.Where((string file) => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray());
-					Environment.Exit(0);
+					launchNewInstance = true;
 				}
 				else
 				{
-					AppPreferences appPreferences = AppPreferences.Load();
+					_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
+					if (!createdNew)
+					{
+						string[] pdfArgs = args.Where((string file) => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray();
+						bool sent = SendArgsToExistingInstance(pdfArgs);
+						if (sent)
+						{
+							Environment.Exit(0);
+						}
+						else
+						{
+							// Main instance is unresponsive or busy printing. Bypass single instance check.
+							_singleInstanceMutex.Dispose();
+							_singleInstanceMutex = null;
+							launchNewInstance = true;
+						}
+					}
+				}
+
+				if (launchNewInstance || _singleInstanceMutex != null)
+				{
 					try
 					{
 						ThemeManager.Current.ChangeTheme(this, appPreferences.IsDarkTheme ? "Dark.Blue" : "Light.Blue");
@@ -76,7 +97,20 @@ public partial class App : Application
 					MainWindow mainWindow = new MainWindow();
 					mainWindow.Show();
 					splashWindow.Close();
-					StartSingleInstanceServer(mainWindow);
+					if (launchNewInstance && args.Length > 0)
+					{
+						foreach (string text in args)
+						{
+							if (!string.IsNullOrWhiteSpace(text) && File.Exists(text) && Path.GetExtension(text).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+							{
+								mainWindow.OpenPdfTab(text);
+							}
+						}
+					}
+					if (_singleInstanceMutex != null)
+					{
+						StartSingleInstanceServer(mainWindow);
+					}
 				}
 			}
 		};
@@ -151,13 +185,32 @@ public partial class App : Application
 
 	public static void HandlePostMergeOpen(string outputPath)
 	{
-		_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
-		if (!createdNew)
+		AppPreferences appPreferences = AppPreferences.Load();
+		bool launchNewInstance = false;
+		if (appPreferences.AllowMultipleInstances)
 		{
-			SendArgsToExistingInstance(new string[] { outputPath });
-			Environment.Exit(0);
+			launchNewInstance = true;
 		}
 		else
+		{
+			_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
+			if (!createdNew)
+			{
+				bool sent = SendArgsToExistingInstance(new string[] { outputPath });
+				if (sent)
+				{
+					Environment.Exit(0);
+				}
+				else
+				{
+					_singleInstanceMutex.Dispose();
+					_singleInstanceMutex = null;
+					launchNewInstance = true;
+				}
+			}
+		}
+
+		if (launchNewInstance || _singleInstanceMutex != null)
 		{
 			Application.Current.Dispatcher.Invoke(delegate
 			{
@@ -170,7 +223,10 @@ public partial class App : Application
 				mainWindow.Show();
 				splashWindow.Close();
 				mainWindow.OpenPdfTab(outputPath);
-				StartSingleInstanceServer(mainWindow);
+				if (_singleInstanceMutex != null)
+				{
+					StartSingleInstanceServer(mainWindow);
+				}
 				mainWindow.Activate();
 				mainWindow.Focus();
 			});

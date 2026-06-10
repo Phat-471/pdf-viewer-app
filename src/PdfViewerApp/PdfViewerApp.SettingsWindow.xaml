@@ -110,12 +110,13 @@
         <StackPanel>
           <Border Style="{StaticResource SectionCard}">
             <StackPanel>
-              <TextBlock Text="GIAO DIỆN" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
-              <TextBlock Text="Chọn theme và cách hiển thị phù hợp." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
-              <StackPanel Orientation="Horizontal">
+              <TextBlock Text="GIAO DIỆN &amp; HỆ THỐNG" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
+              <TextBlock Text="Chọn theme và cấu hình hệ thống." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                 <RadioButton Name="DarkThemeRadio" Content="Dark" GroupName="ThemeMode" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,14,0" />
                 <RadioButton Name="LightThemeRadio" Content="Light" GroupName="ThemeMode" Foreground="#F8FAFC" />
               </StackPanel>
+              <CheckBox Name="AllowMultipleInstancesCheckBox" Content="Mở nhiều cửa sổ ứng dụng độc lập (Multi-instance)" Foreground="#F8FAFC" Margin="0,6,0,0" />
             </StackPanel>
           </Border>
           <Border Style="{StaticResource SectionCard}">

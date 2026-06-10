@@ -29,6 +29,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 		LicenseStateTextBlock.Foreground = activationState.IsActivated ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 211, 153)) : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 113, 133));
 		DarkThemeRadio.IsChecked = _preferences.IsDarkTheme;
 		LightThemeRadio.IsChecked = !_preferences.IsDarkTheme;
+		AllowMultipleInstancesCheckBox.IsChecked = _preferences.AllowMultipleInstances;
 		AiAllowOnlineCheckBox.IsChecked = _aiSettings.AllowOnlineSnapshot;
 		AiEnableTelemetryCheckBox.IsChecked = _aiSettings.EnableTelemetry;
 		AiEnableUpdateCheckCheckBox.IsChecked = _aiSettings.EnableUpdateCheck;
@@ -56,6 +57,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 	private void Save_Click(object sender, RoutedEventArgs e)
 	{
 		_preferences.IsDarkTheme = DarkThemeRadio.IsChecked == true;
+		_preferences.AllowMultipleInstances = AllowMultipleInstancesCheckBox.IsChecked == true;
 		_preferences.Save();
 
 		_aiSettings.ProviderMode = (AiProviderModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Auto";
