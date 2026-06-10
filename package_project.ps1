@@ -145,6 +145,12 @@ $sha256 = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInv
 $releaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $manifestPath = Join-Path $releaseDir "update-manifest.json"
 
+$changelogText = ""
+$changelogFile = Join-Path $scriptDir "CHANGELOG.txt"
+if (Test-Path $changelogFile) {
+    $changelogText = (Get-Content -LiteralPath $changelogFile -Encoding UTF8 -Raw).Trim()
+}
+
 $manifest = [ordered]@{
     version = $version
     file = $zipFileName
@@ -153,7 +159,7 @@ $manifest = [ordered]@{
     release_date = $releaseDate
     download_url = ""
     mandatory = $false
-    changelog = ""
+    changelog = $changelogText
 }
 
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8

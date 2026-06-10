@@ -83,6 +83,16 @@ jobs:
         $zipFile = "${{ steps.package.outputs.zip_file }}"
         $downloadUrl = "https://github.com/$repo/releases/download/$tag/$zipFile"
         
+        $changelog = ""
+        $manifestPath = "releases/update-manifest.json"
+        if (Test-Path $manifestPath) {
+            $manifest = Get-Content $manifestPath | ConvertFrom-Json
+            $changelog = $manifest.changelog
+        }
+        if ([string]::IsNullOrWhiteSpace($changelog)) {
+            $changelog = "Tự động phát hành phiên bản mới qua GitHub Actions CI/CD cho tag $tag."
+        }
+        
         $body = @{
             token = $env:TOKEN
             version = "${{ steps.package.outputs.version }}"
@@ -90,7 +100,7 @@ jobs:
             sha256 = "${{ steps.package.outputs.sha256 }}"
             size = [int]("${{ steps.package.outputs.size }}")
             release_date = "${{ steps.package.outputs.release_date }}"
-            changelog = "Tự động phát hành phiên bản mới qua GitHub Actions CI/CD cho tag $tag."
+            changelog = $changelog
         }
 
         $apiUrl = "$($env:SITE_URL.TrimEnd('/'))/wp-json/pdfpro/v1/update-publish"
