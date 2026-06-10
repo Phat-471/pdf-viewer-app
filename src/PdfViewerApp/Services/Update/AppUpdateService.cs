@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -423,6 +423,70 @@ public sealed class AppUpdateService
         var extension = Path.GetExtension(filePath);
         return string.Equals(extension, ".zip", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(extension, ".download", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ─────────────────────────────────────────────
+    // Silent Update State helpers
+    // ─────────────────────────────────────────────
+
+    private static readonly string SilentUpdateStateFile = Path.Combine(
+        UpdateRootDirectory, "silent-update-ready.json");
+
+    /// <summary>
+    /// Lưu thông tin bản cập nhật đã tải ngầm để dùng khi đóng app.
+    /// </summary>
+    public static void SaveSilentUpdateState(SilentUpdateReadyState state)
+    {
+        try
+        {
+            Directory.CreateDirectory(UpdateRootDirectory);
+            File.WriteAllText(
+                SilentUpdateStateFile,
+                JsonSerializer.Serialize(state, JsonOptions),
+                Encoding.UTF8);
+        }
+        catch { /* Không ảnh hưởng luồng chính */ }
+    }
+
+    /// <summary>
+    /// Đọc thông tin bản cập nhật ngầm đang chờ cài đặt. Trả về null nếu không có.
+    /// </summary>
+    public static SilentUpdateReadyState? LoadSilentUpdateState()
+    {
+        try
+        {
+            if (!File.Exists(SilentUpdateStateFile))
+                return null;
+
+            var json = File.ReadAllText(SilentUpdateStateFile, Encoding.UTF8);
+            var state = JsonSerializer.Deserialize<SilentUpdateReadyState>(json, JsonOptions);
+
+            // Kiểm tra file ZIP vẫn còn tồn tại
+            if (state is null || !File.Exists(state.DownloadZipPath))
+            {
+                ClearSilentUpdateState();
+                return null;
+            }
+
+            return state;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Xóa trạng thái silent update sau khi đã xử lý xong.
+    /// </summary>
+    public static void ClearSilentUpdateState()
+    {
+        try
+        {
+            if (File.Exists(SilentUpdateStateFile))
+                File.Delete(SilentUpdateStateFile);
+        }
+        catch { }
     }
 
     public static void OpenDownloadedPackage(string zipPath)

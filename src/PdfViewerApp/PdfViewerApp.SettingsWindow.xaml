@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="PdfViewerApp.SettingsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Cài Đặt PDF Pro Workspace" Width="860" Height="640" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma, Helvetica">
   <Window.Resources>
     <Style x:Key="PrimaryButton" TargetType="{x:Type Button}">
@@ -125,7 +125,8 @@
               <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                 <CheckBox Name="AiAllowOnlineCheckBox" Content="Cho phép online snapshot" Foreground="#F8FAFC" Margin="0,0,14,0" />
                 <CheckBox Name="AiEnableTelemetryCheckBox" Content="Gửi báo cáo lỗi" Foreground="#F8FAFC" Margin="0,0,14,0" />
-                <CheckBox Name="AiEnableUpdateCheckCheckBox" Content="Tự động cập nhật" Foreground="#F8FAFC" />
+                <CheckBox Name="AiEnableUpdateCheckCheckBox" Content="Tự động kiểm tra cập nhật" Foreground="#F8FAFC" Margin="0,0,14,0" />
+                <CheckBox Name="AiEnableSilentUpdateCheckBox" Content="Tự cập nhật ngầm" Foreground="#F8FAFC" />
               </StackPanel>
               <Grid>
                 <Grid.ColumnDefinitions>

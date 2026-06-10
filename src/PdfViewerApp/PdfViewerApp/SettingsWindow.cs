@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 		AiAllowOnlineCheckBox.IsChecked = _aiSettings.AllowOnlineSnapshot;
 		AiEnableTelemetryCheckBox.IsChecked = _aiSettings.EnableTelemetry;
 		AiEnableUpdateCheckCheckBox.IsChecked = _aiSettings.EnableUpdateCheck;
+		AiEnableSilentUpdateCheckBox.IsChecked = _aiSettings.EnableSilentUpdate;
 		AiProviderModeComboBox.SelectedItem = FindComboItemByTag(AiProviderModeComboBox, _aiSettings.ProviderMode) ?? AiProviderModeComboBox.Items[0];
 		AiGeminiApiKeyTextBox.Text = _aiSettings.GeminiApiKey;
 		AiGeminiModelTextBox.Text = _aiSettings.GeminiModel;
@@ -61,6 +62,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 		_aiSettings.AllowOnlineSnapshot = AiAllowOnlineCheckBox.IsChecked == true;
 		_aiSettings.EnableTelemetry = AiEnableTelemetryCheckBox.IsChecked == true;
 		_aiSettings.EnableUpdateCheck = AiEnableUpdateCheckCheckBox.IsChecked == true;
+		_aiSettings.EnableSilentUpdate = AiEnableSilentUpdateCheckBox.IsChecked == true;
 		_aiSettings.GeminiApiKey = AiGeminiApiKeyTextBox.Text?.Trim() ?? string.Empty;
 		_aiSettings.GeminiModel = string.IsNullOrWhiteSpace(AiGeminiModelTextBox.Text) ? "auto" : AiGeminiModelTextBox.Text.Trim();
 		_aiSettings.OpenAiApiKey = AiOpenAiApiKeyTextBox.Text?.Trim() ?? string.Empty;

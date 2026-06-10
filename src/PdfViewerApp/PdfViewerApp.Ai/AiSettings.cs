@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text.Json;
 
@@ -21,6 +21,9 @@ internal sealed class AiSettings
 	public bool EnableTelemetry { get; set; }
 
 	public bool EnableUpdateCheck { get; set; } = true;
+	
+	public bool EnableSilentUpdate { get; set; } = false;
+
 
 	public static string SettingsPath
 	{

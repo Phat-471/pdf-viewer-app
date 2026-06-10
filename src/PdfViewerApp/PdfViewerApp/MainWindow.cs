@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -52,6 +53,9 @@ public partial class MainWindow : Window, IComponentConnector
 	private MainRibbon? _mainRibbon;
 
 	private AiPanelControl? _aiPanelControl;
+
+	// Bản cập nhật đã tải ngầm, sẵn sàng cài khi đóng app
+	private volatile bool _silentUpdateApplying = false;
 
 	private string _activeTool = "Select";
 
@@ -157,9 +161,75 @@ public partial class MainWindow : Window, IComponentConnector
 				var result = await updateService.CheckAsync();
 				if (result.HasUpdate && !string.IsNullOrEmpty(result.Response.DownloadUrl))
 				{
-					UpdateDialog updateDialog = new UpdateDialog(result.Response, updateService);
-					updateDialog.Owner = this;
-					updateDialog.ShowDialog();
+					if (_aiSettings.EnableSilentUpdate)
+					{
+						// Kiểm tra xem đã có bản sẵn sàng chưa (tránh tải lại)
+						var existingSilent = AppUpdateService.LoadSilentUpdateState();
+						if (existingSilent != null && existingSilent.TargetVersion == result.Response.LatestVersion)
+						{
+							// Đã tải rồi, chỉ thông báo nhẹ
+							Dispatcher.Invoke(() => LogStatus(
+								$"⬆ Bản cập nhật v{result.Response.LatestVersion} đã tải xong — sẽ cài khi bạn đóng ứng dụng."));
+						}
+						else
+						{
+							// Tải ngầm trong background
+							Dispatcher.Invoke(() => LogStatus(
+								$"⬇ Đang tải ngầm bản cập nhật v{result.Response.LatestVersion}..."));
+							_ = Task.Run(async () =>
+							{
+								try
+								{
+									string resolvedUrl = result.Response.DownloadUrl;
+									if (resolvedUrl.Contains("drive.google.com"))
+										resolvedUrl = await ResolveGoogleDriveUrlBackgroundAsync(resolvedUrl);
+
+									var backgroundResponse = new UpdateCheckResponse
+									{
+										Success = result.Response.Success,
+										LatestVersion = result.Response.LatestVersion,
+										DownloadUrl = resolvedUrl,
+										Sha256 = result.Response.Sha256,
+										FileSize = result.Response.FileSize,
+										ReleaseDate = result.Response.ReleaseDate,
+										Mandatory = result.Response.Mandatory,
+										Changelog = result.Response.Changelog
+									};
+
+									var downloadResult = await updateService.DownloadAndVerifyAsync(backgroundResponse);
+
+									// Lưu trạng thái để dùng khi đóng app
+									AppUpdateService.SaveSilentUpdateState(new SilentUpdateReadyState
+									{
+										TargetVersion = result.Response.LatestVersion,
+										DownloadZipPath = downloadResult.FilePath,
+										Sha256 = downloadResult.Sha256,
+										DownloadUrl = resolvedUrl,
+										Changelog = result.Response.Changelog,
+										DownloadedUtc = DateTimeOffset.UtcNow.ToString("O")
+									});
+
+									// Thông báo nhỏ trên status bar (không popup)
+									Dispatcher.Invoke(() => LogStatus(
+										$"✅ Đã tải xong bản cập nhật v{result.Response.LatestVersion} — sẽ cài tự động khi bạn đóng ứng dụng."));
+								}
+								catch
+								{
+									// Tải thất bại: fallback hiện dialog thủ công
+									Dispatcher.Invoke(() =>
+									{
+										LogStatus($"Phát hiện bản mới v{result.Response.LatestVersion}. Nhấn Kiểm tra cập nhật để tải.");
+									});
+								}
+							});
+						}
+					}
+					else
+					{
+						UpdateDialog updateDialog = new UpdateDialog(result.Response, updateService);
+						updateDialog.Owner = this;
+						updateDialog.ShowDialog();
+					}
 				}
 			}
 			catch
@@ -167,6 +237,59 @@ public partial class MainWindow : Window, IComponentConnector
 				// Tránh crash ứng dụng nếu lỗi mạng khi khởi động
 			}
 		}
+	}
+
+	private async Task<string> ResolveGoogleDriveUrlBackgroundAsync(string url)
+	{
+		if (url.Contains("/file/d/"))
+		{
+			Match match = Regex.Match(url, "drive\\.google\\.com/file/d/([^/?#]+)");
+			if (match.Success)
+			{
+				string value = match.Groups[1].Value;
+				url = "https://drive.google.com/uc?export=download&id=" + value;
+			}
+		}
+		try
+		{
+			using var client = new HttpClient();
+			using HttpResponseMessage response = await client.GetAsync(url);
+			if (response.IsSuccessStatusCode)
+			{
+				string mediaType = response.Content.Headers.ContentType?.MediaType;
+				if (mediaType != null && mediaType.Contains("html"))
+				{
+					string html = await response.Content.ReadAsStringAsync();
+					if (html.Contains("id=\"download-form\""))
+					{
+						Match formMatch = Regex.Match(html, "<form\\s+[^>]*id=\"download-form\"\\s+[^>]*action=\"([^\"]+)\"");
+						if (formMatch.Success)
+						{
+							string action = formMatch.Groups[1].Value;
+							if (action.StartsWith("/"))
+							{
+								action = "https://drive.google.com" + action;
+							}
+							MatchCollection inputMatches = Regex.Matches(html, "<input\\s+[^>]*type=\"hidden\"\\s+[^>]*name=\"([^\"]+)\"\\s+[^>]*value=\"([^\"]+)\"");
+							List<string> inputs = new List<string>();
+							foreach (Match item in inputMatches)
+							{
+								string name = item.Groups[1].Value;
+								string val = item.Groups[2].Value;
+								inputs.Add(name + "=" + Uri.EscapeDataString(val));
+							}
+							if (inputs.Count > 0)
+							{
+								string separator = action.Contains("?") ? "&" : "?";
+								return action + separator + string.Join("&", inputs);
+							}
+						}
+					}
+				}
+			}
+		}
+		catch { }
+		return url;
 	}
 
 	private void HideUpdateNotification_Click(object sender, RoutedEventArgs e)
@@ -2831,4 +2954,218 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 		return hashSet.OrderBy((int p) => p).ToList();
 	}
+
+	// ─────────────────────────────────────────────────────────────────
+	// Silent Auto-Update khi đóng ứng dụng
+	// ─────────────────────────────────────────────────────────────────
+
+	protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+	{
+		base.OnClosing(e);
+
+		// Không can thiệp nếu đã đang apply hoặc bị cancel từ nơi khác
+		if (e.Cancel || _silentUpdateApplying)
+			return;
+
+		var silentState = AppUpdateService.LoadSilentUpdateState();
+		if (silentState == null)
+			return;
+
+		// Chặn đóng app ngay lập tức để tiến hành cài đặt ngầm
+		e.Cancel = true;
+		_silentUpdateApplying = true;
+
+		_ = Dispatcher.InvokeAsync(async () =>
+		{
+			try
+			{
+				await RunSilentUpdateOnCloseAsync(silentState);
+			}
+			catch (Exception ex)
+			{
+				_silentUpdateApplying = false;
+				AppUpdateService.ClearSilentUpdateState();
+				App.SendCrashTelemetry(ex);
+				// Nếu lỗi: đóng app bình thường, không cài đặt
+				Application.Current.Shutdown();
+			}
+		});
+	}
+
+	private async Task RunSilentUpdateOnCloseAsync(SilentUpdateReadyState silentState)
+	{
+		try
+		{
+			LogStatus($"🔄 Đang chuẩn bị cài đặt bản cập nhật v{silentState.TargetVersion}...");
+
+			using var httpClient = new System.Net.Http.HttpClient();
+			var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
+
+			string baseDirectory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+			var rollbackState = AppUpdateService.CreateRollbackState(
+				ActivationLicense.AppVersion,
+				silentState.TargetVersion,
+				baseDirectory,
+				silentState.DownloadZipPath);
+
+			LogStatus("💾 Đang sao lưu bản hiện tại...");
+			await updateService.CreateInstallationBackupAsync(baseDirectory, rollbackState.BackupZipPath);
+			AppUpdateService.SaveRollbackState(rollbackState);
+
+			// Xây dựng PowerShell apply-update script (tái sử dụng script từ UpdateDialog)
+			string scriptPath = System.IO.Path.Combine(
+				System.IO.Path.GetDirectoryName(rollbackState.StateFilePath) ?? System.IO.Path.GetTempPath(),
+				"apply-update.ps1");
+			System.IO.File.WriteAllText(scriptPath, BuildSilentUpdateScript(), System.Text.Encoding.UTF8);
+
+			LogStatus($"🚀 Đang khởi chạy cài đặt tự động v{silentState.TargetVersion}...");
+			await Task.Delay(600); // Cho phép UI render status cuối
+
+			// Xóa trạng thái silent update trước khi thoát
+			AppUpdateService.ClearSilentUpdateState();
+
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+			{
+				FileName = "powershell.exe",
+				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{rollbackState.InstallDirectory}\" -BackupZip \"{rollbackState.BackupZipPath}\" -UpdateZip \"{rollbackState.DownloadZipPath}\" -MarkerPath \"{rollbackState.ConfirmationMarkerPath}\" -AppExe \"{rollbackState.AppExecutablePath}\" -TargetVersion \"{silentState.TargetVersion}\" -ParentPid {Environment.ProcessId} -TimeoutSeconds 120",
+				UseShellExecute = false,
+				CreateNoWindow = true,
+				WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+			});
+
+			Application.Current.Shutdown();
+		}
+		catch
+		{
+			_silentUpdateApplying = false;
+			AppUpdateService.ClearSilentUpdateState();
+			// Thất bại → đóng app bình thường, không treo
+			Application.Current.Shutdown();
+		}
+	}
+
+	private static string BuildSilentUpdateScript()
+	{
+		// Tái sử dụng hoàn toàn script giống UpdateDialog.BuildRollbackScript()
+		return @"param(
+    [Parameter(Mandatory = $true)]
+    [string]$InstallDir,
+    [Parameter(Mandatory = $true)]
+    [string]$BackupZip,
+    [Parameter(Mandatory = $true)]
+    [string]$UpdateZip,
+    [Parameter(Mandatory = $true)]
+    [string]$MarkerPath,
+    [Parameter(Mandatory = $true)]
+    [string]$AppExe,
+    [Parameter(Mandatory = $true)]
+    [string]$TargetVersion,
+    [int]$ParentPid = 0,
+    [int]$TimeoutSeconds = 120
+)
+
+$ErrorActionPreference = 'Stop'
+
+$AttemptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$LogPath = Join-Path $AttemptDir ""apply-update.log""
+Start-Transcript -Path $LogPath -Append -ErrorAction SilentlyContinue
+
+function Remove-Tree([string]$Path) {
+    if (Test-Path -LiteralPath $Path) {
+        Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_.PSIsContainer) { Remove-Tree $_.FullName }
+            else { try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue } catch {} }
+        }
+        try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch {}
+    }
 }
+
+function Get-AppFileVersion([string]$Path) {
+    try {
+        if (Test-Path -LiteralPath $Path) {
+            return ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)).FileVersion
+        }
+    } catch {}
+    return $null
+}
+
+function Normalize-Version([string]$Value) {
+    try {
+        $parsed = [version](($Value -replace '^v', '').Trim())
+        return ""$($parsed.Major).$($parsed.Minor).$($parsed.Build)""
+    } catch { return $null }
+}
+
+function Restore-PreviousInstall {
+    Write-Host ""Restoring previous installation due to failure...""
+    Remove-Tree $InstallDir
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    Expand-Archive -LiteralPath $BackupZip -DestinationPath $InstallDir -Force
+    try { Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue } catch {}
+    New-Item -ItemType File -Path (Join-Path $InstallDir ""update-failed.flag"") -Force | Out-Null
+    try { Start-Process -FilePath $AppExe } catch {}
+    Stop-Transcript -ErrorAction SilentlyContinue
+    exit 2
+}
+
+try {
+    if ($ParentPid -gt 0) {
+        Write-Host ""Waiting for parent process $ParentPid to exit...""
+        try {
+            $parentProc = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
+            if ($parentProc) {
+                $parentProc.WaitForExit(5000)
+                if (-not $parentProc.HasExited) { Stop-Process -Id $ParentPid -Force -ErrorAction SilentlyContinue }
+            }
+        } catch {}
+    }
+
+    Write-Host ""Stopping other PdfViewerApp instances...""
+    Get-Process -Name ""PdfViewerApp"" -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID } | ForEach-Object {
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 1
+
+    if (-not (Test-Path -LiteralPath $BackupZip)) { throw ""Rollback backup not found: $BackupZip"" }
+    if (-not (Test-Path -LiteralPath $UpdateZip)) { throw ""Update package not found: $UpdateZip"" }
+
+    Write-Host ""Extracting update package $UpdateZip to $InstallDir...""
+    Expand-Archive -LiteralPath $UpdateZip -DestinationPath $InstallDir -Force
+
+    $installedVersion = Get-AppFileVersion $AppExe
+    if (-not $installedVersion) { throw ""Could not read installed app version after update."" }
+
+    $normalizedInstalled = Normalize-Version $installedVersion
+    $normalizedTarget = Normalize-Version $TargetVersion
+    if ($normalizedInstalled -ne $normalizedTarget) {
+        throw ""Version mismatch after update. Installed=$installedVersion Target=$TargetVersion""
+    }
+
+    Write-Host ""Starting updated executable $AppExe...""
+    $proc = Start-Process -FilePath $AppExe -PassThru
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $confirmed = $false
+    while ((Get-Date) -lt $deadline) {
+        if (Test-Path -LiteralPath $MarkerPath) { $confirmed = $true; break }
+        if ($proc.HasExited) { break }
+        Start-Sleep -Milliseconds 500
+    }
+
+    if ($confirmed) {
+        Write-Host ""Update confirmed successfully!""
+        try { Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue } catch {}
+        New-Item -ItemType File -Path (Join-Path $InstallDir ""update-success.flag"") -Force | Out-Null
+        Stop-Transcript -ErrorAction SilentlyContinue
+        exit 0
+    } else {
+        throw ""Update confirmation timeout or process exited.""
+    }
+}
+catch {
+    Write-Host ""Error encountered: $_""
+    Restore-PreviousInstall
+}
+";
+	}
+}
+
