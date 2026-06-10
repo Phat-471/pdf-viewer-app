@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -70,6 +70,14 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 	private void Close_Click(object sender, RoutedEventArgs e)
 	{
 		CloseRequested?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void QuickPrompt_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is Button { Tag: string prompt })
+		{
+			AiPromptTextBox.Text = prompt;
+		}
 	}
 
 	private void AnySettingsChanged(object sender, RoutedEventArgs e)

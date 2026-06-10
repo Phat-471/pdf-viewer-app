@@ -1,5 +1,39 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<UserControl x:Class="PdfViewerApp.AiPanelControl" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Background="Transparent">
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl x:Class="PdfViewerApp.AiPanelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+  <UserControl.Resources>
+    <Style x:Key="QuickPromptBtn" TargetType="{x:Type Button}">
+      <Setter Property="Background" Value="#1E293B" />
+      <Setter Property="Foreground" Value="#CBD5E1" />
+      <Setter Property="BorderBrush" Value="#334155" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="Margin" Value="0,0,6,6" />
+      <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type Button}">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#334155" />
+                <Setter Property="Foreground" Value="#F8FAFC" />
+                <Setter Property="BorderBrush" Value="#475569" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="#0F172A" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Resources>
   <Border Margin="0,5,5,5" Background="#111827" BorderBrush="#1E293B" BorderThickness="1.5" CornerRadius="12">
     <Grid Margin="16">
       <Grid.RowDefinitions>
@@ -45,6 +79,14 @@
 
           <TextBlock Text="OPENAI MODEL" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
           <TextBox Name="AiOpenAiModelTextBox" Style="{StaticResource ModernTextBox}" Text="gpt-4.1" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
+
+          <TextBlock Text="MẪU GỢI Ý (CAD)" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,4,0,4" />
+          <WrapPanel Margin="0,0,0,8">
+            <Button Content="🔍 Giải thích bản vẽ" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Hãy phân tích vùng bản vẽ kỹ thuật này và giải thích chi tiết các thành phần chính có trong ảnh." />
+            <Button Content="📏 Đọc kích thước" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Hãy quét và đọc chính xác tất cả thông số kích thước, khoảng cách hoặc cao độ trong vùng bản vẽ này." />
+            <Button Content="📐 Giải nghĩa ký hiệu" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Liệt kê và giải thích ý nghĩa các ký hiệu kỹ thuật, ký hiệu vật liệu hoặc ký hiệu thiết bị trong ảnh." />
+            <Button Content="🚧 Tìm điểm bất thường" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Hãy kiểm tra kỹ vùng bản vẽ này để phát hiện nét vẽ chồng chéo, chữ bị đè, lỗi hiển thị hoặc điểm bất thường nào." />
+          </WrapPanel>
 
           <TextBlock Text="CÂU HỎI / YÊU CẦU" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" Margin="0,0,0,4" />
           <TextBox Name="AiPromptTextBox" Style="{StaticResource ModernTextBox}" MinHeight="60" TextWrapping="Wrap" AcceptsReturn="True" Text="Hay doc va giai thich vung ban ve nay. Neu co text, trich xuat cac ghi chu quan trong." Margin="0,0,0,12" TextChanged="AnySettingsChanged" />

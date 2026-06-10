@@ -1,2 +1,2 @@
-- Thiết kế lại toàn diện giao diện Hướng dẫn sử dụng & Phản hồi báo lỗi thành SupportGuideWindow.
-- Hỗ trợ giao diện tối mắt Radial Gradient sang trọng, liên kết Zalo/Hotline tiện lợi.
+- Thêm các nút mẫu câu lệnh nhanh cho bản vẽ CAD trong tính năng AI Snapshot.
+- Tự động điền nhanh các yêu cầu: Giải thích bản vẽ, Đọc kích thước, Giải nghĩa ký hiệu, Tìm điểm bất thường.
