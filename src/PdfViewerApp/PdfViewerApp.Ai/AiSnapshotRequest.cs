@@ -1,3 +1,14 @@
-﻿namespace PdfViewerApp.Ai;
+using System.Collections.Generic;
 
-public sealed record AiSnapshotRequest(string Prompt, string PngBase64, int PageNumber, double X, double Y, double Width, double Height);
+namespace PdfViewerApp.Ai;
+
+public sealed record AiSnapshotRequest(
+	string Prompt, 
+	string PngBase64, 
+	int PageNumber, 
+	double X, 
+	double Y, 
+	double Width, 
+	double Height,
+	List<ChatMessage>? History = null
+);

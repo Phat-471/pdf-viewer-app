@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -48,14 +48,93 @@ internal sealed class GeminiSnapshotProvider : IAiSnapshotProvider
 
 	private async Task<string> GenerateContentAsync(string model, AiSnapshotRequest request, CancellationToken cancellationToken)
 	{
-		string text = $"Bạn là trợ lý đọc bản vẽ kỹ thuật/PDF kiến trúc.\nChỉ phân tích vùng snapshot được gửi, không suy đoán ngoài ảnh.\nTrang: {request.PageNumber}\nVùng chọn normalized: x={request.X:0.####}, y={request.Y:0.####}, width={request.Width:0.####}, height={request.Height:0.####}\nCâu hỏi người dùng:\n{request.Prompt}";
-		var value = new
+		object payloadContents;
+
+		if (request.History != null && request.History.Count > 0)
 		{
-			contents = new object[1]
+			var list = new List<object>();
+			for (int i = 0; i < request.History.Count; i++)
+			{
+				var msg = request.History[i];
+				bool isUser = string.Equals(msg.Role, "user", StringComparison.OrdinalIgnoreCase);
+
+				if (i == 0)
+				{
+					string systemContext = $"Bạn là trợ lý đọc bản vẽ kỹ thuật/PDF kiến trúc.\nChỉ phân tích vùng snapshot/trang được gửi, không suy đoán ngoài ảnh.\nTrang: {request.PageNumber}\n";
+					if (request.Width < 0.99)
+					{
+						systemContext += $"Vùng chọn normalized: x={request.X:0.####}, y={request.Y:0.####}, width={request.Width:0.####}, height={request.Height:0.####}\n";
+					}
+					string firstPrompt = systemContext + "Câu hỏi:\n" + msg.Text;
+
+					list.Add(new
+					{
+						role = "user",
+						parts = new object[]
+						{
+							new { text = firstPrompt },
+							new
+							{
+								inline_data = new
+								{
+									mime_type = "image/png",
+									data = msg.ImageBase64 ?? request.PngBase64
+								}
+							}
+						}
+					});
+				}
+				else
+				{
+					if (!string.IsNullOrEmpty(msg.ImageBase64))
+					{
+						list.Add(new
+						{
+							role = isUser ? "user" : "model",
+							parts = new object[]
+							{
+								new { text = msg.Text },
+								new
+								{
+									inline_data = new
+									{
+										mime_type = "image/png",
+										data = msg.ImageBase64
+									}
+								}
+							}
+						});
+					}
+					else
+					{
+						list.Add(new
+						{
+							role = isUser ? "user" : "model",
+							parts = new object[]
+							{
+								new { text = msg.Text }
+							}
+						});
+					}
+				}
+			}
+			payloadContents = list.ToArray();
+		}
+		else
+		{
+			string systemContext = $"Bạn là trợ lý đọc bản vẽ kỹ thuật/PDF kiến trúc.\nChỉ phân tích vùng snapshot/trang được gửi, không suy đoán ngoài ảnh.\nTrang: {request.PageNumber}\n";
+			if (request.Width < 0.99)
+			{
+				systemContext += $"Vùng chọn normalized: x={request.X:0.####}, y={request.Y:0.####}, width={request.Width:0.####}, height={request.Height:0.####}\n";
+			}
+			string text = systemContext + "Câu hỏi người dùng:\n" + request.Prompt;
+
+			payloadContents = new object[]
 			{
 				new
 				{
-					parts = new object[2]
+					role = "user",
+					parts = new object[]
 					{
 						new { text },
 						new
@@ -68,7 +147,12 @@ internal sealed class GeminiSnapshotProvider : IAiSnapshotProvider
 						}
 					}
 				}
-			}
+			};
+		}
+
+		var value = new
+		{
+			contents = payloadContents
 		};
 		string requestUri = "https://generativelanguage.googleapis.com/v1beta/" + model + ":generateContent?key=" + Uri.EscapeDataString(_apiKey);
 		using HttpRequestMessage httpRequest = new HttpRequestMessage(HttpMethod.Post, requestUri);

@@ -54,6 +54,9 @@ public partial class MainWindow : Window, IComponentConnector
 
 	private AiPanelControl? _aiPanelControl;
 
+	private string? _lastCapturedSnapshotBase64;
+	private int _lastCapturedSnapshotPageNumber;
+
 	// Bản cập nhật đã tải ngầm, sẵn sàng cài khi đóng app
 	private volatile bool _silentUpdateApplying = false;
 
@@ -2544,29 +2547,138 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 	}
 
-	private async void DocTab_AiSnapshotRequested(object? sender, AiSnapshotRequest request)
+	private void DocTab_AiSnapshotRequested(object? sender, AiSnapshotRequest request)
 	{
 		ShowAiPanel();
-		string prompt = _aiPanelControl?.PromptText ?? "Hay doc va giai thich vung ban ve nay.";
-		AiSnapshotRequest request2 = request with
-		{
-			Prompt = prompt
-		};
+		_lastCapturedSnapshotBase64 = request.PngBase64;
+		_lastCapturedSnapshotPageNumber = request.PageNumber;
+
 		if (_aiPanelControl != null)
 		{
-			_aiPanelControl.SetOutput("Provider: " + _aiSnapshotRouter.ActiveProviderName + Environment.NewLine + "Dang phan tich snapshot...");
+			string prompt = _aiPanelControl.PromptText;
+			if (string.IsNullOrWhiteSpace(prompt) || prompt == "Hãy đọc và giải thích vùng bản vẽ này.")
+			{
+				prompt = "Hãy giải thích vùng bản vẽ này.";
+			}
+			AiPanel_SendChatRequested(this, prompt);
 		}
-		LogStatus("AI snapshot analyzing...");
+	}
+
+	private async void AiPanel_SendChatRequested(object? sender, string prompt)
+	{
+		if (_aiPanelControl == null) return;
+
+		var activeTab = GetActiveTab();
+		if (activeTab == null)
+		{
+			_aiPanelControl.AddMessage("model", "Vui lòng mở một tài liệu PDF trước khi chat.");
+			return;
+		}
+
+		string scope = _aiPanelControl.SelectedScope;
+		string? imageBase64 = null;
+		int pageNumber = activeTab.SelectedPageNumber;
+		
+		var chatHistory = _aiPanelControl.GetChatHistory();
+		bool isFirstMessage = (chatHistory.Count == 0);
+
+		if (isFirstMessage)
+		{
+			if (scope == "Snapshot")
+			{
+				if (!string.IsNullOrEmpty(_lastCapturedSnapshotBase64) && _lastCapturedSnapshotPageNumber == pageNumber)
+				{
+					imageBase64 = _lastCapturedSnapshotBase64;
+				}
+				else
+				{
+					_aiPanelControl.AddMessage("model", "Vui lòng kéo chọn (khoanh vùng) một vùng trên bản vẽ trước, hoặc chọn chế độ 'Toàn bộ trang' để chat trực tiếp.");
+					return;
+				}
+			}
+			else
+			{
+				try
+				{
+					string pdfPath = activeTab.CurrentPdfPath;
+					if (string.IsNullOrEmpty(pdfPath))
+					{
+						_aiPanelControl.AddMessage("model", "Tệp PDF không hợp lệ.");
+						return;
+					}
+					
+					var selection = new PdfSnapshotSelection(pdfPath, pageNumber - 1, 0.0, 0.0, 1.0, 1.0);
+					imageBase64 = AiSnapshotImageRenderer.RenderSnapshotToPngBase64(selection);
+				}
+				catch (Exception ex)
+				{
+					_aiPanelControl.AddMessage("model", "Không thể chụp hình ảnh trang PDF: " + ex.Message);
+					return;
+				}
+			}
+		}
+
+		// Add tin nhắn của user vào UI (kèm ảnh thumbnail nếu có)
+		_aiPanelControl.AddMessage("user", prompt, imageBase64);
+
+		// Tạo bản copy lịch sử chat hiện tại gửi lên API
+		var historyToSend = new List<ChatMessage>(_aiPanelControl.GetChatHistory());
+
+		// Thêm bong bóng chờ của AI
+		_aiPanelControl.AddMessage("model", "Đang phân tích...");
+		int aiMessageIndex = _aiPanelControl.GetChatHistory().Count - 1;
+
 		try
 		{
-			string text = await _aiSnapshotRouter.AskSnapshotAsync(request2, CancellationToken.None);
-			_aiPanelControl?.SetOutput(text);
-			LogStatus("AI snapshot complete");
+			var request = new AiSnapshotRequest(
+				Prompt: prompt,
+				PngBase64: imageBase64 ?? string.Empty,
+				PageNumber: pageNumber,
+				X: 0, Y: 0, Width: 1.0, Height: 1.0,
+				History: historyToSend
+			);
+
+			string reply = await _aiSnapshotRouter.AskSnapshotAsync(request, CancellationToken.None);
+			
+			_aiPanelControl.GetChatHistory()[aiMessageIndex].Text = reply;
+			UpdateLastAiMessageInUi(reply);
 		}
 		catch (Exception ex)
 		{
-			_aiPanelControl?.SetOutput("AI snapshot failed: " + ex.Message);
-			LogStatus("AI snapshot failed");
+			string err = "Lỗi kết nối AI: " + ex.Message;
+			_aiPanelControl.GetChatHistory()[aiMessageIndex].Text = err;
+			UpdateLastAiMessageInUi(err);
+		}
+	}
+
+	private void UpdateLastAiMessageInUi(string text)
+	{
+		if (_aiPanelControl == null) return;
+		try
+		{
+			var stackPanel = _aiPanelControl.FindName("ChatMessagesStackPanel") as StackPanel;
+			if (stackPanel != null && stackPanel.Children.Count > 0)
+			{
+				var lastChild = stackPanel.Children[stackPanel.Children.Count - 1] as Border;
+				if (lastChild != null)
+				{
+					var contentPanel = lastChild.Child as StackPanel;
+					if (contentPanel != null)
+					{
+						foreach (var child in contentPanel.Children)
+						{
+							if (child is TextBlock textBlock)
+							{
+								textBlock.Text = text;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		catch
+		{
 		}
 	}
 
@@ -2850,6 +2962,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_aiPanelControl.CheckAiRequested += AiPanel_CheckAiRequested;
 		_aiPanelControl.SaveAiRequested += AiPanel_SaveAiRequested;
 		_aiPanelControl.OpenUrlRequested += (_, url) => OpenUrl(url);
+		_aiPanelControl.SendChatRequested += AiPanel_SendChatRequested;
 	}
 
 	private void EnsureWelcomeDashboardHost()
