@@ -1498,6 +1498,27 @@ exit 0
 		}
 	}
 
+	private void CompressPdf_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				MessageBox.Show("Vui lòng mở một file PDF cần nén tối ưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			CompressPdfWindow compressWindow = new CompressPdfWindow(activeTab.CurrentPdfPath);
+			compressWindow.Owner = this;
+			if (compressWindow.ShowDialog() == true && !string.IsNullOrEmpty(compressWindow.CompressedPdfPath))
+			{
+				activeTab.LoadDocument(compressWindow.CompressedPdfPath);
+				LogStatus("Tối ưu dung lượng PDF thành công.");
+			}
+		}
+	}
+
 	private void Exit_Click(object sender, RoutedEventArgs e)
 	{
 		Application.Current.Shutdown();
@@ -2754,6 +2775,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.SavePdfRequested += SavePdf_Click;
 		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
 		_mainRibbon.ComparePdfsRequested += ComparePdfs_Click;
+		_mainRibbon.CompressPdfRequested += CompressPdf_Click;
 		_mainRibbon.ExitRequested += Exit_Click;
 		_mainRibbon.PrintPdfRequested += PrintPdf_Click;
 		_mainRibbon.BatchPrintRequested += BatchPrint_Click;

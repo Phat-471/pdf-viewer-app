@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use lopdf::{xobject, Dictionary, Document, Object};
+use image::ImageEncoder;
 
 // Convert C string to Rust string slice safely
 fn to_str<'a>(s: *const c_char) -> Option<&'a str> {
@@ -716,6 +717,104 @@ pub extern "C" fn make_pdf_searchable(
                 }
                 _ => {
                     page_dict.set("Contents", Object::Reference(stream_id));
+                }
+            }
+        }
+    }
+
+    doc.save(output_str).is_ok()
+}
+
+#[no_mangle]
+pub extern "C" fn compress_pdf(
+    pdf_path: *const c_char,
+    image_quality: u8,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // Tìm tất cả các stream của Image XObject
+    let mut image_ids = Vec::new();
+    for (id, object) in doc.objects.iter() {
+        if let Ok(stream) = object.as_stream() {
+            let is_image = stream.dict.get(b"Subtype").ok()
+                .and_then(|o| o.as_name().ok())
+                .map(|n| n == b"Image")
+                .unwrap_or(false);
+            if is_image {
+                image_ids.push(*id);
+            }
+        }
+    }
+
+    if image_ids.is_empty() {
+        return doc.save(output_str).is_ok();
+    }
+
+    for id in image_ids {
+        if let Ok(Object::Stream(ref mut stream)) = doc.get_object_mut(id) {
+            let width = stream.dict.get(b"Width").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
+            let height = stream.dict.get(b"Height").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
+            let bits = stream.dict.get(b"BitsPerComponent").ok().and_then(|o| get_integer(o)).unwrap_or(8) as u32;
+
+            if width == 0 || height == 0 || bits != 8 {
+                continue;
+            }
+
+            let color_space: &[u8] = stream.dict.get(b"ColorSpace").ok()
+                .and_then(|o| o.as_name().ok())
+                .unwrap_or(&[]);
+
+            if let Ok(decompressed) = stream.decompressed_content() {
+                let mut compressed_bytes = Vec::new();
+                let mut success = false;
+
+                if color_space == b"DeviceRGB" && decompressed.len() == (width * height * 3) as usize {
+                    let mut jpeg_data = Vec::new();
+                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                    if encoder.write_image(&decompressed, width, height, image::ColorType::Rgb8).is_ok() {
+                        compressed_bytes = jpeg_data;
+                        success = true;
+                    }
+                } else if color_space == b"DeviceGray" && decompressed.len() == (width * height) as usize {
+                    let mut jpeg_data = Vec::new();
+                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                    if encoder.write_image(&decompressed, width, height, image::ColorType::L8).is_ok() {
+                        compressed_bytes = jpeg_data;
+                        success = true;
+                    }
+                } else {
+                    let filter: &[u8] = stream.dict.get(b"Filter").ok()
+                        .and_then(|o| o.as_name().ok())
+                        .unwrap_or(&[]);
+                    if filter == b"DCTDecode" {
+                        if let Ok(img) = image::load_from_memory_with_format(&decompressed, image::ImageFormat::Jpeg) {
+                            let mut jpeg_data = Vec::new();
+                            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                            let rgb = img.to_rgb8();
+                            if encoder.write_image(&rgb, rgb.width(), rgb.height(), image::ColorType::Rgb8).is_ok() {
+                                compressed_bytes = jpeg_data;
+                                success = true;
+                            }
+                        }
+                    }
+                }
+
+                if success && !compressed_bytes.is_empty() {
+                    stream.set_content(compressed_bytes);
+                    stream.dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
                 }
             }
         }

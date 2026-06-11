@@ -50,6 +50,8 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? ComparePdfsRequested;
 
+	public event RoutedEventHandler? CompressPdfRequested;
+
 	public event RoutedEventHandler? RotateLeftRequested;
 
 	public event RoutedEventHandler? RotateLeftAllRequested;
@@ -305,6 +307,8 @@ public partial class MainRibbon : UserControl
 	private void MergeFromExplorer_Click(object sender, RoutedEventArgs e) => MergeFromExplorerRequested?.Invoke(this, e);
 
 	private void ComparePdfs_Click(object sender, RoutedEventArgs e) => ComparePdfsRequested?.Invoke(this, e);
+
+	private void CompressPdf_Click(object sender, RoutedEventArgs e) => CompressPdfRequested?.Invoke(this, e);
 
 	private void RotateLeft_Click(object sender, RoutedEventArgs e) => RotateLeftRequested?.Invoke(this, e);
 
