@@ -158,23 +158,21 @@
           <Border Style="{StaticResource SectionCard}">
             <StackPanel>
               <TextBlock Text="API KEYS" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
-              <TextBlock Text="Nếu dùng Gemini hoặc OpenAI, nhập khóa API tại đây." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
+              <TextBlock Text="Cấu hình Gemini API để sử dụng tính năng phân tích AI." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
               <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Margin="0,0,10,0">
-                  <TextBlock Text="GEMINI API KEY" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,4" />
+                <StackPanel Margin="0,0,0,0">
+                  <DockPanel LastChildFill="True" Margin="0,0,0,4">
+                    <TextBlock Text="GEMINI API KEY" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
+                    <Button Content="Lấy API Key miễn phí" Height="22" Padding="8,2" FontSize="10.5" HorizontalAlignment="Right" DockPanel.Dock="Right" Click="OpenGeminiApiKey_Click" Style="{StaticResource SecondaryButton}" />
+                  </DockPanel>
                   <TextBox Name="AiGeminiApiKeyTextBox" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,6" />
-                  <TextBlock Text="GEMINI MODEL" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,10,0,4" />
-                  <TextBox Name="AiGeminiModelTextBox" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,6" Text="auto" />
-                </StackPanel>
-                <StackPanel Grid.Column="1">
-                  <TextBlock Text="OPENAI API KEY" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,4" />
-                  <TextBox Name="AiOpenAiApiKeyTextBox" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,6" />
-                  <TextBlock Text="OPENAI MODEL" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,10,0,4" />
-                  <TextBox Name="AiOpenAiModelTextBox" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,6" Text="gpt-4.1" />
+                  <TextBlock Text="GEMINI MODEL (Đề xuất các model tiết kiệm token)" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,10,0,4" />
+                  <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,4" Height="34" VerticalContentAlignment="Center">
+                    <ComboBoxItem Content="gemini-3.5-flash (Mới nhất 2026 - Siêu nhanh &amp; Tiết kiệm)" Tag="gemini-3.5-flash" />
+                    <ComboBoxItem Content="gemini-3.1-flash-lite (Siêu rẻ &amp; Phản hồi nhanh)" Tag="gemini-3.1-flash-lite" />
+                    <ComboBoxItem Content="gemini-2.5-flash (Thế hệ 2.5 ổn định)" Tag="gemini-2.5-flash" />
+                    <ComboBoxItem Content="gemini-3.5-pro (Trí tuệ cao nhất - Cho bản vẽ phức tạp)" Tag="gemini-3.5-pro" />
+                  </ComboBox>
                 </StackPanel>
               </Grid>
             </StackPanel>

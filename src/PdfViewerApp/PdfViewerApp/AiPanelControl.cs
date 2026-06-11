@@ -40,13 +40,26 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 		AiEnableTelemetryCheckBox.IsChecked = settings.EnableTelemetry;
 		AiEnableUpdateCheckCheckBox.IsChecked = settings.EnableUpdateCheck;
 		AiGeminiApiKeyTextBox.Text = settings.GeminiApiKey;
-		AiOpenAiApiKeyTextBox.Text = settings.OpenAiApiKey;
-		AiGeminiModelTextBox.Text = settings.GeminiModel;
-		AiOpenAiModelTextBox.Text = settings.OpenAiModel;
+		
+		SelectComboItemByTag(AiGeminiModelComboBox, settings.GeminiModel);
+		if (AiGeminiModelComboBox.SelectedItem == null)
+		{
+			AiGeminiModelComboBox.Text = settings.GeminiModel;
+		}
 	}
 
 	internal AiSettings ReadSettings()
 	{
+		string geminiModel = string.Empty;
+		if (AiGeminiModelComboBox.SelectedItem is ComboBoxItem selectedModelItem)
+		{
+			geminiModel = selectedModelItem.Tag?.ToString() ?? AiGeminiModelComboBox.Text;
+		}
+		else
+		{
+			geminiModel = AiGeminiModelComboBox.Text;
+		}
+
 		return new AiSettings
 		{
 			ProviderMode = GetComboTag(AiProviderModeComboBox, "Auto"),
@@ -54,9 +67,8 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 			EnableTelemetry = (AiEnableTelemetryCheckBox.IsChecked == true),
 			EnableUpdateCheck = (AiEnableUpdateCheckCheckBox.IsChecked == true),
 			GeminiApiKey = (AiGeminiApiKeyTextBox.Text?.Trim() ?? string.Empty),
-			OpenAiApiKey = (AiOpenAiApiKeyTextBox.Text?.Trim() ?? string.Empty),
-			GeminiModel = (string.IsNullOrWhiteSpace(AiGeminiModelTextBox.Text) ? "auto" : AiGeminiModelTextBox.Text.Trim()),
-			OpenAiModel = (string.IsNullOrWhiteSpace(AiOpenAiModelTextBox.Text) ? "gpt-4.1" : AiOpenAiModelTextBox.Text.Trim())
+			GeminiModel = (string.IsNullOrWhiteSpace(geminiModel) ? "gemini-3.5-flash" : geminiModel.Trim()),
+			// Keep existing settings fields unchanged under the hood
 		};
 	}
 
@@ -136,8 +148,9 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 			if (item is ComboBoxItem { Tag: string tag2 } comboBoxItem && string.Equals(tag2, tag, StringComparison.OrdinalIgnoreCase))
 			{
 				comboBox.SelectedItem = comboBoxItem;
-				break;
+				return;
 			}
 		}
+		comboBox.SelectedItem = null;
 	}
 }

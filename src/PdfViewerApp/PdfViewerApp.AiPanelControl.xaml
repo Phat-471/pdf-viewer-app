@@ -57,7 +57,6 @@
             <ComboBox Name="AiProviderModeComboBox" Style="{StaticResource ModernComboBox}" Width="120" Height="28" SelectedIndex="0" SelectionChanged="AnySettingsChanged">
               <ComboBoxItem Content="Auto" Tag="Auto" />
               <ComboBoxItem Content="Gemini" Tag="Gemini" />
-              <ComboBoxItem Content="OpenAI" Tag="OpenAI" />
               <ComboBoxItem Content="Local" Tag="Local" />
               <ComboBoxItem Content="Off" Tag="Off" />
             </ComboBox>
@@ -71,14 +70,13 @@
           <TextBlock Text="GEMINI API KEY" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,4,0,4" />
           <TextBox Name="AiGeminiApiKeyTextBox" Style="{StaticResource ModernTextBox}" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
 
-          <TextBlock Text="OPENAI API KEY" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
-          <TextBox Name="AiOpenAiApiKeyTextBox" Style="{StaticResource ModernTextBox}" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
-
-          <TextBlock Text="GEMINI MODEL" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
-          <TextBox Name="AiGeminiModelTextBox" Style="{StaticResource ModernTextBox}" Text="auto" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
-
-          <TextBlock Text="OPENAI MODEL" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
-          <TextBox Name="AiOpenAiModelTextBox" Style="{StaticResource ModernTextBox}" Text="gpt-4.1" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
+          <TextBlock Text="GEMINI MODEL (Đề xuất model tiết kiệm token)" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
+          <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Style="{StaticResource ModernComboBox}" Margin="0,0,0,10" SelectionChanged="AnySettingsChanged">
+            <ComboBoxItem Content="gemini-3.5-flash (Mới nhất 2026 - Siêu nhanh &amp; Tiết kiệm)" Tag="gemini-3.5-flash" />
+            <ComboBoxItem Content="gemini-3.1-flash-lite (Siêu rẻ &amp; Phản hồi nhanh)" Tag="gemini-3.1-flash-lite" />
+            <ComboBoxItem Content="gemini-2.5-flash (Thế hệ 2.5 ổn định)" Tag="gemini-2.5-flash" />
+            <ComboBoxItem Content="gemini-3.5-pro (Trí tuệ cao nhất - Cho bản vẽ phức tạp)" Tag="gemini-3.5-pro" />
+          </ComboBox>
 
           <TextBlock Text="MẪU GỢI Ý (CAD)" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" Margin="0,4,0,4" />
           <WrapPanel Margin="0,0,0,8">
@@ -93,7 +91,6 @@
 
           <WrapPanel Margin="0,4,0,0">
             <Button Content="Lấy Gemini API" Style="{StaticResource AiActionBtn}" Margin="0,0,6,6" Click="OpenGeminiApiKey_Click" />
-            <Button Content="Lấy OpenAI API" Style="{StaticResource AiActionBtn}" Margin="0,0,6,6" Click="OpenOpenAiApiKey_Click" />
             <Button Content="Cài Local AI" Style="{StaticResource AiActionBtn}" Margin="0,0,6,6" Click="OpenOllamaDownload_Click" />
             <Button Content="Kiểm tra AI" Style="{StaticResource AiActionBtn}" Margin="0,0,6,6" Click="CheckAi_Click" />
             <Button Content="Lưu cấu hình" Style="{StaticResource AiActionBtn}" Margin="0,0,6,6" Click="SaveAiSettings_Click" />
@@ -108,7 +105,7 @@
         <TextBlock Text="KẾT QUẢ PHÂN TÍCH AI" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" Margin="0,4,0,6" />
         <TextBox Name="AiOutputTextBox" Grid.Row="1" Style="{StaticResource ModernTextBox}" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#0B0F19" BorderBrush="#1E293B" />
       </Grid>
-      <TextBlock Grid.Row="3" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#475569" FontSize="10.5" LineHeight="14" Text="API key có thể nhập tại đây hoặc dùng biến môi trường GEMINI_API_KEY / OPENAI_API_KEY. Chỉ vùng snapshot được gửi lên, không gửi toàn bộ file." />
+      <TextBlock Grid.Row="3" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#475569" FontSize="10.5" LineHeight="14" Text="API key có thể nhập tại đây hoặc dùng biến môi trường GEMINI_API_KEY. Chỉ vùng snapshot được gửi lên, không gửi toàn bộ file." />
     </Grid>
   </Border>
 </UserControl>

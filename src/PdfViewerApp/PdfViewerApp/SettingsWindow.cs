@@ -58,9 +58,16 @@ public partial class SettingsWindow : Window, IComponentConnector
 		AiEnableSilentUpdateCheckBox.IsChecked = _aiSettings.EnableSilentUpdate;
 		AiProviderModeComboBox.SelectedItem = FindComboItemByTag(AiProviderModeComboBox, _aiSettings.ProviderMode) ?? AiProviderModeComboBox.Items[0];
 		AiGeminiApiKeyTextBox.Text = _aiSettings.GeminiApiKey;
-		AiGeminiModelTextBox.Text = _aiSettings.GeminiModel;
-		AiOpenAiApiKeyTextBox.Text = _aiSettings.OpenAiApiKey;
-		AiOpenAiModelTextBox.Text = _aiSettings.OpenAiModel;
+		
+		ComboBoxItem? matchedModel = FindComboItemByTag(AiGeminiModelComboBox, _aiSettings.GeminiModel);
+		if (matchedModel != null)
+		{
+			AiGeminiModelComboBox.SelectedItem = matchedModel;
+		}
+		else
+		{
+			AiGeminiModelComboBox.Text = _aiSettings.GeminiModel;
+		}
 	}
 
 	private static ComboBoxItem? FindComboItemByTag(ComboBox comboBox, string tag)
@@ -76,6 +83,21 @@ public partial class SettingsWindow : Window, IComponentConnector
 		return null;
 	}
 
+	private void OpenGeminiApiKey_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+			{
+				FileName = "https://aistudio.google.com/app/apikey",
+				UseShellExecute = true
+			});
+		}
+		catch
+		{
+		}
+	}
+
 	private void Save_Click(object sender, RoutedEventArgs e)
 	{
 		_preferences.IsDarkTheme = DarkThemeRadio.IsChecked == true;
@@ -89,9 +111,17 @@ public partial class SettingsWindow : Window, IComponentConnector
 		_aiSettings.EnableUpdateCheck = AiEnableUpdateCheckCheckBox.IsChecked == true;
 		_aiSettings.EnableSilentUpdate = AiEnableSilentUpdateCheckBox.IsChecked == true;
 		_aiSettings.GeminiApiKey = AiGeminiApiKeyTextBox.Text?.Trim() ?? string.Empty;
-		_aiSettings.GeminiModel = string.IsNullOrWhiteSpace(AiGeminiModelTextBox.Text) ? "auto" : AiGeminiModelTextBox.Text.Trim();
-		_aiSettings.OpenAiApiKey = AiOpenAiApiKeyTextBox.Text?.Trim() ?? string.Empty;
-		_aiSettings.OpenAiModel = string.IsNullOrWhiteSpace(AiOpenAiModelTextBox.Text) ? "gpt-4.1" : AiOpenAiModelTextBox.Text.Trim();
+		
+		string geminiModel = string.Empty;
+		if (AiGeminiModelComboBox.SelectedItem is ComboBoxItem selectedModelItem)
+		{
+			geminiModel = selectedModelItem.Tag?.ToString() ?? AiGeminiModelComboBox.Text;
+		}
+		else
+		{
+			geminiModel = AiGeminiModelComboBox.Text;
+		}
+		_aiSettings.GeminiModel = string.IsNullOrWhiteSpace(geminiModel) ? "gemini-3.5-flash" : geminiModel.Trim();
 		_aiSettings.Save();
 
 		if (Application.Current.MainWindow is MainWindow mainWindow)

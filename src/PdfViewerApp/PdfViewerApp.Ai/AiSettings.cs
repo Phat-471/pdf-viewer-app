@@ -14,7 +14,7 @@ internal sealed class AiSettings
 
 	public string OpenAiApiKey { get; set; } = string.Empty;
 
-	public string GeminiModel { get; set; } = "auto";
+	public string GeminiModel { get; set; } = "gemini-3.5-flash";
 
 	public string OpenAiModel { get; set; } = "gpt-4.1";
 
