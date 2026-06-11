@@ -612,9 +612,9 @@ pub extern "C" fn make_pdf_searchable(
         stream_content.extend_from_slice(b"BT\n/F_OcrHelper 10 Tf\n3 Tr\n");
         for (x, y, w, h, text) in words {
             let escaped_text = text.replace('(', "\\(").replace(')', "\\)");
-            let L = escaped_text.len().max(1) as f64;
+            let len_f = escaped_text.len().max(1) as f64;
             let h_scaled = h;
-            let tz = ((w / (L * 0.6 * h_scaled)) * 100.0).clamp(20.0, 300.0);
+            let tz = ((w / (len_f * 0.6 * h_scaled)) * 100.0).clamp(20.0, 300.0);
             
             let word_stream = format!(
                 "1 0 0 1 {:.2} {:.2} Tm\n{:.1} Tf\n{:.1} Tz\n({}) Tj\n",
@@ -783,14 +783,14 @@ pub extern "C" fn compress_pdf(
 
                 if color_space == b"DeviceRGB" && decompressed.len() == (width * height * 3) as usize {
                     let mut jpeg_data = Vec::new();
-                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
                     if encoder.write_image(&decompressed, width, height, image::ColorType::Rgb8).is_ok() {
                         compressed_bytes = jpeg_data;
                         success = true;
                     }
                 } else if color_space == b"DeviceGray" && decompressed.len() == (width * height) as usize {
                     let mut jpeg_data = Vec::new();
-                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
                     if encoder.write_image(&decompressed, width, height, image::ColorType::L8).is_ok() {
                         compressed_bytes = jpeg_data;
                         success = true;
@@ -802,7 +802,7 @@ pub extern "C" fn compress_pdf(
                     if filter == b"DCTDecode" {
                         if let Ok(img) = image::load_from_memory_with_format(&decompressed, image::ImageFormat::Jpeg) {
                             let mut jpeg_data = Vec::new();
-                            let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
+                            let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
                             let rgb = img.to_rgb8();
                             if encoder.write_image(&rgb, rgb.width(), rgb.height(), image::ColorType::Rgb8).is_ok() {
                                 compressed_bytes = jpeg_data;
