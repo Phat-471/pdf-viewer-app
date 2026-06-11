@@ -15,8 +15,9 @@ namespace PdfViewerApp
         private nint _docHandleA = IntPtr.Zero;
         private nint _docHandleB = IntPtr.Zero;
         
-        private int _currentPage = 1;
-        private int _maxPageCount = 1;
+        private int _currentPageA = 1;
+        private int _currentPageB = 1;
+        private int _pageOffset = 0; // Lưu độ lệch trang giữa hai file (Trang B - Trang A)
         
         private bool _isSyncingScroll;
         private bool _isLoaded;
@@ -91,6 +92,7 @@ namespace PdfViewerApp
 
                 FileATextBlock.Text = Path.GetFileName(_pathA);
                 PlaceholderTextA.Visibility = Visibility.Collapsed;
+                _currentPageA = 1;
                 UpdatePageLimits();
                 RenderCurrentPage();
             }
@@ -117,6 +119,7 @@ namespace PdfViewerApp
 
                 FileBTextBlock.Text = Path.GetFileName(_pathB);
                 PlaceholderTextB.Visibility = Visibility.Collapsed;
+                _currentPageB = 1;
                 UpdatePageLimits();
                 RenderCurrentPage();
             }
@@ -128,16 +131,11 @@ namespace PdfViewerApp
 
         private void UpdatePageLimits()
         {
-            int countA = _docHandleA != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleA) : 0;
-            int countB = _docHandleB != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleB) : 0;
+            int countA = _docHandleA != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleA) : 1;
+            int countB = _docHandleB != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleB) : 1;
             
-            _maxPageCount = Math.Max(1, Math.Max(countA, countB));
-            if (_currentPage > _maxPageCount)
-            {
-                _currentPage = _maxPageCount;
-            }
-
-            PageNumberTextBlock.Text = $"Trang {_currentPage} / {_maxPageCount}";
+            PageNumberTextBlockA.Text = $"{_currentPageA} / {countA}";
+            PageNumberTextBlockB.Text = $"{_currentPageB} / {countB}";
         }
 
         private async void RenderCurrentPage()
@@ -147,15 +145,16 @@ namespace PdfViewerApp
             BitmapSource? bmpA = null;
             BitmapSource? bmpB = null;
 
-            int pageIdx = _currentPage - 1;
+            int pageIdxA = _currentPageA - 1;
+            int pageIdxB = _currentPageB - 1;
 
             // Render File A
             if (_docHandleA != IntPtr.Zero)
             {
                 int countA = PdfiumEngine.FPDF_GetPageCount(_docHandleA);
-                if (pageIdx < countA)
+                if (pageIdxA >= 0 && pageIdxA < countA)
                 {
-                    bmpA = await Task.Run(() => RenderPage(_docHandleA, pageIdx));
+                    bmpA = await Task.Run(() => RenderPage(_docHandleA, pageIdxA));
                     ImageA.Source = bmpA;
                 }
                 else
@@ -168,9 +167,9 @@ namespace PdfViewerApp
             if (_docHandleB != IntPtr.Zero)
             {
                 int countB = PdfiumEngine.FPDF_GetPageCount(_docHandleB);
-                if (pageIdx < countB)
+                if (pageIdxB >= 0 && pageIdxB < countB)
                 {
-                    bmpB = await Task.Run(() => RenderPage(_docHandleB, pageIdx));
+                    bmpB = await Task.Run(() => RenderPage(_docHandleB, pageIdxB));
                     ImageB.Source = bmpB;
                 }
                 else
@@ -200,7 +199,7 @@ namespace PdfViewerApp
                 StatusTextBlock.Text = "Hiển thị trang hoàn tất.";
             }
 
-            PageNumberTextBlock.Text = $"Trang {_currentPage} / {_maxPageCount}";
+            UpdatePageLimits();
         }
 
         private BitmapSource? RenderPage(nint docHandle, int pageIndex)
@@ -247,7 +246,6 @@ namespace PdfViewerApp
         {
             if (SyncScrollToggle.IsChecked == true && CompareModeCombo.SelectedIndex == 0)
             {
-                // Đồng bộ hóa ngay lập tức vị trí ScrollB theo ScrollA
                 _isSyncingScroll = true;
                 ScrollB.ScrollToVerticalOffset(ScrollA.VerticalOffset);
                 ScrollB.ScrollToHorizontalOffset(ScrollA.HorizontalOffset);
@@ -256,21 +254,70 @@ namespace PdfViewerApp
         }
 
         // --- Navigation ---
-        private void PrevPage_Click(object sender, RoutedEventArgs e)
+        private void PrevPageA_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentPage > 1)
+            if (_currentPageA > 1)
             {
-                _currentPage--;
+                _currentPageA--;
+                if (LockPageShiftToggle.IsChecked == true)
+                {
+                    int countB = _docHandleB != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleB) : 1;
+                    _currentPageB = Math.Clamp(_currentPageA + _pageOffset, 1, countB);
+                }
                 RenderCurrentPage();
             }
         }
 
-        private void NextPage_Click(object sender, RoutedEventArgs e)
+        private void NextPageA_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentPage < _maxPageCount)
+            int countA = _docHandleA != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleA) : 1;
+            if (_currentPageA < countA)
             {
-                _currentPage++;
+                _currentPageA++;
+                if (LockPageShiftToggle.IsChecked == true)
+                {
+                    int countB = _docHandleB != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleB) : 1;
+                    _currentPageB = Math.Clamp(_currentPageA + _pageOffset, 1, countB);
+                }
                 RenderCurrentPage();
+            }
+        }
+
+        private void PrevPageB_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPageB > 1)
+            {
+                _currentPageB--;
+                if (LockPageShiftToggle.IsChecked == true)
+                {
+                    int countA = _docHandleA != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleA) : 1;
+                    _currentPageA = Math.Clamp(_currentPageB - _pageOffset, 1, countA);
+                }
+                RenderCurrentPage();
+            }
+        }
+
+        private void NextPageB_Click(object sender, RoutedEventArgs e)
+        {
+            int countB = _docHandleB != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleB) : 1;
+            if (_currentPageB < countB)
+            {
+                _currentPageB++;
+                if (LockPageShiftToggle.IsChecked == true)
+                {
+                    int countA = _docHandleA != IntPtr.Zero ? PdfiumEngine.FPDF_GetPageCount(_docHandleA) : 1;
+                    _currentPageA = Math.Clamp(_currentPageB - _pageOffset, 1, countA);
+                }
+                RenderCurrentPage();
+            }
+        }
+
+        private void LockPageShift_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!_isLoaded) return;
+            if (LockPageShiftToggle.IsChecked == true)
+            {
+                _pageOffset = _currentPageB - _currentPageA;
             }
         }
 
@@ -304,7 +351,6 @@ namespace PdfViewerApp
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
-            // Dọn dẹp tài nguyên để tránh memory leak PDFium
             CloseDocHandle(ref _docHandleA);
             CloseDocHandle(ref _docHandleB);
         }
