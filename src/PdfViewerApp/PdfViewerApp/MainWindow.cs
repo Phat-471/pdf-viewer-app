@@ -78,6 +78,14 @@ public partial class MainWindow : Window, IComponentConnector
 
 	public double ActiveOpacity { get; set; } = 1.0;
 
+	public bool ActiveIsStrikeout { get; set; }
+
+	public bool ActiveIsSubscript { get; set; }
+
+	public bool ActiveIsSuperscript { get; set; }
+
+	public TextAlignment ActiveTextAlignment { get; set; } = TextAlignment.Left;
+
 	public string ActiveTool
 	{
 		get
@@ -362,31 +370,65 @@ public partial class MainWindow : Window, IComponentConnector
 			return;
 		}
 
+		bool hasDiagnostics = false;
+		foreach (object item in diagnosticsGroup.Items)
+		{
+			if (item is Fluent.Button existing && string.Equals(existing.Header?.ToString(), "Chẩn đoán PDF", StringComparison.Ordinal))
+			{
+				hasDiagnostics = true;
+				break;
+			}
+		}
+
+		if (!hasDiagnostics)
+		{
+			Fluent.Button diagnosticsButton = new Fluent.Button
+			{
+				Header = "Chẩn đoán PDF",
+				Margin = new Thickness(8, 0, 8, 0)
+			};
+			diagnosticsButton.Click += ShowPdfDiagnostics_Click;
+			diagnosticsButton.LargeIcon = new TextBlock
+			{
+				FontFamily = new FontFamily("Segoe MDL2 Assets"),
+				Text = "\ue9d9", // Speedometer
+				FontSize = 32,
+				Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8")),
+				HorizontalAlignment = HorizontalAlignment.Center
+			};
+			diagnosticsGroup.Items.Insert(0, diagnosticsButton);
+		}
+
+		bool hasRestore = false;
 		foreach (object item in diagnosticsGroup.Items)
 		{
 			if (item is Fluent.Button existing && string.Equals(existing.Header?.ToString(), "Khôi phục bản trước", StringComparison.Ordinal))
 			{
-				return;
+				hasRestore = true;
+				break;
 			}
 		}
 
-		Fluent.Button restoreButton = new Fluent.Button
+		if (!hasRestore)
 		{
-			Header = "Khôi phục bản trước",
-			Margin = new Thickness(8, 0, 8, 0)
-		};
-		restoreButton.Click += RestorePreviousVersion_Click;
-		restoreButton.LargeIcon = new TextBlock
-		{
-			FontFamily = new FontFamily("Segoe MDL2 Assets"),
-			Text = "\ue72e",
-			FontSize = 32,
-			Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
-			HorizontalAlignment = HorizontalAlignment.Center
-		};
+			Fluent.Button restoreButton = new Fluent.Button
+			{
+				Header = "Khôi phục bản trước",
+				Margin = new Thickness(8, 0, 8, 0)
+			};
+			restoreButton.Click += RestorePreviousVersion_Click;
+			restoreButton.LargeIcon = new TextBlock
+			{
+				FontFamily = new FontFamily("Segoe MDL2 Assets"),
+				Text = "\ue72e",
+				FontSize = 32,
+				Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
+				HorizontalAlignment = HorizontalAlignment.Center
+			};
 
-		int insertIndex = Math.Min(1, diagnosticsGroup.Items.Count);
-		diagnosticsGroup.Items.Insert(insertIndex, restoreButton);
+			int insertIndex = Math.Min(1, diagnosticsGroup.Items.Count);
+			diagnosticsGroup.Items.Insert(insertIndex, restoreButton);
+		}
 	}
 
 	private void EnsureRollbackButtonGroup()
@@ -714,10 +756,23 @@ exit 0
 			e.Handled = true;
 			GetActiveTab()?.RotateSelectedPageAsync(90);
 		}
+		else if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z)
+		{
+			e.Handled = true;
+			GetActiveTab()?.Redo();
+		}
 		else if (Keyboard.Modifiers == ModifierKeys.Control)
 		{
 			switch (e.Key)
 			{
+			case Key.Z:
+				e.Handled = true;
+				GetActiveTab()?.Undo();
+				break;
+			case Key.Y:
+				e.Handled = true;
+				GetActiveTab()?.Redo();
+				break;
 			case Key.O:
 				e.Handled = true;
 				OpenPdf_Click(this, new RoutedEventArgs());
@@ -1068,6 +1123,7 @@ exit 0
 		pdfDocumentTab2.DocumentOpenRequested += DocTab_DocumentOpenRequested;
 		pdfDocumentTab2.AiSnapshotRequested += DocTab_AiSnapshotRequested;
 		pdfDocumentTab2.ScaleCalibrated += DocTab_ScaleCalibrated;
+		pdfDocumentTab2.SelectedAnnotationChanged += DocTab_SelectedAnnotationChanged;
 		StackPanel stackPanel = new StackPanel
 		{
 			Orientation = Orientation.Horizontal
@@ -1153,6 +1209,8 @@ exit 0
 		if (e.Source is TabControl)
 		{
 			UpdateStatusBarFromActiveTab();
+			PdfDocumentTab activeTab = GetActiveTab();
+			_mainRibbon?.SetContextualTabVisibility(activeTab?.SelectedAnnotation != null);
 		}
 	}
 
@@ -1177,6 +1235,32 @@ exit 0
 		if (sender == GetActiveTab() && sender is PdfDocumentTab pdfDocumentTab)
 		{
 			LogStatus(pdfDocumentTab.LastStatusMessage);
+		}
+	}
+
+	private void DocTab_SelectedAnnotationChanged(object? sender, EventArgs e)
+	{
+		if (sender == GetActiveTab() && sender is PdfDocumentTab tab)
+		{
+			var ann = tab.SelectedAnnotation;
+			_mainRibbon?.SetContextualTabVisibility(ann != null);
+			if (ann != null)
+			{
+				_mainRibbon?.UpdateFormattingControls(
+					ann.FontFamily,
+					ann.FontSize,
+					ann.IsBold,
+					ann.IsItalic,
+					ann.IsUnderline,
+					ann.IsStrikeout,
+					ann.IsSubscript,
+					ann.IsSuperscript,
+					ann.TextAlignment,
+					ann.StrokeColor,
+					ann.BgColor,
+					ann.Opacity
+				);
+			}
 		}
 	}
 
@@ -1527,6 +1611,42 @@ exit 0
 		Application.Current.Shutdown();
 	}
 
+	private void Paste_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.PasteAnnotation(inPlace: false);
+	}
+
+	private void Cut_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.CopySelectedAnnotation();
+			activeTab.HandleDeleteKey();
+		}
+	}
+
+	private void Copy_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			if (activeTab.ActiveTool == "SelectText")
+			{
+				activeTab.CopySelectedText();
+			}
+			else
+			{
+				activeTab.CopySelectedAnnotation();
+			}
+		}
+	}
+
+	private void Format_Click(object sender, RoutedEventArgs e)
+	{
+		LogStatus("Đã chọn công cụ Sao chép định dạng");
+	}
+
 	private async void MergeFiles_Click(object sender, RoutedEventArgs e)
 	{
 		if (EnsureActivated())
@@ -1601,6 +1721,20 @@ exit 0
 		string report = BuildPerformanceTraceReport();
 		LogStatus("Performance trace opened");
 		ShowReportWindow("Performance Trace", report);
+	}
+
+	private void ShowPdfDiagnostics_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+		{
+			MessageBox.Show(this, "Vui lòng mở một tài liệu PDF để thực hiện chẩn đoán.", "Chẩn đoán PDF", MessageBoxButton.OK, MessageBoxImage.Information);
+			return;
+		}
+
+		PdfDiagnosticsWindow diagWindow = new PdfDiagnosticsWindow(activeTab.CurrentPdfPath, activeTab);
+		diagWindow.Owner = this;
+		diagWindow.ShowDialog();
 	}
 
 	private void About_Click(object sender, RoutedEventArgs e)
@@ -1745,6 +1879,11 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			activeTab.ActiveTool = "MeasureArea";
 			activeTab.CurrentMeasurementScale = _mainRibbon.GetMeasurementScale();
 		}
+	}
+
+	private void MeasurePerimeterTool_Click(object sender, RoutedEventArgs e)
+	{
+		MessageBox.Show("Tính năng Đo Chu vi (Perimeter Measurement) đang được phát triển và sẽ sớm cập nhật trong phiên bản tiếp theo.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
 	}
 
 	private void HandwriteSign_Click(object sender, RoutedEventArgs e)
@@ -2507,6 +2646,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "TextBox";
 		}
+		_mainRibbon?.SelectMeasureAndSignTab();
 		LogStatus("Đã chuyển sang công cụ Hộp văn bản để thực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ để tạo.");
 	}
 
@@ -2518,6 +2658,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Callout";
 		}
+		_mainRibbon?.SelectMeasureAndSignTab();
 		LogStatus("Đã chuyển sang công cụ Mũi tên chệdẫn để thực hiện kích hoạt. Nhập chuỗi để tạo mũi tên, kéo để tạo ghi chú.");
 	}
 
@@ -2762,12 +2903,16 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			return;
 		}
 
-		(string fontFamily, double fontSize, bool bold, bool italic, bool underline, Color strokeColor, Color backgroundColor, double opacity) = _mainRibbon.ReadAnnotationSettings();
+		(string fontFamily, double fontSize, bool bold, bool italic, bool underline, bool strikeout, bool subscript, bool superscript, TextAlignment alignment, Color strokeColor, Color backgroundColor, double opacity) = _mainRibbon.ReadAnnotationSettings();
 		ActiveFontFamily = fontFamily;
 		ActiveFontSize = fontSize;
 		ActiveIsBold = bold;
 		ActiveIsItalic = italic;
 		ActiveIsUnderline = underline;
+		ActiveIsStrikeout = strikeout;
+		ActiveIsSubscript = subscript;
+		ActiveIsSuperscript = superscript;
+		ActiveTextAlignment = alignment;
 		ActiveStrokeColor = strokeColor;
 		ActiveBgColor = backgroundColor;
 		ActiveOpacity = opacity;
@@ -2816,7 +2961,30 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 
 	private void ApplyStylesToActiveTab()
 	{
-		GetActiveTab()?.ApplyStylesToActiveAnnotation(ActiveFontFamily, ActiveFontSize, ActiveIsBold, ActiveIsItalic, ActiveIsUnderline, ActiveStrokeColor, ActiveBgColor, ActiveOpacity);
+		GetActiveTab()?.ApplyStylesToActiveAnnotation(
+			ActiveFontFamily,
+			ActiveFontSize,
+			ActiveIsBold,
+			ActiveIsItalic,
+			ActiveIsUnderline,
+			ActiveIsStrikeout,
+			ActiveIsSubscript,
+			ActiveIsSuperscript,
+			ActiveTextAlignment,
+			ActiveStrokeColor,
+			ActiveBgColor,
+			ActiveOpacity
+		);
+	}
+
+	private void BulletList_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.ApplyBulletListToActiveTextBox();
+	}
+
+	private void NumberList_Click(object sender, RoutedEventArgs e)
+	{
+		GetActiveTab()?.ApplyNumberListToActiveTextBox();
 	}
 
 	private Color ParseColor(string colorName)
@@ -2936,13 +3104,20 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.VirtualPrinterConfigRequested += VirtualPrinterConfig_Click;
 		_mainRibbon.MeasureDistanceToolRequested += MeasureDistanceTool_Click;
 		_mainRibbon.MeasureAreaToolRequested += MeasureAreaTool_Click;
+		_mainRibbon.MeasurePerimeterToolRequested += MeasurePerimeterTool_Click;
 		_mainRibbon.CalibrateScaleRequested += CalibrateScale_Click;
 		_mainRibbon.HandwriteSignRequested += HandwriteSign_Click;
 		_mainRibbon.StampApproveRequested += StampApprove_Click;
+		_mainRibbon.PasteRequested += Paste_Click;
+		_mainRibbon.CutRequested += Cut_Click;
+		_mainRibbon.CopyRequested += Copy_Click;
+		_mainRibbon.FormatRequested += Format_Click;
 		_mainRibbon.MeasurementScaleChanged += MeasurementScale_Changed;
 		_mainRibbon.SettingsChanged += MainRibbon_SettingsChanged;
 		_mainRibbon.OpenUrlRequested += OpenUrl;
 		_mainRibbon.PageOrganizerRequested += PageOrganizer_Click;
+		_mainRibbon.BulletListRequested += BulletList_Click;
+		_mainRibbon.NumberListRequested += NumberList_Click;
 	}
 
 	private void MainRibbon_SettingsChanged(object? sender, EventArgs e)

@@ -122,6 +122,8 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? MeasureAreaToolRequested;
 
+	public event RoutedEventHandler? MeasurePerimeterToolRequested;
+
 	public event RoutedEventHandler? HandwriteSignRequested;
 
 	public event RoutedEventHandler? StampApproveRequested;
@@ -133,6 +135,18 @@ public partial class MainRibbon : UserControl
 	public event EventHandler? SettingsChanged;
 
 	public event Action<string>? OpenUrlRequested;
+
+	public event RoutedEventHandler? PasteRequested;
+
+	public event RoutedEventHandler? CutRequested;
+
+	public event RoutedEventHandler? CopyRequested;
+
+	public event RoutedEventHandler? FormatRequested;
+
+	public event RoutedEventHandler? BulletListRequested;
+
+	public event RoutedEventHandler? NumberListRequested;
 
 	public MainRibbon()
 	{
@@ -152,6 +166,26 @@ public partial class MainRibbon : UserControl
 		{
 			ThemeToggleBtn.IsChecked = isDark;
 			ThemeToggleBtn.Header = (isDark ? "Tối" : "Sáng");
+		}
+	}
+
+	public void SelectMeasureAndSignTab()
+	{
+		if (MyRibbon != null)
+		{
+			MyRibbon.SelectedTabIndex = 3;
+		}
+	}
+
+	public void SetContextualTabVisibility(bool isVisible)
+	{
+		if (CommentFormatGroup != null)
+		{
+			CommentFormatGroup.Visibility = (isVisible ? Visibility.Visible : Visibility.Collapsed);
+			if (isVisible && MyRibbon != null && CommentFormatTab != null)
+			{
+				MyRibbon.SelectedTabItem = CommentFormatTab;
+			}
 		}
 	}
 
@@ -217,6 +251,10 @@ public partial class MainRibbon : UserControl
 		{
 			MeasureAreaToolBtn.IsChecked = activeTool == "MeasureArea";
 		}
+		if (MeasurePerimeterToolBtn != null)
+		{
+			MeasurePerimeterToolBtn.IsChecked = activeTool == "MeasurePerimeter";
+		}
 	}
 
 	public void SetActivationState(bool isActivated)
@@ -236,21 +274,39 @@ public partial class MainRibbon : UserControl
 		ApplyProButtonState(AiSnapshotBtn, opacity, toolTip);
 	}
 
-	public (string FontFamily, double FontSize, bool Bold, bool Italic, bool Underline, Color StrokeColor, Color BackgroundColor, double Opacity) ReadAnnotationSettings()
+	public (string FontFamily, double FontSize, bool Bold, bool Italic, bool Underline, bool Strikeout, bool Subscript, bool Superscript, System.Windows.TextAlignment Alignment, Color StrokeColor, Color BackgroundColor, double Opacity) ReadAnnotationSettings()
 	{
-		string fontFamily = GetComboTag(FontFamilyCombo, "Segoe UI");
+		var combo = (FontFamilyCombo2 != null && FontFamilyCombo2.SelectedIndex >= 0) ? FontFamilyCombo2 : FontFamilyCombo;
+		string fontFamily = GetComboTag(combo, "Segoe UI");
 		double fontSize = 14.0;
-		if (FontSizeCombo.SelectedItem is ComboBoxItem { Tag: string tag } && double.TryParse(tag, out var parsedFontSize))
+		var sizeCombo = (FontSizeCombo2 != null && FontSizeCombo2.SelectedIndex >= 0) ? FontSizeCombo2 : FontSizeCombo;
+		if (sizeCombo != null && sizeCombo.SelectedItem is ComboBoxItem { Tag: string tag } && double.TryParse(tag, out var parsedFontSize))
 		{
 			fontSize = parsedFontSize;
 		}
 
+		bool bold = (BoldToggle2 != null && BoldToggle2.IsChecked == true) || (BoldToggle != null && BoldToggle.IsChecked == true);
+		bool italic = (ItalicToggle2 != null && ItalicToggle2.IsChecked == true) || (ItalicToggle != null && ItalicToggle.IsChecked == true);
+		bool underline = (UnderlineToggle2 != null && UnderlineToggle2.IsChecked == true) || (UnderlineToggle != null && UnderlineToggle.IsChecked == true);
+		bool strikeout = (StrikeToggle2 != null && StrikeToggle2.IsChecked == true) || (StrikeToggle != null && StrikeToggle.IsChecked == true);
+		bool subscript = (SubscriptToggle2 != null && SubscriptToggle2.IsChecked == true) || (SubscriptToggle != null && SubscriptToggle.IsChecked == true);
+		bool superscript = SuperscriptToggle != null && SuperscriptToggle.IsChecked == true;
+
+		System.Windows.TextAlignment alignment = System.Windows.TextAlignment.Left;
+		if (AlignCenterToggle != null && AlignCenterToggle.IsChecked == true) alignment = System.Windows.TextAlignment.Center;
+		else if (AlignRightToggle != null && AlignRightToggle.IsChecked == true) alignment = System.Windows.TextAlignment.Right;
+		else if (AlignJustifyToggle != null && AlignJustifyToggle.IsChecked == true) alignment = System.Windows.TextAlignment.Justify;
+
 		return (
 			fontFamily,
 			fontSize,
-			BoldToggle.IsChecked == true,
-			ItalicToggle.IsChecked == true,
-			UnderlineToggle.IsChecked == true,
+			bold,
+			italic,
+			underline,
+			strikeout,
+			subscript,
+			superscript,
+			alignment,
 			ParseColor(GetComboTag(StrokeColorCombo, "Red")),
 			ParseColor(GetComboTag(BgColorCombo, "Transparent")),
 			OpacitySpinner.Value / 100.0
@@ -266,6 +322,114 @@ public partial class MainRibbon : UserControl
 
 		control.Opacity = opacity;
 		control.ToolTip = toolTip;
+	}
+
+	public void UpdateFormattingControls(string fontFamily, double fontSize, bool bold, bool italic, bool underline, bool strikeout, bool subscript, bool superscript, System.Windows.TextAlignment alignment, Color strokeColor, Color bgColor, double opacity)
+	{
+		_isSyncingSettings = true;
+		try
+		{
+			var combo = FontFamilyCombo2 ?? FontFamilyCombo;
+			if (combo != null)
+			{
+				for (int i = 0; i < combo.Items.Count; i++)
+				{
+					if (combo.Items[i] is ComboBoxItem item && item.Tag?.ToString() == fontFamily)
+					{
+						combo.SelectedIndex = i;
+						break;
+					}
+				}
+				if (FontFamilyCombo != null && FontFamilyCombo2 != null)
+				{
+					FontFamilyCombo.SelectedIndex = combo.SelectedIndex;
+					FontFamilyCombo2.SelectedIndex = combo.SelectedIndex;
+				}
+			}
+
+			var sizeCombo = FontSizeCombo2 ?? FontSizeCombo;
+			if (sizeCombo != null)
+			{
+				for (int i = 0; i < sizeCombo.Items.Count; i++)
+				{
+					if (sizeCombo.Items[i] is ComboBoxItem item && double.TryParse(item.Tag?.ToString(), out var sizeVal) && Math.Abs(sizeVal - fontSize) < 0.1)
+					{
+						sizeCombo.SelectedIndex = i;
+						break;
+					}
+				}
+				if (FontSizeCombo != null && FontSizeCombo2 != null)
+				{
+					FontSizeCombo.SelectedIndex = sizeCombo.SelectedIndex;
+					FontSizeCombo2.SelectedIndex = sizeCombo.SelectedIndex;
+				}
+			}
+
+			if (BoldToggle != null) BoldToggle.IsChecked = bold;
+			if (BoldToggle2 != null) BoldToggle2.IsChecked = bold;
+
+			if (ItalicToggle != null) ItalicToggle.IsChecked = italic;
+			if (ItalicToggle2 != null) ItalicToggle2.IsChecked = italic;
+
+			if (UnderlineToggle != null) UnderlineToggle.IsChecked = underline;
+			if (UnderlineToggle2 != null) UnderlineToggle2.IsChecked = underline;
+
+			if (StrikeToggle != null) StrikeToggle.IsChecked = strikeout;
+			if (StrikeToggle2 != null) StrikeToggle2.IsChecked = strikeout;
+
+			if (SubscriptToggle != null) SubscriptToggle.IsChecked = subscript;
+			if (SubscriptToggle2 != null) SubscriptToggle2.IsChecked = subscript;
+
+			if (SuperscriptToggle != null) SuperscriptToggle.IsChecked = superscript;
+
+			if (AlignLeftToggle != null) AlignLeftToggle.IsChecked = (alignment == System.Windows.TextAlignment.Left);
+			if (AlignCenterToggle != null) AlignCenterToggle.IsChecked = (alignment == System.Windows.TextAlignment.Center);
+			if (AlignRightToggle != null) AlignRightToggle.IsChecked = (alignment == System.Windows.TextAlignment.Right);
+			if (AlignJustifyToggle != null) AlignJustifyToggle.IsChecked = (alignment == System.Windows.TextAlignment.Justify);
+
+			if (StrokeColorCombo != null)
+			{
+				string hexStroke = strokeColor.ToString();
+				for (int i = 0; i < StrokeColorCombo.Items.Count; i++)
+				{
+					if (StrokeColorCombo.Items[i] is ComboBoxItem item)
+					{
+						string? tagColor = item.Tag?.ToString();
+						if (tagColor != null && (tagColor.Equals(hexStroke, StringComparison.OrdinalIgnoreCase) || ParseColor(tagColor) == strokeColor))
+						{
+							StrokeColorCombo.SelectedIndex = i;
+							break;
+						}
+					}
+				}
+			}
+
+			if (BgColorCombo != null)
+			{
+				string hexBg = bgColor.ToString();
+				for (int i = 0; i < BgColorCombo.Items.Count; i++)
+				{
+					if (BgColorCombo.Items[i] is ComboBoxItem item)
+					{
+						string? tagColor = item.Tag?.ToString();
+						if (tagColor != null && (tagColor.Equals(hexBg, StringComparison.OrdinalIgnoreCase) || ParseColor(tagColor) == bgColor))
+						{
+							BgColorCombo.SelectedIndex = i;
+							break;
+						}
+					}
+				}
+			}
+
+			if (OpacitySpinner != null)
+			{
+				OpacitySpinner.Value = opacity * 100.0;
+			}
+		}
+		finally
+		{
+			_isSyncingSettings = false;
+		}
 	}
 
 	private void OpenPdf_Click(object sender, RoutedEventArgs e) => OpenPdfRequested?.Invoke(this, e);
@@ -358,15 +522,94 @@ public partial class MainRibbon : UserControl
 
 	private void AiSnapshotTool_Click(object sender, RoutedEventArgs e) => AiSnapshotToolRequested?.Invoke(this, e);
 
-	private void FontFamilyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+	private bool _isSyncingSettings = false;
+	private void SyncAnnotationSettings(object sender)
+	{
+		if (_isSyncingSettings) return;
+		_isSyncingSettings = true;
+		try
+		{
+			if (sender == FontFamilyCombo && FontFamilyCombo2 != null) FontFamilyCombo2.SelectedIndex = FontFamilyCombo.SelectedIndex;
+			else if (sender == FontFamilyCombo2 && FontFamilyCombo != null) FontFamilyCombo.SelectedIndex = FontFamilyCombo2.SelectedIndex;
 
-	private void FontSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+			if (sender == FontSizeCombo && FontSizeCombo2 != null) FontSizeCombo2.SelectedIndex = FontSizeCombo.SelectedIndex;
+			else if (sender == FontSizeCombo2 && FontSizeCombo != null) FontSizeCombo.SelectedIndex = FontSizeCombo2.SelectedIndex;
 
-	private void BoldToggle_Click(object sender, RoutedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+			if (sender == BoldToggle && BoldToggle2 != null) BoldToggle2.IsChecked = BoldToggle.IsChecked;
+			else if (sender == BoldToggle2 && BoldToggle != null) BoldToggle.IsChecked = BoldToggle2.IsChecked;
 
-	private void ItalicToggle_Click(object sender, RoutedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+			if (sender == ItalicToggle && ItalicToggle2 != null) ItalicToggle2.IsChecked = ItalicToggle.IsChecked;
+			else if (sender == ItalicToggle2 && ItalicToggle != null) ItalicToggle.IsChecked = ItalicToggle2.IsChecked;
 
-	private void UnderlineToggle_Click(object sender, RoutedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+			if (sender == UnderlineToggle && UnderlineToggle2 != null) UnderlineToggle2.IsChecked = UnderlineToggle.IsChecked;
+			else if (sender == UnderlineToggle2 && UnderlineToggle != null) UnderlineToggle.IsChecked = UnderlineToggle2.IsChecked;
+
+			if (sender == StrikeToggle && StrikeToggle2 != null) StrikeToggle2.IsChecked = StrikeToggle.IsChecked;
+			else if (sender == StrikeToggle2 && StrikeToggle != null) StrikeToggle.IsChecked = StrikeToggle2.IsChecked;
+
+			if (sender == SubscriptToggle && SubscriptToggle2 != null) SubscriptToggle2.IsChecked = SubscriptToggle.IsChecked;
+			else if (sender == SubscriptToggle2 && SubscriptToggle != null) SubscriptToggle.IsChecked = SubscriptToggle2.IsChecked;
+
+			if (sender == AlignLeftToggle || sender == AlignCenterToggle || sender == AlignRightToggle || sender == AlignJustifyToggle)
+			{
+				if (AlignLeftToggle != null) AlignLeftToggle.IsChecked = (sender == AlignLeftToggle);
+				if (AlignCenterToggle != null) AlignCenterToggle.IsChecked = (sender == AlignCenterToggle);
+				if (AlignRightToggle != null) AlignRightToggle.IsChecked = (sender == AlignRightToggle);
+				if (AlignJustifyToggle != null) AlignJustifyToggle.IsChecked = (sender == AlignJustifyToggle);
+			}
+		}
+		finally
+		{
+			_isSyncingSettings = false;
+		}
+		SettingsChanged?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void FontFamilyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void FontSizeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void BoldToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void ItalicToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void UnderlineToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void StrikeToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void SubscriptToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void SuperscriptToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void AlignLeftToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void AlignCenterToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void AlignRightToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void AlignJustifyToggle_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void BulletListBtn_Click(object sender, RoutedEventArgs e) => BulletListRequested?.Invoke(this, e);
+
+	private void NumberListBtn_Click(object sender, RoutedEventArgs e) => NumberListRequested?.Invoke(this, e);
+
+	private void FontFamilyCombo2_SelectionChanged(object sender, SelectionChangedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void FontSizeCombo2_SelectionChanged(object sender, SelectionChangedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void BoldToggle2_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void ItalicToggle2_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void UnderlineToggle2_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void Paste_Click(object sender, RoutedEventArgs e) => PasteRequested?.Invoke(this, e);
+
+	private void Cut_Click(object sender, RoutedEventArgs e) => CutRequested?.Invoke(this, e);
+
+	private void Copy_Click(object sender, RoutedEventArgs e) => CopyRequested?.Invoke(this, e);
+
+	private void Format_Click(object sender, RoutedEventArgs e) => FormatRequested?.Invoke(this, e);
 
 	private void StrokeColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => SettingsChanged?.Invoke(this, EventArgs.Empty);
 
@@ -395,6 +638,65 @@ public partial class MainRibbon : UserControl
 	private void MeasureDistanceTool_Click(object sender, RoutedEventArgs e) => MeasureDistanceToolRequested?.Invoke(this, e);
 
 	private void MeasureAreaTool_Click(object sender, RoutedEventArgs e) => MeasureAreaToolRequested?.Invoke(this, e);
+
+	private void MeasurePerimeterTool_Click(object sender, RoutedEventArgs e) => MeasurePerimeterToolRequested?.Invoke(this, e);
+
+	private void FontGrowBtn2_Click(object sender, RoutedEventArgs e)
+	{
+		if (FontSizeCombo2 != null && FontSizeCombo2.SelectedIndex < FontSizeCombo2.Items.Count - 1)
+		{
+			FontSizeCombo2.SelectedIndex++;
+		}
+	}
+
+	private void FontShrinkBtn2_Click(object sender, RoutedEventArgs e)
+	{
+		if (FontSizeCombo2 != null && FontSizeCombo2.SelectedIndex > 0)
+		{
+			FontSizeCombo2.SelectedIndex--;
+		}
+	}
+
+	private void StrikeToggle2_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+	private void SubscriptToggle2_Click(object sender, RoutedEventArgs e) => SyncAnnotationSettings(sender);
+
+	private void HighlightColor_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is Fluent.MenuItem menuItem && menuItem.Tag is string colorTag)
+		{
+			if (BgColorCombo != null)
+			{
+				foreach (ComboBoxItem item in BgColorCombo.Items)
+				{
+					if (item.Tag?.ToString() == colorTag)
+					{
+						BgColorCombo.SelectedItem = item;
+						break;
+					}
+				}
+			}
+			SettingsChanged?.Invoke(this, EventArgs.Empty);
+		}
+	}
+
+	private void TextColor_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is Fluent.MenuItem menuItem && menuItem.Tag is string colorTag)
+		{
+			if (StrokeColorCombo != null)
+			{
+				foreach (ComboBoxItem item in StrokeColorCombo.Items)
+				{
+					if (item.Tag?.ToString() == colorTag)
+					{
+						StrokeColorCombo.SelectedItem = item;
+						break;
+					}
+				}
+			}
+			SettingsChanged?.Invoke(this, EventArgs.Empty);
+		}
+	}
 
 	private void CalibrateScale_Click(object sender, RoutedEventArgs e) => CalibrateScaleRequested?.Invoke(this, e);
 

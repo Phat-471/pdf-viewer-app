@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -8,17 +8,55 @@ public static class InputDialog
 {
 	public static string? Show(string title, string instruction, string defaultValue = "")
 	{
+		Window? ownerWindow = null;
+		try
+		{
+			foreach (Window window in Application.Current.Windows)
+			{
+				if (window.IsActive)
+				{
+					ownerWindow = window;
+					break;
+				}
+			}
+		}
+		catch { }
+
+		if (ownerWindow == null)
+		{
+			try
+			{
+				ownerWindow = Application.Current.MainWindow;
+			}
+			catch { }
+		}
+
 		Window dialog = new Window
 		{
 			Title = title,
 			Width = 420.0,
 			Height = 190.0,
-			WindowStartupLocation = WindowStartupLocation.CenterOwner,
-			Owner = Application.Current.MainWindow,
 			ResizeMode = ResizeMode.NoResize,
 			Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
 			WindowStyle = WindowStyle.ToolWindow
 		};
+
+		if (ownerWindow != null && ownerWindow != dialog)
+		{
+			try
+			{
+				dialog.Owner = ownerWindow;
+				dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+			}
+			catch
+			{
+				dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+			}
+		}
+		else
+		{
+			dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+		}
 		Grid grid = new Grid
 		{
 			Margin = new Thickness(16.0)

@@ -1,4 +1,4 @@
-﻿# build_project.ps1
+# build_project.ps1
 # Automated build script for PDF Pro: compiles Rust core and C# WPF app
 
 $ErrorActionPreference = "Stop"
@@ -62,9 +62,9 @@ Write-Host "    ﾄ静｣ sao chﾃｩp pdf_core.dll vﾃo thﾆｰ m盻･c 
 # 3. Build WPF Application
 Write-Host "`n[3/3] Biﾃｪn d盻議h 盻ｩng d盻･ng giao di盻㌻ WPF (C#)..." -ForegroundColor Yellow
 Set-Location $wpfDir
-& dotnet build -c Release
+& dotnet build PdfViewerApp.csproj -c Release
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Biﾃｪn d盻議h WPF th蘯･t b蘯｡i!"
+    Write-Error "Biên dịch WPF thất bại!"
     exit 2
 }
 Write-Host "    Biﾃｪn d盻議h WPF hoﾃn t蘯･t thﾃnh cﾃｴng!" -ForegroundColor Green

@@ -161,6 +161,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private Point _smoothZoomAnchor;
 
+	private Point _smoothZoomHostAnchor;
+
+	private readonly Stack<List<PdfAnnotation>> _undoStack = new();
+
+	private readonly Stack<List<PdfAnnotation>> _redoStack = new();
+
 	private DispatcherTimer? _smoothZoomTimer;
 
 	private readonly DispatcherTimer _viewportTimer;
@@ -226,7 +232,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		ActiveTool = "MeasureCalibrate";
 	}
 
-	public PdfAnnotation? SelectedAnnotation { get; set; }
+	public event EventHandler? SelectedAnnotationChanged;
+
+	private PdfAnnotation? _selectedAnnotation;
+	public PdfAnnotation? SelectedAnnotation
+	{
+		get => _selectedAnnotation;
+		set
+		{
+			if (_selectedAnnotation != value)
+			{
+				_selectedAnnotation = value;
+				SelectedAnnotationChanged?.Invoke(this, EventArgs.Empty);
+			}
+		}
+	}
 
 	public string ActiveFontFamily { get; set; } = "Segoe UI";
 
@@ -243,6 +263,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public Color ActiveBgColor { get; set; } = Colors.Transparent;
 
 	public double ActiveOpacity { get; set; } = 1.0;
+
+	public bool ActiveIsStrikeout { get; set; }
+
+	public bool ActiveIsSubscript { get; set; }
+
+	public bool ActiveIsSuperscript { get; set; }
+
+	public TextAlignment ActiveTextAlignment { get; set; } = TextAlignment.Left;
 
 	public string? CurrentPdfPath { get; private set; }
 
@@ -282,6 +310,52 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (!(sender is Canvas { Tag: var tag } canvas) || !(tag is int num))
 		{
 			return;
+		}
+		if (ActiveTool != "EditText" && ActiveTool != "SelectText")
+		{
+			FrameworkElement clickedElement = e.Source as FrameworkElement;
+			while (clickedElement != null && clickedElement != canvas && !(clickedElement.Tag is PdfAnnotation))
+			{
+				clickedElement = VisualTreeHelper.GetParent(clickedElement) as FrameworkElement;
+			}
+			if (clickedElement != null && clickedElement.Tag is PdfAnnotation clickedAnnotation)
+			{
+				// Auto-switch to Select tool to allow moving and editing the annotation
+				ActiveTool = "Select";
+				if (Window.GetWindow(this) is MainWindow mainWindow)
+				{
+					mainWindow.ActiveTool = "Select";
+				}
+				SelectedAnnotation = clickedAnnotation;
+
+				if (e.ClickCount == 2)
+				{
+					if (clickedAnnotation is PdfTextBoxAnnotation tb)
+					{
+						ShowEditTextBoxInput(canvas, tb, num);
+						e.Handled = true;
+						return;
+					}
+					else if (clickedAnnotation is PdfStickyNoteAnnotation sticky)
+					{
+						ShowStickyNoteEdit(canvas, sticky, num);
+						e.Handled = true;
+						return;
+					}
+				}
+				else
+				{
+					SaveUndoState();
+					_isDraggingAnn = true;
+					_drawStartPoint = e.GetPosition(canvas);
+					_dragStartAnnX = clickedAnnotation.X;
+					_dragStartAnnY = clickedAnnotation.Y;
+					canvas.CaptureMouse();
+				}
+				e.Handled = true;
+				RedrawPageAnnotations(canvas, num);
+				return;
+			}
 		}
 		if (ActiveTool == "EditText" || ActiveTool == "SelectText")
 		{
@@ -326,6 +400,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (ActiveTool == "Select")
 		{
 			FrameworkElement frameworkElement = e.Source as FrameworkElement;
+			if (frameworkElement != null && (frameworkElement.Tag as string == "ResizeHandle" || frameworkElement.Tag as string == "ArrowHandle" || frameworkElement.Tag as string == "LineStartHandle" || frameworkElement.Tag as string == "LineEndHandle"))
+			{
+				SaveUndoState();
+			}
 			if (frameworkElement != null && frameworkElement.Tag as string == "ResizeHandle" && SelectedAnnotation is PdfTextBoxAnnotation pdfTextBoxAnnotation)
 			{
 				_isResizingAnn = true;
@@ -403,6 +481,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else
 				{
+					SaveUndoState();
 					_isDraggingAnn = true;
 					_drawStartPoint = e.GetPosition(canvas);
 					_dragStartAnnX = pdfAnnotation.X;
@@ -499,6 +578,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				ColorHex = "#FCD34D",
 				NoteText = "Nhập ghi chú nhanh..."
 			};
+			SaveUndoState();
 			Annotations.Add(pdfStickyNoteAnnotation);
 			SelectedAnnotation = pdfStickyNoteAnnotation;
 			ActiveTool = "Select";
@@ -528,6 +608,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				sigAnn.X = Math.Clamp(sigAnn.X, 0.0, 1.0 - sigAnn.Width);
 				sigAnn.Y = Math.Clamp(sigAnn.Y, 0.0, 1.0 - sigAnn.Height);
 
+				SaveUndoState();
 				Annotations.Add(sigAnn);
 				SelectedAnnotation = sigAnn;
 				ActiveTool = "Select";
@@ -558,6 +639,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			stampAnn.X = Math.Clamp(stampAnn.X, 0.0, 1.0 - stampAnn.Width);
 			stampAnn.Y = Math.Clamp(stampAnn.Y, 0.0, 1.0 - stampAnn.Height);
 
+			SaveUndoState();
 			Annotations.Add(stampAnn);
 			SelectedAnnotation = stampAnn;
 			ActiveTool = "Select";
@@ -599,6 +681,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				};
 				_pendingAreaAnnotation.Points.Add(new Point(position.X / canvas.Width, position.Y / canvas.Height));
 				_pendingAreaAnnotation.Points.Add(new Point(position.X / canvas.Width, position.Y / canvas.Height));
+				SaveUndoState();
 				Annotations.Add(_pendingAreaAnnotation);
 				SelectedAnnotation = _pendingAreaAnnotation;
 				_isDrawing = true;
@@ -876,6 +959,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					Opacity = ActiveOpacity,
 					Thickness = 2.0
 				};
+				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation);
 				SelectedAnnotation = pdfShapeAnnotation;
 				ActiveTool = "Select";
@@ -902,6 +986,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					Opacity = ActiveOpacity,
 					Thickness = 2.0
 				};
+				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation2);
 				SelectedAnnotation = pdfShapeAnnotation2;
 				ActiveTool = "Select";
@@ -934,6 +1019,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					Opacity = ActiveOpacity,
 					Thickness = 2.0
 				};
+				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation3);
 				SelectedAnnotation = pdfShapeAnnotation3;
 				ActiveTool = "Select";
@@ -957,6 +1043,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				measureAnn.Points.Add(new Point(_drawStartPoint.X / canvas.Width, _drawStartPoint.Y / canvas.Height));
 				measureAnn.Points.Add(new Point(position.X / canvas.Width, position.Y / canvas.Height));
 
+				SaveUndoState();
 				Annotations.Add(measureAnn);
 				SelectedAnnotation = measureAnn;
 				ActiveTool = "Select";
@@ -1005,6 +1092,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						Opacity = ActiveOpacity,
 						Thickness = 2.0
 					};
+					SaveUndoState();
 					Annotations.Add(pdfInkAnnotation);
 					SelectedAnnotation = pdfInkAnnotation;
 				}
@@ -1232,6 +1320,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					BgColor = ActiveBgColor,
 					Opacity = ActiveOpacity
 				};
+				SaveUndoState();
 				Annotations.Add(pdfTextBoxAnnotation);
 				SelectedAnnotation = pdfTextBoxAnnotation;
 				ActiveTool = "Select";
@@ -1301,6 +1390,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					BgColor = ActiveBgColor,
 					Opacity = ActiveOpacity
 				};
+				SaveUndoState();
 				Annotations.Add(pdfCalloutAnnotation);
 				SelectedAnnotation = pdfCalloutAnnotation;
 				ActiveTool = "Select";
@@ -1469,6 +1559,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			canvas.Children.Remove(editorBorder);
 			if (!string.IsNullOrEmpty(text))
 			{
+				SaveUndoState();
 				sticky.NoteText = text;
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
@@ -1511,6 +1602,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		tbInput.SelectAll();
 		tbInput.LostFocus += delegate
 		{
+			SaveUndoState();
 			tb.Text = tbInput.Text.Trim();
 			canvas.Children.Remove(tbInput);
 			RedrawPageAnnotations(canvas, pageNumber);
@@ -1561,6 +1653,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				pdfCalloutAnnotation.ArrowY = Math.Clamp(pdfCalloutAnnotation.ArrowY + 0.02, 0.0, 0.9);
 			}
 		}
+		SaveUndoState();
 		Annotations.Add(pdfAnnotation);
 		SelectedAnnotation = pdfAnnotation;
 		RedrawAllPageAnnotations();
@@ -1892,6 +1985,194 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		_isRulersEnabled = !_isRulersEnabled;
 		LogStatus(_isRulersEnabled ? "Hiện thước đo" : "Ẩn thước đo");
+
+		Visibility visibility = _isRulersEnabled ? Visibility.Visible : Visibility.Collapsed;
+		if (HorizontalRulerBorder != null) HorizontalRulerBorder.Visibility = visibility;
+		if (VerticalRulerBorder != null) VerticalRulerBorder.Visibility = visibility;
+		if (RulerCornerBlock != null) RulerCornerBlock.Visibility = visibility;
+
+		if (_isRulersEnabled)
+		{
+			UpdateRulers();
+		}
+	}
+
+	private void Ruler_SizeChanged(object sender, SizeChangedEventArgs e)
+	{
+		UpdateRulers();
+	}
+
+	private void PagesHost_SizeChanged(object sender, SizeChangedEventArgs e)
+	{
+		UpdateRulers();
+	}
+
+	private void UpdateRulers()
+	{
+		if (!_isRulersEnabled || HorizontalRuler == null || VerticalRuler == null || PagesHost == null || DocumentScrollViewer == null)
+		{
+			return;
+		}
+
+		try
+		{
+			Point pageOrigin = PagesHost.TranslatePoint(new Point(0, 0), DocumentScrollViewer);
+			DrawHorizontalRuler(pageOrigin.X);
+			DrawVerticalRuler(pageOrigin.Y);
+		}
+		catch
+		{
+			// Safe guard against TranslatePoint when visual is not connected to source yet
+		}
+	}
+
+	private void DrawHorizontalRuler(double pageOriginX)
+	{
+		HorizontalRuler.Children.Clear();
+		double width = HorizontalRuler.ActualWidth;
+		if (width <= 0 || PagesHost.ActualWidth <= 0) return;
+
+		double visualScale = 1.33333333 * CurrentZoom;
+
+		// Adaptive tick step
+		double pointsPerTick = 100.0;
+		double pixelStep = pointsPerTick * visualScale;
+		while (pixelStep < 50.0)
+		{
+			pointsPerTick *= 2.0;
+			pixelStep = pointsPerTick * visualScale;
+		}
+		while (pixelStep > 150.0)
+		{
+			pointsPerTick /= 2.0;
+			pixelStep = pointsPerTick * visualScale;
+		}
+
+		double subTickStep = pointsPerTick / 10.0;
+		double startPt = -pageOriginX / visualScale;
+		double endPt = (width - pageOriginX) / visualScale;
+		double startAligned = Math.Floor(startPt / subTickStep) * subTickStep;
+
+		for (double pt = startAligned; pt <= endPt; pt += subTickStep)
+		{
+			double x = pageOriginX + pt * visualScale;
+			if (x < 0 || x > width) continue;
+
+			bool isMajor = Math.Abs(pt % pointsPerTick) < 0.001 || Math.Abs((pt % pointsPerTick) - pointsPerTick) < 0.001;
+			bool isMedium = Math.Abs(pt % (pointsPerTick / 2.0)) < 0.001 || Math.Abs((pt % (pointsPerTick / 2.0)) - (pointsPerTick / 2.0)) < 0.001;
+
+			Line tick = new Line
+			{
+				X1 = x,
+				X2 = x,
+				Stroke = new SolidColorBrush(Color.FromRgb(148, 163, 184)), // slate-400
+				StrokeThickness = 1
+			};
+
+			if (isMajor)
+			{
+				tick.Y1 = 8;
+				tick.Y2 = 20;
+
+				TextBlock label = new TextBlock
+				{
+					Text = Math.Round(pt).ToString(),
+					Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+					FontSize = 8,
+					FontWeight = FontWeights.Bold
+				};
+				Canvas.SetLeft(label, x + 2);
+				Canvas.SetTop(label, 0);
+				HorizontalRuler.Children.Add(label);
+			}
+			else if (isMedium)
+			{
+				tick.Y1 = 12;
+				tick.Y2 = 20;
+			}
+			else
+			{
+				tick.Y1 = 15;
+				tick.Y2 = 20;
+			}
+
+			HorizontalRuler.Children.Add(tick);
+		}
+	}
+
+	private void DrawVerticalRuler(double pageOriginY)
+	{
+		VerticalRuler.Children.Clear();
+		double height = VerticalRuler.ActualHeight;
+		if (height <= 0 || PagesHost.ActualHeight <= 0) return;
+
+		double visualScale = 1.33333333 * CurrentZoom;
+
+		// Adaptive tick step
+		double pointsPerTick = 100.0;
+		double pixelStep = pointsPerTick * visualScale;
+		while (pixelStep < 50.0)
+		{
+			pointsPerTick *= 2.0;
+			pixelStep = pointsPerTick * visualScale;
+		}
+		while (pixelStep > 150.0)
+		{
+			pointsPerTick /= 2.0;
+			pixelStep = pointsPerTick * visualScale;
+		}
+
+		double subTickStep = pointsPerTick / 10.0;
+		double startPt = -pageOriginY / visualScale;
+		double endPt = (height - pageOriginY) / visualScale;
+		double startAligned = Math.Floor(startPt / subTickStep) * subTickStep;
+
+		for (double pt = startAligned; pt <= endPt; pt += subTickStep)
+		{
+			double y = pageOriginY + pt * visualScale;
+			if (y < 0 || y > height) continue;
+
+			bool isMajor = Math.Abs(pt % pointsPerTick) < 0.001 || Math.Abs((pt % pointsPerTick) - pointsPerTick) < 0.001;
+			bool isMedium = Math.Abs(pt % (pointsPerTick / 2.0)) < 0.001 || Math.Abs((pt % (pointsPerTick / 2.0)) - (pointsPerTick / 2.0)) < 0.001;
+
+			Line tick = new Line
+			{
+				Y1 = y,
+				Y2 = y,
+				Stroke = new SolidColorBrush(Color.FromRgb(148, 163, 184)), // slate-400
+				StrokeThickness = 1
+			};
+
+			if (isMajor)
+			{
+				tick.X1 = 8;
+				tick.X2 = 20;
+
+				TextBlock label = new TextBlock
+				{
+					Text = Math.Round(pt).ToString(),
+					Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+					FontSize = 8,
+					FontWeight = FontWeights.Bold,
+					LayoutTransform = new RotateTransform(-90)
+				};
+				Canvas.SetLeft(label, 0);
+				Canvas.SetTop(label, y + 2);
+				VerticalRuler.Children.Add(label);
+			}
+			else if (isMedium)
+			{
+				tick.X1 = 12;
+				tick.X2 = 20;
+			}
+			else
+			{
+				tick.X1 = 15;
+				tick.X2 = 20;
+			}
+
+			VerticalRuler.Children.Add(tick);
+		}
 	}
 
 	public void ContextGuides_Click(object sender, RoutedEventArgs e)
@@ -2563,6 +2844,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					FontSize = fontSizePoints,
 					Opacity = 1.0
 				};
+				SaveUndoState();
 				Annotations.Add(whiteout);
 				Annotations.Add(replacement);
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
@@ -2660,6 +2942,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					FontSize = fontSizePoints,
 					Opacity = 1.0
 				};
+				SaveUndoState();
 				Annotations.Add(whiteout);
 				Annotations.Add(replacement);
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
@@ -3194,8 +3477,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		_targetZoom = nextTarget;
 		_smoothZoomAnchor = viewportAnchor ?? GetViewportCenter();
+
+		// Pre-calculate the anchor in page space based on current zoom before starting the animation
+		double currentScale = CurrentZoom / Math.Max(0.0001, _baseZoomForLayout);
+		_smoothZoomHostAnchor = GetZoomHostAnchor(_smoothZoomAnchor, currentScale);
+
 		_pendingZoomBaseZoom = _baseZoomForLayout;
 		_pendingZoomViewportPoint = _smoothZoomAnchor;
+		_pendingZoomHostPoint = _smoothZoomHostAnchor; // Ensure post-render layout scrolling centers on the exact same host point
 		_pendingZoomContentPoint = null;
 		_resetScrollAfterRender = false;
 		ClearRenderQueue();
@@ -3488,6 +3777,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void DocumentScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
 	{
 		RequestViewportRefresh();
+		UpdateRulers();
 	}
 
 	private void ThumbScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -3546,8 +3836,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_smoothZoomTimer.Stop();
 				return;
 			}
-			double currentScale = CurrentZoom / Math.Max(0.0001, _baseZoomForLayout);
-			Point hostPoint = GetZoomHostAnchor(_smoothZoomAnchor, currentScale);
 			double delta = _targetZoom - CurrentZoom;
 			if (Math.Abs(delta) < 0.001)
 			{
@@ -3563,7 +3851,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			ReportZoomChanged();
 			double ratio = CurrentZoom / _baseZoomForLayout;
 			ApplyZoomPreviewTransform(ratio);
-			ScrollToKeepHostPointAtViewport(hostPoint, _smoothZoomAnchor, ratio, updateLayout: false);
+			ScrollToKeepHostPointAtViewport(_smoothZoomHostAnchor, _smoothZoomAnchor, ratio, updateLayout: false);
 		};
 		_viewportTimer = new DispatcherTimer();
 		_viewportTimer.Interval = TimeSpan.FromMilliseconds(50.0);
@@ -3577,6 +3865,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		DocumentScrollViewer.PreviewMouseMove += DocumentScrollViewer_PreviewMouseMove;
 		DocumentScrollViewer.PreviewMouseUp += DocumentScrollViewer_PreviewMouseUp;
 		DocumentScrollViewer.ScrollChanged += DocumentScrollViewer_ScrollChanged;
+		PagesHost.SizeChanged += PagesHost_SizeChanged;
 		base.Loaded += delegate
 		{
 			if (PageCount > 0 && _isFirstLoad)
@@ -5845,26 +6134,87 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	public void ApplyStylesToActiveAnnotation(string fontFamily, double fontSize, bool bold, bool italic, bool underline, Color stroke, Color bg, double opacity)
+	public void ApplyStylesToActiveAnnotation(string fontFamily, double fontSize, bool bold, bool italic, bool underline, bool strikeout, bool subscript, bool superscript, TextAlignment alignment, Color stroke, Color bg, double opacity)
 	{
 		ActiveFontFamily = fontFamily;
 		ActiveFontSize = fontSize;
 		ActiveIsBold = bold;
 		ActiveIsItalic = italic;
 		ActiveIsUnderline = underline;
+		ActiveIsStrikeout = strikeout;
+		ActiveIsSubscript = subscript;
+		ActiveIsSuperscript = superscript;
+		ActiveTextAlignment = alignment;
 		ActiveStrokeColor = stroke;
 		ActiveBgColor = bg;
 		ActiveOpacity = opacity;
 		if (SelectedAnnotation != null)
 		{
+			SaveUndoState();
 			SelectedAnnotation.FontFamily = fontFamily;
 			SelectedAnnotation.FontSize = fontSize;
 			SelectedAnnotation.IsBold = bold;
 			SelectedAnnotation.IsItalic = italic;
 			SelectedAnnotation.IsUnderline = underline;
+			SelectedAnnotation.IsStrikeout = strikeout;
+			SelectedAnnotation.IsSubscript = subscript;
+			SelectedAnnotation.IsSuperscript = superscript;
+			SelectedAnnotation.TextAlignment = alignment;
 			SelectedAnnotation.StrokeColor = stroke;
 			SelectedAnnotation.BgColor = bg;
 			SelectedAnnotation.Opacity = opacity;
+			RedrawAllPageAnnotations();
+		}
+	}
+
+	public void ApplyBulletListToActiveTextBox()
+	{
+		if (SelectedAnnotation is PdfTextBoxAnnotation tb)
+		{
+			SaveUndoState();
+			string[] lines = tb.Text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+			for (int i = 0; i < lines.Length; i++)
+			{
+				string trimmed = lines[i].TrimStart();
+				if (!trimmed.StartsWith("• "))
+				{
+					lines[i] = "• " + lines[i];
+				}
+			}
+			tb.Text = string.Join(Environment.NewLine, lines);
+			RedrawAllPageAnnotations();
+		}
+	}
+
+	public void ApplyNumberListToActiveTextBox()
+	{
+		if (SelectedAnnotation is PdfTextBoxAnnotation tb)
+		{
+			SaveUndoState();
+			string[] lines = tb.Text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+			int counter = 1;
+			for (int i = 0; i < lines.Length; i++)
+			{
+				string trimmed = lines[i].TrimStart();
+				int dotIndex = trimmed.IndexOf(". ");
+				bool alreadyNumbered = false;
+				if (dotIndex > 0 && int.TryParse(trimmed.Substring(0, dotIndex), out _))
+				{
+					alreadyNumbered = true;
+				}
+
+				if (!alreadyNumbered)
+				{
+					lines[i] = $"{counter}. " + lines[i];
+					counter++;
+				}
+				else
+				{
+					lines[i] = $"{counter}. " + trimmed.Substring(dotIndex + 2);
+					counter++;
+				}
+			}
+			tb.Text = string.Join(Environment.NewLine, lines);
 			RedrawAllPageAnnotations();
 		}
 	}
@@ -5873,9 +6223,117 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		if (SelectedAnnotation != null)
 		{
+			SaveUndoState();
 			Annotations.Remove(SelectedAnnotation);
 			SelectedAnnotation = null;
 			RedrawAllPageAnnotations();
+		}
+	}
+
+	private void SaveUndoState()
+	{
+		try
+		{
+			List<PdfAnnotation> snapshot = new List<PdfAnnotation>();
+			foreach (var ann in Annotations)
+			{
+				var cloned = CloneAnnotation(ann);
+				if (cloned != null)
+				{
+					snapshot.Add(cloned);
+				}
+			}
+
+			_undoStack.Push(snapshot);
+			if (_undoStack.Count > 50)
+			{
+				var tempStack = new Stack<List<PdfAnnotation>>();
+				while (_undoStack.Count > 1)
+				{
+					tempStack.Push(_undoStack.Pop());
+				}
+				_undoStack.Clear();
+				while (tempStack.Count > 0)
+				{
+					_undoStack.Push(tempStack.Pop());
+				}
+			}
+
+			_redoStack.Clear();
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"Failed to save undo state: {ex}");
+		}
+	}
+
+	public void Undo()
+	{
+		if (_undoStack.Count == 0)
+		{
+			LogStatus("Không có gì để hoàn tác");
+			return;
+		}
+
+		try
+		{
+			List<PdfAnnotation> currentSnapshot = new List<PdfAnnotation>();
+			foreach (var ann in Annotations)
+			{
+				var cloned = CloneAnnotation(ann);
+				if (cloned != null)
+				{
+					currentSnapshot.Add(cloned);
+				}
+			}
+			_redoStack.Push(currentSnapshot);
+
+			var previousState = _undoStack.Pop();
+			Annotations.Clear();
+			Annotations.AddRange(previousState);
+
+			SelectedAnnotation = null;
+			RedrawAllPageAnnotations();
+			LogStatus("Đã hoàn tác");
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"Undo failed: {ex}");
+		}
+	}
+
+	public void Redo()
+	{
+		if (_redoStack.Count == 0)
+		{
+			LogStatus("Không có gì để làm lại");
+			return;
+		}
+
+		try
+		{
+			List<PdfAnnotation> currentSnapshot = new List<PdfAnnotation>();
+			foreach (var ann in Annotations)
+			{
+				var cloned = CloneAnnotation(ann);
+				if (cloned != null)
+				{
+					currentSnapshot.Add(cloned);
+				}
+			}
+			_undoStack.Push(currentSnapshot);
+
+			var nextState = _redoStack.Pop();
+			Annotations.Clear();
+			Annotations.AddRange(nextState);
+
+			SelectedAnnotation = null;
+			RedrawAllPageAnnotations();
+			LogStatus("Đã làm lại");
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"Redo failed: {ex}");
 		}
 	}
 
@@ -5927,11 +6385,26 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					FontSize = pdfTextBoxAnnotation.FontSize,
 					FontWeight = (pdfTextBoxAnnotation.IsBold ? FontWeights.Bold : FontWeights.Normal),
 					FontStyle = (pdfTextBoxAnnotation.IsItalic ? FontStyles.Italic : FontStyles.Normal),
-					TextDecorations = (pdfTextBoxAnnotation.IsUnderline ? TextDecorations.Underline : null),
 					Foreground = new SolidColorBrush(pdfTextBoxAnnotation.StrokeColor),
 					TextWrapping = TextWrapping.Wrap,
-					Padding = new Thickness(4.0)
+					Padding = new Thickness(4.0),
+					TextAlignment = pdfTextBoxAnnotation.TextAlignment
 				};
+				TextDecorationCollection decors = new TextDecorationCollection();
+				if (pdfTextBoxAnnotation.IsUnderline) decors.Add(TextDecorations.Underline[0]);
+				if (pdfTextBoxAnnotation.IsStrikeout) decors.Add(TextDecorations.Strikethrough[0]);
+				child.TextDecorations = decors;
+
+				if (pdfTextBoxAnnotation.IsSubscript)
+				{
+					child.FontSize = pdfTextBoxAnnotation.FontSize * 0.7;
+					child.Margin = new Thickness(0, pdfTextBoxAnnotation.FontSize * 0.3, 0, 0);
+				}
+				else if (pdfTextBoxAnnotation.IsSuperscript)
+				{
+					child.FontSize = pdfTextBoxAnnotation.FontSize * 0.7;
+					child.Margin = new Thickness(0, 0, 0, pdfTextBoxAnnotation.FontSize * 0.3);
+				}
 				border.Child = child;
 				Canvas.SetLeft(border, num3);
 				Canvas.SetTop(border, num4);
@@ -6576,6 +7049,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void ReportZoomChanged()
 	{
 		this.ZoomChanged?.Invoke(this, EventArgs.Empty);
+		UpdateRulers();
 	}
 
 	private void ReportPageChanged()
@@ -6599,4 +7073,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		ActiveTool = "PlaceStamp";
 		LogStatus($"Nhấp chuột vào trang để đóng dấu '{stampText}'.");
 	}
+
+	public int BitmapCacheCount => _bitmapCache?.Count ?? 0;
+	public long BitmapCacheBytes => _bitmapCacheBytes;
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -108,10 +108,48 @@ public partial class WelcomeDashboard : UserControl, IComponentConnector
 		this.Resources["RecentFileTextFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
 		this.Resources["RecentFileTextDescFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
 
-		var bgBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#FFFFFF"));
+		System.Windows.Media.Brush bgBrush;
+		if (isDark)
+		{
+			var gradient = new System.Windows.Media.LinearGradientBrush();
+			gradient.StartPoint = new System.Windows.Point(0, 0);
+			gradient.EndPoint = new System.Windows.Point(1, 1);
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0F172A"), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#1E293B"), 1));
+			bgBrush = gradient;
+		}
+		else
+		{
+			var gradient = new System.Windows.Media.LinearGradientBrush();
+			gradient.StartPoint = new System.Windows.Point(0, 0);
+			gradient.EndPoint = new System.Windows.Point(1, 1);
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FFFFFF"), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"), 1));
+			bgBrush = gradient;
+		}
+
 		var borderBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#CBD5E1"));
 		var innerBgBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0B1220" : "#F8FAFC"));
-		var rightBgBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#111827" : "#F1F5F9"));
+
+		System.Windows.Media.Brush rightBgBrush;
+		if (isDark)
+		{
+			var gradient = new System.Windows.Media.LinearGradientBrush();
+			gradient.StartPoint = new System.Windows.Point(0, 0);
+			gradient.EndPoint = new System.Windows.Point(0, 1);
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0B1220"), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#111827"), 1));
+			rightBgBrush = gradient;
+		}
+		else
+		{
+			var gradient = new System.Windows.Media.LinearGradientBrush();
+			gradient.StartPoint = new System.Windows.Point(0, 0);
+			gradient.EndPoint = new System.Windows.Point(0, 1);
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#E2E8F0"), 1));
+			rightBgBrush = gradient;
+		}
 
 		var textTitleBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
 		var textDescBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));

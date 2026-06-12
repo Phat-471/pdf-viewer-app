@@ -67,21 +67,24 @@ internal sealed class GeminiSnapshotProvider : IAiSnapshotProvider
 					}
 					string firstPrompt = systemContext + "Câu hỏi:\n" + msg.Text;
 
+					var partsList = new List<object> { new { text = firstPrompt } };
+					string? imgData = msg.ImageBase64 ?? request.PngBase64;
+					if (!string.IsNullOrWhiteSpace(imgData))
+					{
+						partsList.Add(new
+						{
+							inline_data = new
+							{
+								mime_type = "image/png",
+								data = imgData
+							}
+						});
+					}
+
 					list.Add(new
 					{
 						role = "user",
-						parts = new object[]
-						{
-							new { text = firstPrompt },
-							new
-							{
-								inline_data = new
-								{
-									mime_type = "image/png",
-									data = msg.ImageBase64 ?? request.PngBase64
-								}
-							}
-						}
+						parts = partsList.ToArray()
 					});
 				}
 				else
@@ -129,23 +132,25 @@ internal sealed class GeminiSnapshotProvider : IAiSnapshotProvider
 			}
 			string text = systemContext + "Câu hỏi người dùng:\n" + request.Prompt;
 
+			var partsList = new List<object> { new { text } };
+			if (!string.IsNullOrWhiteSpace(request.PngBase64))
+			{
+				partsList.Add(new
+				{
+					inline_data = new
+					{
+						mime_type = "image/png",
+						data = request.PngBase64
+					}
+				});
+			}
+
 			payloadContents = new object[]
 			{
 				new
 				{
 					role = "user",
-					parts = new object[]
-					{
-						new { text },
-						new
-						{
-							inline_data = new
-							{
-								mime_type = "image/png",
-								data = request.PngBase64
-							}
-						}
-					}
+					parts = partsList.ToArray()
 				}
 			};
 		}

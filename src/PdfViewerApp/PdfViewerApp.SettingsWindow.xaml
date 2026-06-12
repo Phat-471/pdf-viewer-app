@@ -165,7 +165,7 @@
                     <TextBlock Text="GEMINI API KEY" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
                     <Button Content="Lấy API Key miễn phí" Height="22" Padding="8,2" FontSize="10.5" HorizontalAlignment="Right" DockPanel.Dock="Right" Click="OpenGeminiApiKey_Click" Style="{StaticResource SecondaryButton}" />
                   </DockPanel>
-                  <TextBox Name="AiGeminiApiKeyTextBox" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,6" />
+                  <TextBox Name="AiGeminiApiKeyTextBox" Background="#1E293B" Foreground="#fcf8f8ff" BorderBrush="#475569" BorderThickness="1" Padding="8,6" />
                   <TextBlock Text="GEMINI MODEL (Đề xuất các model tiết kiệm token)" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,10,0,4" />
                   <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,4" Height="34" VerticalContentAlignment="Center">
                     <ComboBoxItem Content="gemini-3.5-flash (Mới nhất 2026 - Siêu nhanh &amp; Tiết kiệm)" Tag="gemini-3.5-flash" />
