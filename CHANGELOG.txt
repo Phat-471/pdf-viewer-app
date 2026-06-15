@@ -1,2 +1,4 @@
-- Thêm các nút mẫu câu lệnh nhanh cho bản vẽ CAD trong tính năng AI Snapshot.
-- Tự động điền nhanh các yêu cầu: Giải thích bản vẽ, Đọc kích thước, Giải nghĩa ký hiệu, Tìm điểm bất thường.
+- Thêm dấu tích checkmark cho các thẻ theme được chọn trong Cài đặt.
+- Sửa lỗi theme tự động hoàn tác về mặc định khi khởi động lại ứng dụng.
+- Đồng bộ giao diện cài đặt AI Panel, sửa các nút chức năng và căn lề.
+- Nâng cấp phiên bản lên v1.3.0.
