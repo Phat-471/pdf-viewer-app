@@ -6,10 +6,11 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="FontSize" Value="14" />
       <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="16,10" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="{x:Type Button}">
-            <Border Name="Border" CornerRadius="8" Padding="16,10">
+            <Border Name="Border" CornerRadius="8" Padding="{TemplateBinding Padding}">
               <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                   <GradientStop Color="#0F766E" Offset="0.0" />
@@ -35,10 +36,11 @@
       <Setter Property="FontWeight" Value="Medium" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="14,8" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="{x:Type Button}">
-            <Border Name="Border" CornerRadius="8" BorderThickness="1.5" BorderBrush="#334155" Background="#00FFFFFF" Padding="14,8">
+            <Border Name="Border" CornerRadius="8" BorderThickness="1.5" BorderBrush="#334155" Background="#00FFFFFF" Padding="{TemplateBinding Padding}">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
@@ -112,27 +114,308 @@
             <StackPanel>
               <TextBlock Text="GIAO DIỆN &amp; HỆ THỐNG" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
               <TextBlock Text="Chọn theme và cấu hình hệ thống." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
-              <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <RadioButton Name="DarkThemeRadio" Content="Dark" GroupName="ThemeMode" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,14,0" />
-                <RadioButton Name="LightThemeRadio" Content="Light" GroupName="ThemeMode" Foreground="#F8FAFC" />
-              </StackPanel>
+              <!-- Theme Picker: 6 theme cards -->
+              <TextBlock Text="CHỦ ĐỀ MÀU SẮC" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,8" />
+              <WrapPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <!-- Dark -->
+                <RadioButton Name="ThemeDarkRadio" GroupName="ThemePicker" Tag="Dark" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#111827" BorderBrush="#1E293B">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#0B0F19"/>
+                              <Border Grid.Column="1" Height="14" Background="#1E293B"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#14B8A6"/>
+                            </Grid>
+                            <TextBlock Text="🌑 Tối" Foreground="#F8FAFC" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#14B8A6" BorderBrush="#111827" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#14B8A6"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#475569"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Light -->
+                <RadioButton Name="ThemeLightRadio" GroupName="ThemePicker" Tag="Light" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#F1F5F9" BorderBrush="#CBD5E1">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#F8FAFC"/>
+                              <Border Grid.Column="1" Height="14" Background="#E2E8F0"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#0F766E"/>
+                            </Grid>
+                            <TextBlock Text="☀️ Sáng" Foreground="#0F172A" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#0F766E" BorderBrush="#F1F5F9" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#0F766E"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#94A3B8"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Midnight -->
+                <RadioButton Name="ThemeMidnightRadio" GroupName="ThemePicker" Tag="Midnight" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#161630" BorderBrush="#2D2B55">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#0D0D1A"/>
+                              <Border Grid.Column="1" Height="14" Background="#1F1F45"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#8B5CF6"/>
+                            </Grid>
+                            <TextBlock Text="🌌 Tối" Foreground="#EDE9FE" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#8B5CF6" BorderBrush="#161630" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#8B5CF6"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#4C1D95"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Forest -->
+                <RadioButton Name="ThemeForestRadio" GroupName="ThemePicker" Tag="Forest" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#0D2B1E" BorderBrush="#1A4D30">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#071A10"/>
+                              <Border Grid.Column="1" Height="14" Background="#143D27"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#22C55E"/>
+                            </Grid>
+                            <TextBlock Text="🌿 Xanh Lá" Foreground="#DCFCE7" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#22C55E" BorderBrush="#0D2B1E" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#22C55E"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#166534"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Sunset -->
+                <RadioButton Name="ThemeSunsetRadio" GroupName="ThemePicker" Tag="Sunset" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#2D1710" BorderBrush="#4A2D1E">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#1A0A06"/>
+                              <Border Grid.Column="1" Height="14" Background="#3D2015"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#F97316"/>
+                            </Grid>
+                            <TextBlock Text="🌅 Hoàng Hôn" Foreground="#FEF3C7" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#F97316" BorderBrush="#2D1710" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#F97316"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#7C2D12"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Ocean -->
+                <RadioButton Name="ThemeOceanRadio" GroupName="ThemePicker" Tag="Ocean" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#0A2040" BorderBrush="#163A65">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#041226"/>
+                              <Border Grid.Column="1" Height="14" Background="#0F2E55"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#38BDF8"/>
+                            </Grid>
+                            <TextBlock Text="🌊 Xanh Biển" Foreground="#E0F2FE" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#38BDF8" BorderBrush="#0A2040" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="#0A2040" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#38BDF8"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#0369A1"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Sakura -->
+                <RadioButton Name="ThemeSakuraRadio" GroupName="ThemePicker" Tag="Sakura" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#FFF5F5" BorderBrush="#FFD2D2">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#FFF5F5"/>
+                              <Border Grid.Column="1" Height="14" Background="#FFE3E3"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#FF6B6B"/>
+                            </Grid>
+                            <TextBlock Text="🌸 Anh Đào" Foreground="#495057" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#FF6B6B" BorderBrush="#FFF5F5" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#FF6B6B"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#FFA8A8"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+                <!-- Mint -->
+                <RadioButton Name="ThemeMintRadio" GroupName="ThemePicker" Tag="Mint" Margin="0,0,8,8" Cursor="Hand" Click="ThemeRadio_Click">
+                  <RadioButton.Template>
+                    <ControlTemplate TargetType="RadioButton">
+                      <Grid>
+                        <Border Name="ThemeCard" CornerRadius="10" BorderThickness="2" Padding="10,8" Width="100"
+                                Background="#F4FBF7" BorderBrush="#CEEAD6">
+                          <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                              </Grid.ColumnDefinitions>
+                              <Border Grid.Column="0" Height="14" CornerRadius="3,0,0,3" Background="#F4FBF7"/>
+                              <Border Grid.Column="1" Height="14" Background="#E6F4EA"/>
+                              <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#0F9D58"/>
+                            </Grid>
+                            <TextBlock Text="🍃 Bạc Hà" Foreground="#3C4043" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                          </StackPanel>
+                        </Border>
+                        <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#0F9D58" BorderBrush="#F4FBF7" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">
+                          <TextBlock Text="✓" Foreground="White" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                      </Grid>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#0F9D58"/>
+                          <Setter TargetName="CheckBadge" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThemeCard" Property="BorderBrush" Value="#81C784"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </RadioButton.Template>
+                </RadioButton>
+              </WrapPanel>
               <CheckBox Name="AllowMultipleInstancesCheckBox" Content="Mở nhiều cửa sổ ứng dụng độc lập (Multi-instance)" Foreground="#F8FAFC" Margin="0,6,0,0" />
               <StackPanel Margin="0,10,0,0">
                 <TextBlock Text="NGÔN NGỮ OCR MONG MUỐN" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,4" />
-                <ComboBox Name="OcrLanguageComboBox" Height="30" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" />
+                <ComboBox Name="OcrLanguageComboBox" Style="{StaticResource ModernComboBox}" Height="30" />
               </StackPanel>
             </StackPanel>
           </Border>
+
           <Border Style="{StaticResource SectionCard}">
             <StackPanel>
               <TextBlock Text="AI / SNAPSHOT" Foreground="#38BDF8" FontSize="10" FontWeight="Bold" />
               <TextBlock Text="Cấu hình hành vi AI và kiểm tra cập nhật." Foreground="#F8FAFC" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,12" />
-              <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                <CheckBox Name="AiAllowOnlineCheckBox" Content="Cho phép online snapshot" Foreground="#F8FAFC" Margin="0,0,14,0" />
-                <CheckBox Name="AiEnableTelemetryCheckBox" Content="Gửi báo cáo lỗi" Foreground="#F8FAFC" Margin="0,0,14,0" />
-                <CheckBox Name="AiEnableUpdateCheckCheckBox" Content="Tự động kiểm tra cập nhật" Foreground="#F8FAFC" Margin="0,0,14,0" />
-                <CheckBox Name="AiEnableSilentUpdateCheckBox" Content="Tự cập nhật ngầm" Foreground="#F8FAFC" />
-              </StackPanel>
+              <WrapPanel Orientation="Horizontal" Margin="0,0,0,10">
+                <CheckBox Name="AiAllowOnlineCheckBox" Content="Cho phép online snapshot" Foreground="#F8FAFC" Margin="0,0,14,8" />
+                <CheckBox Name="AiEnableTelemetryCheckBox" Content="Gửi báo cáo lỗi" Foreground="#F8FAFC" Margin="0,0,14,8" />
+                <CheckBox Name="AiEnableUpdateCheckCheckBox" Content="Tự động kiểm tra cập nhật" Foreground="#F8FAFC" Margin="0,0,14,8" />
+                <CheckBox Name="AiEnableSilentUpdateCheckBox" Content="Tự cập nhật ngầm" Foreground="#F8FAFC" Margin="0,0,14,8" />
+              </WrapPanel>
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
@@ -140,7 +423,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Margin="0,0,10,0">
                   <TextBlock Text="Chế độ AI" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,4" />
-                  <ComboBox Name="AiProviderModeComboBox" Height="30" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569">
+                  <ComboBox Name="AiProviderModeComboBox" Style="{StaticResource ModernComboBox}" Height="30">
                     <ComboBoxItem Content="Auto" Tag="Auto" />
                     <ComboBoxItem Content="Gemini" Tag="Gemini" />
                     <ComboBoxItem Content="OpenAI" Tag="OpenAI" />
@@ -167,7 +450,7 @@
                   </DockPanel>
                   <TextBox Name="AiGeminiApiKeyTextBox" Background="#1E293B" Foreground="#fcf8f8ff" BorderBrush="#475569" BorderThickness="1" Padding="8,6" />
                   <TextBlock Text="GEMINI MODEL (Đề xuất các model tiết kiệm token)" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,10,0,4" />
-                  <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Background="#1E293B" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" Padding="8,4" Height="34" VerticalContentAlignment="Center">
+                  <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Style="{StaticResource ModernComboBox}" Height="34">
                     <ComboBoxItem Content="gemini-3.5-flash (Mới nhất 2026 - Siêu nhanh &amp; Tiết kiệm)" Tag="gemini-3.5-flash" />
                     <ComboBoxItem Content="gemini-3.1-flash-lite (Siêu rẻ &amp; Phản hồi nhanh)" Tag="gemini-3.1-flash-lite" />
                     <ComboBoxItem Content="gemini-2.5-flash (Thế hệ 2.5 ổn định)" Tag="gemini-2.5-flash" />

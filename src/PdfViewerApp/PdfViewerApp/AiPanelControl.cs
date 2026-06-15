@@ -32,6 +32,7 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 	public event EventHandler<string>? SendChatRequested;
 
 	private readonly List<ChatMessage> _chatHistory = new();
+	private AppThemeDefinition _currentTheme = AppThemeRegistry.All[0];
 
 	public AiPanelControl()
 	{
@@ -96,14 +97,18 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 
 		bool isUser = string.Equals(role, "user", StringComparison.OrdinalIgnoreCase);
 
+		Color bgCol = isUser ? (Color)ColorConverter.ConvertFromString(_currentTheme.AccentColor) : (Color)ColorConverter.ConvertFromString(_currentTheme.SurfaceBackground);
+		Color borderCol = isUser ? Colors.Transparent : (Color)ColorConverter.ConvertFromString(_currentTheme.BorderColor);
+		Color fgCol = isUser ? Colors.White : (Color)ColorConverter.ConvertFromString(_currentTheme.ForegroundPrimary);
+
 		Border bubbleBorder = new Border
 		{
 			CornerRadius = new CornerRadius(10),
 			Padding = new Thickness(10, 8, 10, 8),
 			Margin = new Thickness(isUser ? 40 : 0, 0, isUser ? 0 : 40, 8),
 			HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-			Background = isUser ? new SolidColorBrush(Color.FromRgb(2, 132, 199)) : new SolidColorBrush(Color.FromRgb(30, 41, 59)),
-			BorderBrush = isUser ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+			Background = new SolidColorBrush(bgCol),
+			BorderBrush = new SolidColorBrush(borderCol),
 			BorderThickness = new Thickness(1)
 		};
 
@@ -139,7 +144,7 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 		TextBlock textBlock = new TextBlock
 		{
 			Text = text,
-			Foreground = Brushes.White,
+			Foreground = new SolidColorBrush(fgCol),
 			FontSize = 12,
 			TextWrapping = TextWrapping.Wrap,
 			LineHeight = 16
@@ -182,7 +187,9 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 		
 		Border welcome = new Border
 		{
-			Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+			Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_currentTheme.SurfaceBackground)),
+			BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_currentTheme.BorderColor)),
+			BorderThickness = new Thickness(1),
 			CornerRadius = new CornerRadius(8),
 			Padding = new Thickness(12),
 			Margin = new Thickness(0, 0, 0, 10)
@@ -190,7 +197,7 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 		welcome.Child = new TextBlock
 		{
 			Text = "Chào bạn! Tôi là trợ lý AI. Bạn có thể chọn phạm vi phân tích bên dưới, sau đó chụp một vùng bản vẽ hoặc hỏi trực tiếp về toàn bộ trang PDF đang mở.",
-			Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+			Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_currentTheme.ForegroundSecondary)),
 			FontSize = 12.5,
 			TextWrapping = TextWrapping.Wrap,
 			LineHeight = 17
@@ -283,5 +290,202 @@ public partial class AiPanelControl : UserControl, IComponentConnector
 			}
 		}
 		comboBox.SelectedItem = null;
+	}
+
+	internal void ApplyTheme(AppThemeDefinition theme)
+	{
+		_currentTheme = theme;
+
+		// 1. Root border and config card
+		if (RootBorder != null)
+		{
+			RootBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.PanelBackground));
+			RootBorder.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+		}
+		if (AiConfigPanel != null)
+		{
+			AiConfigPanel.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground));
+			AiConfigPanel.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+		}
+
+		// 2. Titles and labels
+		var fgPrimary = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		var fgSecondary = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
+		var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
+
+		if (AiPanelTitle != null) AiPanelTitle.Foreground = accentBrush;
+		if (ConfigTitleText != null) ConfigTitleText.Foreground = accentBrush;
+		if (ConfigModeText != null) ConfigModeText.Foreground = fgSecondary;
+		if (ConfigApiKeyText != null) ConfigApiKeyText.Foreground = fgSecondary;
+		if (ConfigModelText != null) ConfigModelText.Foreground = fgSecondary;
+		if (QuickPromptTitleText != null) QuickPromptTitleText.Foreground = fgSecondary;
+		if (ScopeTitleText != null) ScopeTitleText.Foreground = fgSecondary;
+		if (BottomNoteText != null) BottomNoteText.Foreground = fgSecondary;
+
+		// Checkboxes
+		if (AiAllowOnlineCheckBox != null) AiAllowOnlineCheckBox.Foreground = fgPrimary;
+		if (AiEnableTelemetryCheckBox != null) AiEnableTelemetryCheckBox.Foreground = fgPrimary;
+		if (AiEnableUpdateCheckCheckBox != null) AiEnableUpdateCheckCheckBox.Foreground = fgPrimary;
+
+		// Radio buttons
+		if (ScopeSnapshotRadio != null) ScopeSnapshotRadio.Foreground = fgPrimary;
+		if (ScopeWholePageRadio != null) ScopeWholePageRadio.Foreground = fgPrimary;
+
+		// 3. Inputs (TextBoxes and ComboBoxes)
+		var inputBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground));
+		var borderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+
+		if (AiGeminiApiKeyTextBox != null)
+		{
+			AiGeminiApiKeyTextBox.Background = inputBg;
+			AiGeminiApiKeyTextBox.Foreground = fgPrimary;
+			AiGeminiApiKeyTextBox.BorderBrush = borderBrush;
+		}
+		if (AiPromptTextBox != null)
+		{
+			AiPromptTextBox.Background = inputBg;
+			AiPromptTextBox.Foreground = fgPrimary;
+			AiPromptTextBox.BorderBrush = borderBrush;
+		}
+		if (AiProviderModeComboBox != null)
+		{
+			AiProviderModeComboBox.Background = inputBg;
+			AiProviderModeComboBox.Foreground = fgPrimary;
+			AiProviderModeComboBox.BorderBrush = borderBrush;
+		}
+		if (AiGeminiModelComboBox != null)
+		{
+			AiGeminiModelComboBox.Background = inputBg;
+			AiGeminiModelComboBox.Foreground = fgPrimary;
+			AiGeminiModelComboBox.BorderBrush = borderBrush;
+		}
+
+		// 4. Buttons (Traverse and apply styles)
+		foreach (var btn in FindVisualChildren<Button>(this))
+		{
+			if (btn == SendBtn)
+			{
+				SendBtn.Background = accentBrush;
+				if (SendBtn.Content is Grid sendGrid && sendGrid.Children.Count > 0 && sendGrid.Children[0] is TextBlock sendIcon)
+				{
+					sendIcon.Foreground = theme.IsLight ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42));
+				}
+				continue;
+			}
+			btn.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground));
+			btn.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+			btn.Foreground = fgPrimary;
+		}
+
+		// 5. Redraw chat messages history with new colors
+		if (ChatMessagesStackPanel != null)
+		{
+			ChatMessagesStackPanel.Children.Clear();
+			foreach (var msg in _chatHistory)
+			{
+				AddMessageToUiOnly(msg.Role, msg.Text, msg.ImageBase64);
+			}
+			if (_chatHistory.Count == 0)
+			{
+				Border welcome = new Border
+				{
+					Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground)),
+					BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor)),
+					BorderThickness = new Thickness(1),
+					CornerRadius = new CornerRadius(8),
+					Padding = new Thickness(12),
+					Margin = new Thickness(0, 0, 0, 10)
+				};
+				welcome.Child = new TextBlock
+				{
+					Text = "Chào bạn! Tôi là trợ lý AI. Bạn có thể chọn phạm vi phân tích bên dưới, sau đó chụp một vùng bản vẽ hoặc hỏi trực tiếp về toàn bộ trang PDF đang mở.",
+					Foreground = fgSecondary,
+					FontSize = 12.5,
+					TextWrapping = TextWrapping.Wrap,
+					LineHeight = 17
+				};
+				ChatMessagesStackPanel.Children.Add(welcome);
+			}
+		}
+	}
+
+	private void AddMessageToUiOnly(string role, string text, string? imageBase64)
+	{
+		bool isUser = string.Equals(role, "user", StringComparison.OrdinalIgnoreCase);
+
+		Color bgCol = isUser ? (Color)ColorConverter.ConvertFromString(_currentTheme.AccentColor) : (Color)ColorConverter.ConvertFromString(_currentTheme.SurfaceBackground);
+		Color borderCol = isUser ? Colors.Transparent : (Color)ColorConverter.ConvertFromString(_currentTheme.BorderColor);
+		Color fgCol = isUser ? Colors.White : (Color)ColorConverter.ConvertFromString(_currentTheme.ForegroundPrimary);
+
+		Border bubbleBorder = new Border
+		{
+			CornerRadius = new CornerRadius(10),
+			Padding = new Thickness(10, 8, 10, 8),
+			Margin = new Thickness(isUser ? 40 : 0, 0, isUser ? 0 : 40, 8),
+			HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
+			Background = new SolidColorBrush(bgCol),
+			BorderBrush = new SolidColorBrush(borderCol),
+			BorderThickness = new Thickness(1)
+		};
+
+		StackPanel contentPanel = new StackPanel();
+
+		if (!string.IsNullOrEmpty(imageBase64))
+		{
+			try
+			{
+				byte[] binaryData = Convert.FromBase64String(imageBase64);
+				BitmapImage bitmap = new BitmapImage();
+				bitmap.BeginInit();
+				bitmap.StreamSource = new MemoryStream(binaryData);
+				bitmap.EndInit();
+
+				Image img = new Image
+				{
+					Source = bitmap,
+					MaxWidth = 180,
+					MaxHeight = 120,
+					Margin = new Thickness(0, 0, 0, 6),
+					Stretch = Stretch.Uniform,
+					HorizontalAlignment = HorizontalAlignment.Center
+				};
+				contentPanel.Children.Add(img);
+			}
+			catch
+			{
+			}
+		}
+
+		TextBlock textBlock = new TextBlock
+		{
+			Text = text,
+			Foreground = new SolidColorBrush(fgCol),
+			FontSize = 12,
+			TextWrapping = TextWrapping.Wrap,
+			LineHeight = 16
+		};
+		contentPanel.Children.Add(textBlock);
+
+		bubbleBorder.Child = contentPanel;
+		ChatMessagesStackPanel.Children.Add(bubbleBorder);
+	}
+
+	private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+	{
+		if (depObj != null)
+		{
+			for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+			{
+				DependencyObject child = VisualTreeHelper.GetChild(depObj, i);
+				if (child != null && child is T)
+				{
+					yield return (T)child;
+				}
+				foreach (T childOfChild in FindVisualChildren<T>(child))
+				{
+					yield return childOfChild;
+				}
+			}
+		}
 	}
 }

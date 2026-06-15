@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -36,6 +36,11 @@ internal static class LocalAiInstaller
 		Timeout = TimeSpan.FromSeconds(5.0)
 	};
 
+	private static readonly HttpClient LongTimeoutHttpClient = new HttpClient
+	{
+		Timeout = TimeSpan.FromMinutes(15.0)
+	};
+
 	public static void StartInitializeBackground()
 	{
 		Task.Run(async delegate
@@ -52,7 +57,7 @@ internal static class LocalAiInstaller
 
 	public static async Task InitializeAsync()
 	{
-		if (GetTotalRamGb() < 15.5)
+		if (GetTotalRamGb() < 7.5)
 		{
 			return;
 		}
@@ -79,7 +84,7 @@ internal static class LocalAiInstaller
 		string tempInstaller = Path.Combine(Path.GetTempPath(), "OllamaSetup.exe");
 		try
 		{
-			using (HttpResponseMessage response = await HttpClient.GetAsync("https://ollama.com/download/OllamaSetup.exe"))
+			using (HttpResponseMessage response = await LongTimeoutHttpClient.GetAsync("https://ollama.com/download/OllamaSetup.exe"))
 			{
 				response.EnsureSuccessStatusCode();
 				using FileStream fs = new FileStream(tempInstaller, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -200,7 +205,7 @@ internal static class LocalAiInstaller
 			try
 			{
 				StringContent content = new StringContent("{\"name\":\"" + modelName + "\"}", Encoding.UTF8, "application/json");
-				await HttpClient.PostAsync("http://localhost:11434/api/pull", content);
+				await LongTimeoutHttpClient.PostAsync("http://localhost:11434/api/pull", content);
 			}
 			catch
 			{

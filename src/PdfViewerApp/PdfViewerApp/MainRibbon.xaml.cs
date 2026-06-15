@@ -156,16 +156,29 @@ public partial class MainRibbon : UserControl
 
 	public void ApplyTheme(bool isDark)
 	{
+		ApplyTheme(AppThemeRegistry.Get(AppThemeRegistry.FromLegacyBool(isDark)));
+	}
+
+	internal void ApplyTheme(AppThemeDefinition theme)
+	{
+		bool isDark = !theme.IsLight;
 		if (ThemeToggleIcon != null)
 		{
 			ThemeToggleIcon.Text = (isDark ? "\ue706" : "\ue708");
-			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#38BDF8" : "#0F766E"));
+			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
 		}
 
 		if (ThemeToggleBtn != null)
 		{
 			ThemeToggleBtn.IsChecked = isDark;
-			ThemeToggleBtn.Header = (isDark ? "Tối" : "Sáng");
+			ThemeToggleBtn.Header = theme.DisplayName;
+		}
+
+		if (MyRibbon != null)
+		{
+			MyRibbon.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
+			MyRibbon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+			MyRibbon.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
 		}
 	}
 

@@ -1,46 +1,111 @@
 # install.ps1
 # PDF Pro - Automated Installer for Desktop Shortcut & Explorer Context Menu
 $ErrorActionPreference = "Stop"
+
+# 1. Require Administrator Elevation
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "Dang yeu cau quyen Administrator de cai dat..." -ForegroundColor Yellow
+    try {
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -Wait
+    } catch {
+        Write-Error "Yeu cau quyen Administrator bi tu choi!"
+    }
+    exit
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
-Write-Host "=== Cai dat PDF Pro - HPhat Edition ===" -ForegroundColor Cyan
+Write-Host "=== Bat dau qua trinh cai dat PDF Pro - HPhat Edition ===" -ForegroundColor Cyan
 
+# 2. Terminate any running PdfViewerApp process
+Write-Host "`n[1/7] Dang dong cac ung dung dang chay de tranh khoa tap tin..." -ForegroundColor Yellow
+Stop-Process -Name PdfViewerApp -Force -ErrorAction SilentlyContinue
+Get-Process | Where-Object {$_.Path -like "*PdfViewerApp*"} | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 1
+
+# 3. Clean previous builds and caches
+Write-Host "`n[2/7] Dang xoa cac ban build cu va lam sach cache..." -ForegroundColor Yellow
+$wpfProjectDir = Join-Path $scriptDir "src\PdfViewerApp"
+$rustProjectDir = Join-Path $scriptDir "src\PdfCore"
+
+# Shutdown MSBuild server to release any lock
+dotnet build-server shutdown | Out-Null
+
+if (Test-Path "src\PdfViewerApp\bin") { Remove-Item -Path "src\PdfViewerApp\bin" -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path "src\PdfViewerApp\obj") { Remove-Item -Path "src\PdfViewerApp\obj" -Recurse -Force -ErrorAction SilentlyContinue }
+if (Test-Path "src\PdfCore\target") { Remove-Item -Path "src\PdfCore\target" -Recurse -Force -ErrorAction SilentlyContinue }
+
+try {
+    dotnet nuget locals all --clear | Out-Null
+    Write-Host "    Da lam sach cache NuGet thanh cong!" -ForegroundColor Green
+} catch {
+    Write-Host "    Khong the lam sach cache NuGet, tiep tuc..." -ForegroundColor DarkYellow
+}
+
+# 4. Compile and Publish Project
+Write-Host "`n[3/7] Bien dich va xuat ban tu ma nguon..." -ForegroundColor Yellow
 $installDir = Join-Path $env:LOCALAPPDATA "PDFPro"
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 }
 
-$wpfProjectDir = Join-Path $scriptDir "src\PdfViewerApp"
 if (Test-Path $wpfProjectDir) {
-    # 1. Developer Mode: Build and Publish
-    Write-Host "`n[1/4] Bien dich va xuat ban ung dung tu ma nguon..." -ForegroundColor Yellow
+    # Compile Rust core first
+    if (Test-Path $rustProjectDir) {
+        Write-Host "    Dang bien dich Rust Core (PdfCore)..." -ForegroundColor Yellow
+        Set-Location $rustProjectDir
+        & cargo build --release
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Bien dich Rust core that bai!"
+            exit 1
+        }
+        Set-Location $scriptDir
+    }
+
+    # Publish C# WPF
+    Write-Host "    Dang xuat ban C# WPF Application..." -ForegroundColor Yellow
     Set-Location $wpfProjectDir
     & dotnet publish -c Release -r win-x64 --self-contained true
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Bien dich that bai!"
+        Write-Error "Xuat ban WPF that bai!"
         exit 1
     }
     Set-Location $scriptDir
 
     # Copy native dependencies
-    Copy-Item "libs\pdfium.dll" -Destination "src\PdfViewerApp\bin\Release\net8.0-windows\win-x64\publish\pdfium.dll" -Force
-    Copy-Item "libs\pdf_core.dll" -Destination "src\PdfViewerApp\bin\Release\net8.0-windows\win-x64\publish\pdf_core.dll" -Force
+    $publishDir = Join-Path $scriptDir "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\win-x64\publish"
+    
+    if (Test-Path "libs\pdfium.dll") {
+        Copy-Item "libs\pdfium.dll" -Destination "$publishDir\pdfium.dll" -Force
+    }
+    
+    $rustDll = Join-Path $rustProjectDir "target\release\pdf_core.dll"
+    if (Test-Path $rustDll) {
+        Copy-Item $rustDll -Destination "$publishDir\pdf_core.dll" -Force
+    } elseif (Test-Path "libs\pdf_core.dll") {
+        Copy-Item "libs\pdf_core.dll" -Destination "$publishDir\pdf_core.dll" -Force
+    }
 
-    $publishDir = Join-Path $scriptDir "src\PdfViewerApp\bin\Release\net8.0-windows\win-x64\publish"
-    Write-Host "`n[2/4] Thiet lap thu muc ung dung..." -ForegroundColor Yellow
+    Write-Host "`n[4/7] Sao chep tep vao thu muc cai dat..." -ForegroundColor Yellow
+    # Clear target install directory first to avoid old files
+    if (Test-Path $installDir) {
+        Remove-Item -Path "$installDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+    }
     Copy-Item -Path "$publishDir\*" -Destination $installDir -Recurse -Force
 } else {
-    # 2. Standalone Mode: Install directly from extracted files
-    Write-Host "`n[1/4] Phat hien che do cai dat nhanh di dong..." -ForegroundColor Yellow
-    Write-Host "`n[2/4] Sao chep tep ung dung..." -ForegroundColor Yellow
-    Copy-Item -Path "$scriptDir\*" -Destination $installDir -Exclude "install.ps1", "*.zip" -Recurse -Force
+    Write-Host "`n[3/7] Che do cai dat nhanh tu file dung san..." -ForegroundColor Yellow
+    if (Test-Path $installDir) {
+        Remove-Item -Path "$installDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Copy-Item -Path "$scriptDir\*" -Destination $installDir -Exclude "install.ps1", "install.bat", "uninstall.ps1", "uninstall.bat", "*.zip", ".git" -Recurse -Force
 }
 
-Write-Host "    Da cai dat tep ung dung vao: $installDir" -ForegroundColor Green
+Write-Host "    Da thiet lap thu muc ung dung tai: $installDir" -ForegroundColor Green
 
-# 3. Create Desktop Shortcut
-Write-Host "`n[3/4] Tao phim tat tren Desktop (Shortcut)..." -ForegroundColor Yellow
+# 5. Create Desktop Shortcut
+Write-Host "`n[5/7] Tao phim tat tren Desktop (Shortcut)..." -ForegroundColor Yellow
 $exePath = Join-Path $installDir "PdfViewerApp.exe"
 $desktopPath = [System.IO.Path]::Combine([System.Environment]::GetFolderPath('Desktop'), "PDF Pro - HPhat Edition.lnk")
 
@@ -51,12 +116,11 @@ $Shortcut.WorkingDirectory = $installDir
 $Shortcut.IconLocation = "$exePath,0"
 $Shortcut.Description = "PDF Pro - HPhat Edition"
 $Shortcut.Save()
-Write-Host "    Da tao shortcut tren Desktop!" -ForegroundColor Green
+Write-Host "    Da tao phim tat tren Desktop!" -ForegroundColor Green
 
-# 4. Install Registry Explorer Context Menu
-Write-Host "`n[4/4] Dang ky Menu chuot phai (Right-Click Context Menu) & Mo mac dinh..." -ForegroundColor Yellow
+# 6. Install Registry Context Menu & File Association
+Write-Host "`n[6/7] Dang ky Menu chuot phai & Hiep hoi tep tin..." -ForegroundColor Yellow
 
-# Register right-click merge
 $baseKey = "HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge"
 $commandKey = Join-Path $baseKey "command"
 New-Item -Path $commandKey -Force | Out-Null
@@ -70,21 +134,17 @@ New-ItemProperty -Path $baseKey -Name "Position" -Value "Top" -PropertyType Stri
 $command = "`"$exePath`" `"%1`" --merge --exit-after-merge"
 Set-ItemProperty -Path $commandKey -Name "(default)" -Value $command
 
-# Register Default PDF Handler association capability
 $appRegKey = "HKCU:\Software\Classes\Applications\PdfViewerApp.exe\shell\open\command"
 New-Item -Path $appRegKey -Force | Out-Null
 Set-ItemProperty -Path $appRegKey -Name "(default)" -Value "`"$exePath`" `"%1`""
 
-# Register FriendlyAppName so "Open with" shows correct app display name
 $appRootKey = "HKCU:\Software\Classes\Applications\PdfViewerApp.exe"
 New-ItemProperty -Path $appRootKey -Name "FriendlyAppName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 New-ItemProperty -Path $appRootKey -Name "FriendlyTypeName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 
-# Register app description for .pdf Open With list
 $appShellKey = "HKCU:\Software\Classes\Applications\PdfViewerApp.exe\shell\open"
 New-ItemProperty -Path $appShellKey -Name "FriendlyAppName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 
-# Register as available OpenWithProgIds for .pdf so it appears in Open With list with proper name
 $openWithKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithList"
 if (-not (Test-Path $openWithKey)) {
     New-Item -Path $openWithKey -Force | Out-Null
@@ -97,70 +157,52 @@ if ($existingValues) {
 }
 New-ItemProperty -Path $openWithKey -Name $nextLetter -Value "PdfViewerApp.exe" -PropertyType String -Force | Out-Null
 
-# Register as OpenWithProgIds
 $openWithProgIdsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids"
 if (-not (Test-Path $openWithProgIdsKey)) {
     New-Item -Path $openWithProgIdsKey -Force | Out-Null
 }
 New-ItemProperty -Path $openWithProgIdsKey -Name "PdfViewerApp.Document" -Value ([byte[]]@()) -PropertyType Binary -Force | Out-Null
 
-# Register app ProgID with display name
 $progIdKey = "HKCU:\Software\Classes\PdfViewerApp.Document"
 New-Item -Path "$progIdKey\shell\open\command" -Force | Out-Null
 New-ItemProperty -Path $progIdKey -Name "(default)" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 New-ItemProperty -Path $progIdKey -Name "FriendlyTypeName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 Set-ItemProperty -Path "$progIdKey\shell\open\command" -Name "(default)" -Value "`"$exePath`" `"%1`""
 
-Write-Host "    Dang ky Menu chuot phai hoan tat!" -ForegroundColor Green
+Write-Host "    Hiep hoi tep tin va Menu chuot phai hoan tat!" -ForegroundColor Green
 
-# 5. Register Virtual PDF Printer (Print to PDF Pro)
-Write-Host "`n[5/5] Dang ky may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
+# 7. Register Virtual PDF Printer
+Write-Host "`n[7/7] Dang ky may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
 $printerName = "PDF Pro - HPhat Edition"
 $portName    = "PDFPro_HPhat_Port:"
 $driverName  = "Microsoft Print To PDF"
 
 try {
-    # Remove old printer if exists
     if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
         Remove-Printer -Name $printerName -ErrorAction SilentlyContinue
-        Write-Host "    Da xoa may in cu." -ForegroundColor DarkGray
     }
-
-    # Remove old port if exists
     if (Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue) {
         Remove-PrinterPort -Name $portName -ErrorAction SilentlyContinue
     }
 
-    # Check if Microsoft Print To PDF driver is available
     $driver = Get-PrinterDriver -Name $driverName -ErrorAction SilentlyContinue
     if ($driver -eq $null) {
-        Write-Host "    Khong tim thay driver '$driverName'. Bo qua cai may in ao." -ForegroundColor DarkYellow
+        Write-Host "    Khong tim thay driver '$driverName'. Bo qua may in ao." -ForegroundColor DarkYellow
     } else {
-        # Add a new FILE: port for the virtual printer
         Add-PrinterPort -Name $portName -ErrorAction SilentlyContinue
-
-        # Add the virtual printer
         Add-Printer -Name $printerName -DriverName $driverName -PortName $portName -ErrorAction Stop
-        Write-Host "    Da cai may in ao: $printerName" -ForegroundColor Green
+        Write-Host "    Da cai dat may in ao: $printerName" -ForegroundColor Green
 
-        # Register redirect: when user prints to this printer, open saved PDF in our app
-        # This sets a registry key that our app reads when PDF is produced by the print port
         $printRegKey = "HKCU:\Software\PDFPro\VirtualPrinter"
         New-Item -Path $printRegKey -Force | Out-Null
         New-ItemProperty -Path $printRegKey -Name "PrinterName" -Value $printerName -PropertyType String -Force | Out-Null
         New-ItemProperty -Path $printRegKey -Name "AppPath" -Value $exePath -PropertyType String -Force | Out-Null
         New-ItemProperty -Path $printRegKey -Name "AutoOpen" -Value 1 -PropertyType DWord -Force | Out-Null
-
-        Write-Host "    May in ao da san sang! In tu bat ky ung dung nao, chon '$printerName' de luu PDF." -ForegroundColor Green
     }
 } catch {
-    Write-Host "    Luu y: Khong the cai may in ao tu dong (can quyen Admin). Ban co the cai thu cong sau." -ForegroundColor DarkYellow
-    Write-Host "    Loi: $($_.Exception.Message)" -ForegroundColor DarkGray
+    Write-Host "    Loi khi cai dat may in ao: $($_.Exception.Message)" -ForegroundColor DarkYellow
 }
 
-Write-Host "`n=== CAI DAT THANH CONG! ===" -ForegroundColor Cyan
-Write-Host "Ban co the dong cua so nay, nhap dup vao bieu tuong tren Desktop de chay,"
-Write-Host "hoac chon nhieu tep PDF, nhap chuot phai va chon 'Ghep PDF bang PDF HPhat'!" -ForegroundColor Yellow
-Write-Host "De luu PDF tu app khac: khi in, chon may in '$printerName'." -ForegroundColor Cyan
-
-Read-Host "`nNhan Enter de hoan tat..."
+Write-Host "`n=== CAI DAT HOAN TAT VA THANH CONG! ===" -ForegroundColor Cyan
+Write-Host "Ban co the chay ung dung tu shortcut tren Desktop" -ForegroundColor Green
+Read-Host "`nNhan Enter de thoat..."

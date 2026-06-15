@@ -13,11 +13,15 @@ public partial class SettingsWindow : Window, IComponentConnector
 
 	private AiSettings _aiSettings;
 
+	/// <summary>Tên theme đang được chọn tạm thời trong UI (chưa lưu).</summary>
+	private string _selectedThemeName;
+
 	public SettingsWindow()
 	{
 		InitializeComponent();
 		_preferences = AppPreferences.Load();
 		_aiSettings = AiSettings.Load();
+		_selectedThemeName = _preferences.ThemeName;
 		RefreshUi();
 	}
 
@@ -27,8 +31,10 @@ public partial class SettingsWindow : Window, IComponentConnector
 		ActivationState activationState = ActivationLicense.LoadState();
 		LicenseStateTextBlock.Text = activationState.IsActivated ? "Đã kích hoạt" : "Chưa kích hoạt";
 		LicenseStateTextBlock.Foreground = activationState.IsActivated ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 211, 153)) : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 113, 133));
-		DarkThemeRadio.IsChecked = _preferences.IsDarkTheme;
-		LightThemeRadio.IsChecked = !_preferences.IsDarkTheme;
+
+		// Chọn đúng RadioButton theme card theo ThemeName
+		SelectThemeRadio(_selectedThemeName);
+
 		AllowMultipleInstancesCheckBox.IsChecked = _preferences.AllowMultipleInstances;
 
 		OcrLanguageComboBox.Items.Clear();
@@ -70,6 +76,33 @@ public partial class SettingsWindow : Window, IComponentConnector
 		}
 	}
 
+	/// <summary>Chọn RadioButton đúng theo tên theme.</summary>
+	private void SelectThemeRadio(string themeName)
+	{
+		if (ThemeDarkRadio != null)    ThemeDarkRadio.IsChecked    = themeName == AppThemeRegistry.Dark;
+		if (ThemeLightRadio != null)   ThemeLightRadio.IsChecked   = themeName == AppThemeRegistry.Light;
+		if (ThemeMidnightRadio != null) ThemeMidnightRadio.IsChecked = themeName == AppThemeRegistry.Midnight;
+		if (ThemeForestRadio != null)  ThemeForestRadio.IsChecked  = themeName == AppThemeRegistry.Forest;
+		if (ThemeSunsetRadio != null)  ThemeSunsetRadio.IsChecked  = themeName == AppThemeRegistry.Sunset;
+		if (ThemeOceanRadio != null)   ThemeOceanRadio.IsChecked   = themeName == AppThemeRegistry.Ocean;
+		if (ThemeSakuraRadio != null)  ThemeSakuraRadio.IsChecked  = themeName == AppThemeRegistry.Sakura;
+		if (ThemeMintRadio != null)    ThemeMintRadio.IsChecked    = themeName == AppThemeRegistry.Mint;
+	}
+
+	/// <summary>Xử lý khi người dùng click một theme card — preview ngay lập tức.</summary>
+	private void ThemeRadio_Click(object sender, RoutedEventArgs e)
+	{
+		if (sender is RadioButton rb && rb.Tag is string tagName)
+		{
+			_selectedThemeName = tagName;
+			// Preview ngay lập tức để người dùng thấy kết quả trước khi nhấn Lưu
+			if (Application.Current.MainWindow is MainWindow mainWindow)
+			{
+				mainWindow.PreviewTheme(tagName);
+			}
+		}
+	}
+
 	private static ComboBoxItem? FindComboItemByTag(ComboBox comboBox, string tag)
 	{
 		foreach (object item in comboBox.Items)
@@ -100,11 +133,10 @@ public partial class SettingsWindow : Window, IComponentConnector
 
 	private void Save_Click(object sender, RoutedEventArgs e)
 	{
-		_preferences.IsDarkTheme = DarkThemeRadio.IsChecked == true;
-		_preferences.AllowMultipleInstances = AllowMultipleInstancesCheckBox.IsChecked == true;
-		_preferences.OcrLanguage = (OcrLanguageComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
-		_preferences.Save();
-
+		// Lưu các thiết lập khác qua MainWindow
+		bool allowInstances = AllowMultipleInstancesCheckBox.IsChecked == true;
+		string ocrLang = (OcrLanguageComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
+		
 		_aiSettings.ProviderMode = (AiProviderModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Auto";
 		_aiSettings.AllowOnlineSnapshot = AiAllowOnlineCheckBox.IsChecked == true;
 		_aiSettings.EnableTelemetry = AiEnableTelemetryCheckBox.IsChecked == true;
@@ -126,14 +158,15 @@ public partial class SettingsWindow : Window, IComponentConnector
 
 		if (Application.Current.MainWindow is MainWindow mainWindow)
 		{
-			mainWindow.ApplyThemeFromPreferences(_preferences.IsDarkTheme);
+			mainWindow.UpdatePreferences(_selectedThemeName, allowInstances, ocrLang);
 			mainWindow.ReloadAiSettings();
 			mainWindow.RefreshRecentFilesDashboard();
 		}
 
 		try
 		{
-			ThemeManager.Current.ChangeTheme(Application.Current, _preferences.IsDarkTheme ? "Dark.Blue" : "Light.Blue");
+			var theme = AppThemeRegistry.Get(_selectedThemeName);
+			ThemeManager.Current.ChangeTheme(Application.Current, theme.FluentTheme);
 		}
 		catch
 		{
@@ -143,3 +176,4 @@ public partial class SettingsWindow : Window, IComponentConnector
 		Close();
 	}
 }
+

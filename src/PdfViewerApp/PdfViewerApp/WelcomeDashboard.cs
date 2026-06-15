@@ -89,70 +89,55 @@ public partial class WelcomeDashboard : UserControl, IComponentConnector
 
 	public void ApplyTheme(bool isDark)
 	{
-		this.Resources["DashboardBtnBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#E2E8F0"));
-		this.Resources["DashboardBtnFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
-		this.Resources["DashboardBtnBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#475569" : "#CBD5E1"));
-		this.Resources["DashboardBtnHoverBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#334155" : "#CBD5E1"));
-		this.Resources["DashboardBtnHoverBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#64748B" : "#94A3B8"));
-		this.Resources["DashboardBtnPressedBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#94A3B8"));
+		ApplyTheme(AppThemeRegistry.Get(AppThemeRegistry.FromLegacyBool(isDark)));
+	}
 
-		this.Resources["RecentFileBtnBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#111827" : "#F8FAFC"));
-		this.Resources["RecentFileBtnFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#E2E8F0" : "#0F172A"));
-		this.Resources["RecentFileBtnBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#E2E8F0"));
-		this.Resources["RecentFileBtnHoverBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#E2E8F0"));
-		this.Resources["RecentFileBtnHoverBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#334155" : "#CBD5E1"));
-		this.Resources["RecentFileBtnPressedBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0B1220" : "#E2E8F0"));
+	internal void ApplyTheme(AppThemeDefinition theme)
+	{
+		this.Resources["DashboardBtnBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.PanelBackground));
+		this.Resources["DashboardBtnFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		this.Resources["DashboardBtnBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.BorderColor));
+		this.Resources["DashboardBtnHoverBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.HoverBackground));
+		this.Resources["DashboardBtnHoverBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.AccentColor));
+		this.Resources["DashboardBtnPressedBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.SurfaceBackground));
 
-		this.Resources["RecentFileIconBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0B1220" : "#E2E8F0"));
-		this.Resources["RecentFileIconBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#CBD5E1"));
-		this.Resources["RecentFileTextFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
-		this.Resources["RecentFileTextDescFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
+		this.Resources["RecentFileBtnBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.PanelBackground));
+		this.Resources["RecentFileBtnFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		this.Resources["RecentFileBtnBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.BorderColor));
+		this.Resources["RecentFileBtnHoverBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.HoverBackground));
+		this.Resources["RecentFileBtnHoverBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.AccentColor));
+		this.Resources["RecentFileBtnPressedBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.SurfaceBackground));
+
+		this.Resources["RecentFileIconBg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.SurfaceBackground));
+		this.Resources["RecentFileIconBorder"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.BorderColor));
+		this.Resources["RecentFileTextFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		this.Resources["RecentFileTextDescFg"] = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 
 		System.Windows.Media.Brush bgBrush;
-		if (isDark)
 		{
 			var gradient = new System.Windows.Media.LinearGradientBrush();
 			gradient.StartPoint = new System.Windows.Point(0, 0);
 			gradient.EndPoint = new System.Windows.Point(1, 1);
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0F172A"), 0));
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#1E293B"), 1));
-			bgBrush = gradient;
-		}
-		else
-		{
-			var gradient = new System.Windows.Media.LinearGradientBrush();
-			gradient.StartPoint = new System.Windows.Point(0, 0);
-			gradient.EndPoint = new System.Windows.Point(1, 1);
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FFFFFF"), 0));
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"), 1));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.WindowBackground), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.PanelBackground), 1));
 			bgBrush = gradient;
 		}
 
-		var borderBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#CBD5E1"));
-		var innerBgBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#0B1220" : "#F8FAFC"));
+		var borderBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.BorderColor));
+		var innerBgBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.SurfaceBackground));
 
 		System.Windows.Media.Brush rightBgBrush;
-		if (isDark)
 		{
 			var gradient = new System.Windows.Media.LinearGradientBrush();
 			gradient.StartPoint = new System.Windows.Point(0, 0);
 			gradient.EndPoint = new System.Windows.Point(0, 1);
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0B1220"), 0));
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#111827"), 1));
-			rightBgBrush = gradient;
-		}
-		else
-		{
-			var gradient = new System.Windows.Media.LinearGradientBrush();
-			gradient.StartPoint = new System.Windows.Point(0, 0);
-			gradient.EndPoint = new System.Windows.Point(0, 1);
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"), 0));
-			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#E2E8F0"), 1));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.SurfaceBackground), 0));
+			gradient.GradientStops.Add(new System.Windows.Media.GradientStop((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.PanelBackground), 1));
 			rightBgBrush = gradient;
 		}
 
-		var textTitleBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
-		var textDescBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
+		var textTitleBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		var textDescBrush = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 
 		if (MainPanelBorder != null)
 		{

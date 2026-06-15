@@ -85,7 +85,7 @@ public partial class App : Application
 				{
 					try
 					{
-						ThemeManager.Current.ChangeTheme(this, appPreferences.IsDarkTheme ? "Dark.Blue" : "Light.Blue");
+						ThemeManager.Current.ChangeTheme(this, AppThemeRegistry.Get(appPreferences.ThemeName).FluentTheme);
 					}
 					catch
 					{

@@ -47,15 +47,7 @@
     </fluent:Ribbon.ContextualGroups>
     <fluent:Ribbon.Style>
       <Style TargetType="fluent:Ribbon">
-        <Setter Property="Background" Value="#FFFFFF" />
-        <Setter Property="BorderBrush" Value="#E2E8F0" />
         <Setter Property="BorderThickness" Value="0,0,0,1" />
-        <Style.Triggers>
-          <DataTrigger Binding="{Binding Path=Tag, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-            <Setter Property="Background" Value="#0F172A" />
-            <Setter Property="BorderBrush" Value="#1E293B" />
-          </DataTrigger>
-        </Style.Triggers>
       </Style>
     </fluent:Ribbon.Style>
     <fluent:Ribbon.Menu>

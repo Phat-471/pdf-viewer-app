@@ -7017,26 +7017,31 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public void ApplyTheme(bool isDark)
 	{
-		base.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0B0F19" : "#F8FAFC"));
+		ApplyTheme(AppThemeRegistry.Get(AppThemeRegistry.FromLegacyBool(isDark)));
+	}
+
+	internal void ApplyTheme(AppThemeDefinition theme)
+	{
+		base.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.WindowBackground));
 		if (SidebarBorder != null)
 		{
-			SidebarBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#FFFFFF"));
+			SidebarBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.PanelBackground));
 		}
 		if (SidebarHeaderBorder != null)
 		{
-			SidebarHeaderBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#1E1B4B" : "#F1F5F9"));
+			SidebarHeaderBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground));
 		}
 		if (SidebarHeaderText != null)
 		{
-			SidebarHeaderText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#FFFFFF" : "#0F172A"));
+			SidebarHeaderText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
 		}
 		if (CanvasBorder != null)
 		{
-			CanvasBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#111827" : "#E2E8F0"));
+			CanvasBorder.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.SurfaceBackground));
 		}
 		if (EmptyStateText != null)
 		{
-			EmptyStateText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
+			EmptyStateText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 		}
 	}
 

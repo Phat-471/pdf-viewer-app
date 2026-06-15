@@ -113,7 +113,7 @@ public partial class MainWindow : Window, IComponentConnector
 		EnsureAiPanelHost();
 		EnsureMainRibbonHost();
 		UpdateToolButtonStates();
-		ApplyThemeFromPreferences(_appPreferences.IsDarkTheme);
+		SetTheme(_appPreferences.ThemeName);
 		ApplyAppActivationState();
 		ApplyAiSettingsToUi();
 		TryApplyAppLogo();
@@ -608,99 +608,84 @@ exit 0
 
 	private void ThemeToggle_Click(object sender, RoutedEventArgs e)
 	{
-		SetTheme(!_isDarkMode);
+		// Toggle giữa Dark và Light
+		string next = _isDarkMode ? AppThemeRegistry.Light : AppThemeRegistry.Dark;
+		SetTheme(next);
 	}
 
-	private void SetTheme(bool isDark)
+	/// <summary>Áp dụng theme theo tên (Dark, Light, Midnight, Forest, Sunset, Ocean).</summary>
+	private void SetTheme(string themeName)
 	{
+		var theme = AppThemeRegistry.Get(themeName);
+		bool isDark = !theme.IsLight;
 		_isDarkMode = isDark;
-		_appPreferences.IsDarkTheme = isDark;
+		_appPreferences.ThemeName = theme.Name;
 		_appPreferences.Save();
 		base.Tag = isDark;
 		try
 		{
-			ThemeManager.Current.ChangeTheme(Application.Current, isDark ? "Dark.Blue" : "Light.Blue");
+			ThemeManager.Current.ChangeTheme(Application.Current, theme.FluentTheme);
 		}
 		catch
 		{
 		}
 		if (MainRootGrid != null)
 		{
-			var bgBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0B0F19" : "#F8FAFC"));
+			var bgBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.WindowBackground));
 			base.Background = bgBrush;
 			MainRootGrid.Background = bgBrush;
 		}
 		if (TitleBarGrid != null)
 		{
-			TitleBarGrid.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#E2E8F0"));
+			TitleBarGrid.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
 		}
 		if (TitleBarText != null)
 		{
-			TitleBarText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#F8FAFC" : "#0F172A"));
+			TitleBarText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
 		}
 		if (TitleBarSubtitle != null)
 		{
-			TitleBarSubtitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#94A3B8" : "#475569"));
+			TitleBarSubtitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 		}
 		if (TabEmptyState != null)
 		{
-			TabEmptyState.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#0F172A" : "#FFFFFF"));
-			TabEmptyState.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isDark ? "#1E293B" : "#CBD5E1"));
+			TabEmptyState.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.PanelBackground));
+			TabEmptyState.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
 		}
 		if (AppStatusBar != null)
 		{
-			if (isDark)
+			var statusGrad = new LinearGradientBrush
 			{
-				LinearGradientBrush linearGradientBrush = new LinearGradientBrush
-				{
-					StartPoint = new Point(0.0, 0.0),
-					EndPoint = new Point(1.0, 0.0)
-				};
-				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F172A"), 0.0));
-				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#1E293B"), 0.4));
-				linearGradientBrush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F766E"), 1.0));
-				AppStatusBar.Background = linearGradientBrush;
-				AppStatusBar.Foreground = Brushes.White;
-			}
-			else
-			{
-				LinearGradientBrush linearGradientBrush2 = new LinearGradientBrush
-				{
-					StartPoint = new Point(0.0, 0.0),
-					EndPoint = new Point(1.0, 0.0)
-				};
-				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#E2E8F0"), 0.0));
-				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#F1F5F9"), 0.4));
-				linearGradientBrush2.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString("#0F766E"), 1.0));
-				AppStatusBar.Background = linearGradientBrush2;
-				AppStatusBar.Foreground = Brushes.Black;
-			}
+				StartPoint = new Point(0.0, 0.0),
+				EndPoint = new Point(1.0, 0.0)
+			};
+			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.StatusBarStart), 0.0));
+			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.StatusBarMid), 0.4));
+			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.AccentDark), 1.0));
+			AppStatusBar.Background = statusGrad;
+			AppStatusBar.Foreground = isDark ? Brushes.White : Brushes.Black;
 		}
-		if (StatusMessage != null)
-		{
-			StatusMessage.Foreground = (isDark ? Brushes.White : Brushes.Black);
-		}
-		if (PageTotalText != null)
-		{
-			PageTotalText.Foreground = (isDark ? Brushes.White : Brushes.Black);
-		}
-		if (ZoomIndicator != null)
-		{
-			ZoomIndicator.Foreground = (isDark ? Brushes.White : Brushes.Black);
-		}
+		var fgBrush = isDark ? Brushes.White : Brushes.Black;
+		if (StatusMessage != null) StatusMessage.Foreground = fgBrush;
+		if (PageTotalText != null) PageTotalText.Foreground = fgBrush;
+		if (ZoomIndicator != null) ZoomIndicator.Foreground = fgBrush;
 		if (PdfTabControl != null)
 		{
 			foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
 			{
 				if (item.Content is PdfDocumentTab pdfDocumentTab)
 				{
-					pdfDocumentTab.ApplyTheme(isDark);
+					pdfDocumentTab.ApplyTheme(theme);
 				}
 			}
 		}
-		_welcomeDashboard?.ApplyTheme(isDark);
-		_mainRibbon?.ApplyTheme(isDark);
+		_welcomeDashboard?.ApplyTheme(theme);
+		_mainRibbon?.ApplyTheme(theme);
+		_aiPanelControl?.ApplyTheme(theme);
 	}
+
+	/// <summary>Overload tương thích ngược khi chỉ có bool.</summary>
+	private void SetTheme(bool isDark) => SetTheme(AppThemeRegistry.FromLegacyBool(isDark));
 
 	private void Minimize_Click(object sender, RoutedEventArgs e)
 	{
@@ -1115,7 +1100,7 @@ exit 0
 			}
 		}
 		PdfDocumentTab pdfDocumentTab2 = new PdfDocumentTab(path);
-		pdfDocumentTab2.ApplyTheme(_isDarkMode);
+		pdfDocumentTab2.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
 		pdfDocumentTab2.StatusChanged += DocTab_StatusChanged;
 		pdfDocumentTab2.ZoomChanged += DocTab_ZoomChanged;
 		pdfDocumentTab2.PageChanged += DocTab_PageChanged;
@@ -3012,9 +2997,27 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		RefreshRecentFilesDashboard();
 	}
 
+	/// <summary>Áp dụng theme từ preferences (ưu tiên ThemeName, fallback IsDarkTheme).</summary>
 	public void ApplyThemeFromPreferences(bool isDark)
 	{
-		SetTheme(isDark);
+		// Gọi SetTheme với ThemeName từ preferences để hỗ trợ multi-theme
+		SetTheme(_appPreferences.ThemeName);
+	}
+
+	/// <summary>Cập nhật cấu hình và áp dụng ngay lập tức trong thời gian thực.</summary>
+	public void UpdatePreferences(string themeName, bool allowMultipleInstances, string ocrLanguage)
+	{
+		_appPreferences.ThemeName = themeName;
+		_appPreferences.AllowMultipleInstances = allowMultipleInstances;
+		_appPreferences.OcrLanguage = ocrLanguage;
+		_appPreferences.Save();
+		SetTheme(themeName);
+	}
+
+	/// <summary>Preview theme ngay lập tức khi người dùng chọn trong Settings (chưa lưu).</summary>
+	public void PreviewTheme(string themeName)
+	{
+		SetTheme(themeName);
 	}
 
 	public void ReloadAiSettings()
@@ -3148,7 +3151,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 
 		_welcomeDashboard = new WelcomeDashboard();
-		_welcomeDashboard.ApplyTheme(_isDarkMode);
+		_welcomeDashboard.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
 		DashboardHostContainer.Children.Clear();
 		DashboardHostContainer.Children.Add(_welcomeDashboard);
 	}
@@ -3164,6 +3167,8 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			Visibility = Visibility.Collapsed
 		};
+		_aiPanelControl.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
+		_aiPanelControl.LoadSettings(_aiSettings);
 		AiPanelHostContainer.Children.Clear();
 		AiPanelHostContainer.Children.Add(_aiPanelControl);
 		HookAiPanelEvents();

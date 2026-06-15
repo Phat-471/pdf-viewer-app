@@ -222,6 +222,7 @@ namespace PdfViewerApp
         // --- Scroll Syncing ---
         private void ScrollA_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
+            if (SyncScrollToggle == null || CompareModeCombo == null || ScrollB == null) return;
             if (SyncScrollToggle.IsChecked == true && !_isSyncingScroll && CompareModeCombo.SelectedIndex == 0)
             {
                 _isSyncingScroll = true;
@@ -233,6 +234,7 @@ namespace PdfViewerApp
 
         private void ScrollB_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
+            if (SyncScrollToggle == null || CompareModeCombo == null || ScrollA == null) return;
             if (SyncScrollToggle.IsChecked == true && !_isSyncingScroll && CompareModeCombo.SelectedIndex == 0)
             {
                 _isSyncingScroll = true;
@@ -244,6 +246,7 @@ namespace PdfViewerApp
 
         private void SyncScroll_Toggled(object sender, RoutedEventArgs e)
         {
+            if (SyncScrollToggle == null || CompareModeCombo == null || ScrollA == null || ScrollB == null) return;
             if (SyncScrollToggle.IsChecked == true && CompareModeCombo.SelectedIndex == 0)
             {
                 _isSyncingScroll = true;

@@ -34,7 +34,7 @@
       </Setter>
     </Style>
   </UserControl.Resources>
-  <Border Margin="0,5,5,5" Background="#111827" BorderBrush="#1E293B" BorderThickness="1.5" CornerRadius="12">
+  <Border x:Name="RootBorder" Margin="0,5,5,5" Background="#111827" BorderBrush="#1E293B" BorderThickness="1.5" CornerRadius="12">
     <Grid Margin="14">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" /> <!-- Header -->
@@ -45,22 +45,22 @@
 
       <!-- Row 0: Header -->
       <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
-        <TextBlock Text="Trợ Lý AI" FontWeight="Black" FontSize="16" Foreground="#38BDF8" DockPanel.Dock="Left" VerticalAlignment="Center">
+        <TextBlock Name="AiPanelTitle" Text="Trợ Lý AI" FontWeight="Black" FontSize="16" Foreground="#38BDF8" DockPanel.Dock="Left" VerticalAlignment="Center">
           <UIElement.Effect>
             <DropShadowEffect Color="#38BDF8" BlurRadius="6" Opacity="0.2" ShadowDepth="0" />
           </UIElement.Effect>
         </TextBlock>
         <Button Content="" FontFamily="Segoe MDL2 Assets" FontSize="10" Width="28" Height="28" HorizontalAlignment="Right" DockPanel.Dock="Right" Style="{StaticResource AiActionBtn}" Click="Close_Click" Margin="4,0,0,0" ToolTip="Đóng Panel" />
-        <Button Name="ToggleConfigBtn" Content="⚙" FontFamily="Segoe MDL2 Assets" FontSize="14" Width="28" Height="28" HorizontalAlignment="Right" DockPanel.Dock="Right" Style="{StaticResource AiActionBtn}" Click="ToggleConfig_Click" ToolTip="Cài đặt AI" />
+        <Button Name="ToggleConfigBtn" Content="" FontFamily="Segoe MDL2 Assets" FontSize="14" Width="28" Height="28" HorizontalAlignment="Right" DockPanel.Dock="Right" Style="{StaticResource AiActionBtn}" Click="ToggleConfig_Click" ToolTip="Cài đặt AI" />
         <Button Name="ClearChatBtn" Content="" FontFamily="Segoe MDL2 Assets" FontSize="12" Width="28" Height="28" HorizontalAlignment="Right" DockPanel.Dock="Right" Style="{StaticResource AiActionBtn}" Click="ClearChat_Click" Margin="0,0,4,0" ToolTip="Xóa đoạn chat" />
       </DockPanel>
 
       <!-- Row 1: Collapsible Config -->
       <Border Name="AiConfigPanel" Grid.Row="1" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
         <StackPanel>
-          <TextBlock Text="CẤU HÌNH AI" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" Margin="0,0,0,8" />
+          <TextBlock Name="ConfigTitleText" Text="CẤU HÌNH AI" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" Margin="0,0,0,8" />
           
-          <TextBlock Text="CHẾ ĐỘ AI" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
+          <TextBlock Name="ConfigModeText" Text="CHẾ ĐỘ AI" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
           <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
             <ComboBox Name="AiProviderModeComboBox" Style="{StaticResource ModernComboBox}" Width="110" Height="26" SelectedIndex="0" SelectionChanged="AnySettingsChanged">
               <ComboBoxItem Content="Auto" Tag="Auto" />
@@ -71,10 +71,10 @@
             <CheckBox Name="AiAllowOnlineCheckBox" Content="Online snapshot" IsChecked="True" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#F8FAFC" FontSize="11" Checked="AnySettingsChanged" Unchecked="AnySettingsChanged" />
           </StackPanel>
 
-          <TextBlock Text="GEMINI API KEY" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
+          <TextBlock Name="ConfigApiKeyText" Text="GEMINI API KEY" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
           <TextBox Name="AiGeminiApiKeyTextBox" Style="{StaticResource ModernTextBox}" Height="26" Margin="0,0,0,10" TextChanged="AnySettingsChanged" />
 
-          <TextBlock Text="GEMINI MODEL (Đề xuất tiết kiệm token)" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
+          <TextBlock Name="ConfigModelText" Text="GEMINI MODEL (Đề xuất tiết kiệm token)" FontSize="9" FontWeight="Bold" Foreground="#94A3B8" Margin="0,0,0,4" />
           <ComboBox Name="AiGeminiModelComboBox" IsEditable="True" Style="{StaticResource ModernComboBox}" Height="28" Margin="0,0,0,10" SelectionChanged="AnySettingsChanged">
             <ComboBoxItem Content="gemini-3.5-flash (Nhanh &amp; Tiết kiệm)" Tag="gemini-3.5-flash" />
             <ComboBoxItem Content="gemini-3.1-flash-lite (Siêu rẻ)" Tag="gemini-3.1-flash-lite" />
@@ -109,8 +109,8 @@
       <!-- Row 3: Chat Input & Prompts -->
       <StackPanel Grid.Row="3">
         <!-- Quick prompts (CAD chips) -->
-        <TextBlock Text="Ý KIẾN NHANH (CAD)" FontSize="9" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
+        <TextBlock Name="QuickPromptTitleText" Text="Ý KIẾN NHANH (CAD)" FontSize="9" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,4" />
+        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,8">
           <StackPanel Orientation="Horizontal">
             <Button Content="🔍 Giải thích bản vẽ" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Hãy phân tích vùng bản vẽ kỹ thuật này và giải thích chi tiết các thành phần chính có trong ảnh." Height="24" Padding="8,2" />
             <Button Content="📏 Đọc kích thước" Style="{StaticResource QuickPromptBtn}" Click="QuickPrompt_Click" Tag="Hãy quét và đọc chính xác tất cả thông số kích thước, khoảng cách hoặc cao độ trong vùng bản vẽ này." Height="24" Padding="8,2" />
@@ -127,7 +127,7 @@
           </Grid.ColumnDefinitions>
           
           <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2" Margin="0,0,0,6">
-            <TextBlock Text="Phạm vi:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <TextBlock Name="ScopeTitleText" Text="Phạm vi:" Foreground="#94A3B8" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
             <RadioButton Name="ScopeSnapshotRadio" Content="Vùng chụp (Snapshot)" Foreground="#F8FAFC" FontSize="11" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0" />
             <RadioButton Name="ScopeWholePageRadio" Content="Toàn bộ trang" Foreground="#F8FAFC" FontSize="11" VerticalAlignment="Center" />
           </StackPanel>
@@ -146,7 +146,7 @@
           </Button>
         </Grid>
         
-        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#475569" FontSize="9.5" LineHeight="13" Text="Sử dụng mô hình Gemini API thế hệ mới. Toàn bộ hội thoại được lưu trữ trong suốt thời gian chạy." />
+        <TextBlock Name="BottomNoteText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#475569" FontSize="9.5" LineHeight="13" Text="Sử dụng mô hình Gemini API thế hệ mới. Toàn bộ hội thoại được lưu trữ trong suốt thời gian chạy." />
       </StackPanel>
     </Grid>
   </Border>

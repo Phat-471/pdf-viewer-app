@@ -6,7 +6,28 @@ namespace PdfViewerApp;
 
 internal sealed class AppPreferences
 {
-	public bool IsDarkTheme { get; set; } = true;
+	/// <summary>
+	/// Tên theme hiện tại (Dark, Light, Midnight, Forest, Sunset, Ocean).
+	/// Ưu tiên cao hơn IsDarkTheme (tương thích ngược).
+	/// </summary>
+	public string ThemeName { get; set; } = AppThemeRegistry.Dark;
+
+	/// <summary>
+	/// Tương thích ngược với phiên bản cũ.
+	/// Khi load: nếu file JSON cũ chỉ có IsDarkTheme thì dùng giá trị đó.
+	/// </summary>
+	public bool IsDarkTheme
+	{
+		get => !AppThemeRegistry.Get(ThemeName).IsLight;
+		set
+		{
+			if (ThemeName != AppThemeRegistry.Dark && ThemeName != AppThemeRegistry.Light)
+			{
+				return;
+			}
+			ThemeName = AppThemeRegistry.FromLegacyBool(value);
+		}
+	}
 
 	public bool AllowMultipleInstances { get; set; } = true;
 
