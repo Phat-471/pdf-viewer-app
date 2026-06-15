@@ -1,4 +1,3 @@
-- Thêm dấu tích checkmark cho các thẻ theme được chọn trong Cài đặt.
-- Sửa lỗi theme tự động hoàn tác về mặc định khi khởi động lại ứng dụng.
-- Đồng bộ giao diện cài đặt AI Panel, sửa các nút chức năng và căn lề.
-- Nâng cấp phiên bản lên v1.3.0.
+- Khắc phục lỗi trình cài đặt xóa mất file bản quyền và cấu hình cá nhân khi cập nhật.
+- Bảo toàn các file *.json (key kích hoạt, cài đặt giao diện, danh sách file gần đây) khi nâng cấp ứng dụng.
+- Nâng cấp phiên bản lên v1.3.1.

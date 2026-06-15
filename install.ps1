@@ -88,16 +88,15 @@ if (Test-Path $wpfProjectDir) {
         Copy-Item "libs\pdf_core.dll" -Destination "$publishDir\pdf_core.dll" -Force
     }
 
-    Write-Host "`n[4/7] Sao chep tep vao thu muc cai dat..." -ForegroundColor Yellow
-    # Clear target install directory first to avoid old files
+    # Clear target install directory first to avoid old files, but preserve configuration and license (*.json) files
     if (Test-Path $installDir) {
-        Remove-Item -Path "$installDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path $installDir -Exclude "*.json" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
     Copy-Item -Path "$publishDir\*" -Destination $installDir -Recurse -Force
 } else {
     Write-Host "`n[3/7] Che do cai dat nhanh tu file dung san..." -ForegroundColor Yellow
     if (Test-Path $installDir) {
-        Remove-Item -Path "$installDir\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path $installDir -Exclude "*.json" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     }
     Copy-Item -Path "$scriptDir\*" -Destination $installDir -Exclude "install.ps1", "install.bat", "uninstall.ps1", "uninstall.bat", "*.zip", ".git" -Recurse -Force
 }
