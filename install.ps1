@@ -205,4 +205,4 @@ try {
 
 Write-Host "`n=== CAI DAT HOAN TAT VA THANH CONG! ===" -ForegroundColor Cyan
 Write-Host "Ban co the chay ung dung tu shortcut tren Desktop" -ForegroundColor Green
-Read-Host "`nNhan Enter de thoat..."
+# Read-Host "`nNhan Enter de thoat..."
