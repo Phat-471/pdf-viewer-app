@@ -22,68 +22,231 @@ public static class PdfiumEngine
 
 	public static object SyncRoot => RenderLock;
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_InitLibrary();
+	private static class Native
+	{
+		[DllImport("pdfium.dll")]
+		public static extern void FPDF_InitLibrary();
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_DestroyLibrary();
+		[DllImport("pdfium.dll")]
+		public static extern void FPDF_DestroyLibrary();
 
-	[DllImport("pdfium.dll")]
-	public static extern nint FPDF_LoadDocument([MarshalAs(UnmanagedType.LPUTF8Str)] string file_path, [MarshalAs(UnmanagedType.LPUTF8Str)] string? password);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_LoadDocument")]
+		public static extern nint FPDF_LoadDocument([MarshalAs(UnmanagedType.LPUTF8Str)] string file_path, [MarshalAs(UnmanagedType.LPUTF8Str)] string? password);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_CloseDocument(nint document);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_CloseDocument")]
+		public static extern void FPDF_CloseDocument(nint document);
 
-	[DllImport("pdfium.dll")]
-	public static extern int FPDF_GetPageCount(nint document);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageCount")]
+		public static extern int FPDF_GetPageCount(nint document);
 
-	[DllImport("pdfium.dll")]
-	public static extern nint FPDF_LoadPage(nint document, int page_index);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_LoadPage")]
+		public static extern nint FPDF_LoadPage(nint document, int page_index);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_ClosePage(nint page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_ClosePage")]
+		public static extern void FPDF_ClosePage(nint page);
 
-	[DllImport("pdfium.dll")]
-	public static extern double FPDF_GetPageWidth(nint page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageWidth")]
+		public static extern double FPDF_GetPageWidth(nint page);
 
-	[DllImport("pdfium.dll")]
-	public static extern double FPDF_GetPageHeight(nint page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageHeight")]
+		public static extern double FPDF_GetPageHeight(nint page);
 
-	[DllImport("pdfium.dll")]
-	private static extern int FPDF_GetPageSizeByIndex(nint document, int page_index, out double width, out double height);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageSizeByIndex")]
+		public static extern int FPDF_GetPageSizeByIndex(nint document, int page_index, out double width, out double height);
 
-	[DllImport("pdfium.dll")]
-	public static extern nint FPDFBitmap_CreateEx(int width, int height, int format, nint first_scan, int stride);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFBitmap_CreateEx")]
+		public static extern nint FPDFBitmap_CreateEx(int width, int height, int format, nint first_scan, int stride);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDFBitmap_FillRect(nint bitmap, int left, int top, int width, int height, uint color);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFBitmap_FillRect")]
+		public static extern void FPDFBitmap_FillRect(nint bitmap, int left, int top, int width, int height, uint color);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_RenderPageBitmap(nint bitmap, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_RenderPageBitmap")]
+		public static extern void FPDF_RenderPageBitmap(nint bitmap, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDF_RenderPage(nint dc, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags);
+		[DllImport("pdfium.dll", EntryPoint = "FPDF_RenderPage")]
+		public static extern void FPDF_RenderPage(nint dc, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDFBitmap_Destroy(nint bitmap);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFBitmap_Destroy")]
+		public static extern void FPDFBitmap_Destroy(nint bitmap);
 
-	[DllImport("pdfium.dll")]
-	public static extern nint FPDFText_LoadPage(nint page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_LoadPage")]
+		public static extern nint FPDFText_LoadPage(nint page);
 
-	[DllImport("pdfium.dll")]
-	public static extern void FPDFText_ClosePage(nint text_page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_ClosePage")]
+		public static extern void FPDFText_ClosePage(nint text_page);
 
-	[DllImport("pdfium.dll")]
-	public static extern int FPDFText_CountChars(nint text_page);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_CountChars")]
+		public static extern int FPDFText_CountChars(nint text_page);
 
-	[DllImport("pdfium.dll")]
-	public static extern int FPDFText_GetText(nint text_page, int start_index, int count, [MarshalAs(UnmanagedType.LPWStr)] StringBuilder result);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_GetText")]
+		public static extern int FPDFText_GetText(nint text_page, int start_index, int count, [MarshalAs(UnmanagedType.LPWStr)] StringBuilder result);
 
-	[DllImport("pdfium.dll")]
-	public static extern int FPDFText_GetCharIndexAtPos(nint text_page, double x, double y, double xTolerance, double yTolerance);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_GetCharIndexAtPos")]
+		public static extern int FPDFText_GetCharIndexAtPos(nint text_page, double x, double y, double xTolerance, double yTolerance);
 
-	[DllImport("pdfium.dll")]
-	public static extern bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top);
+		[DllImport("pdfium.dll", EntryPoint = "FPDFText_GetCharBox")]
+		public static extern bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top);
+	}
+
+	public static void FPDF_InitLibrary()
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_InitLibrary();
+		}
+	}
+
+	public static void FPDF_DestroyLibrary()
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_DestroyLibrary();
+		}
+	}
+
+	public static nint FPDF_LoadDocument(string file_path, string? password)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDF_LoadDocument(file_path, password);
+		}
+	}
+
+	public static void FPDF_CloseDocument(nint document)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_CloseDocument(document);
+		}
+	}
+
+	public static int FPDF_GetPageCount(nint document)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDF_GetPageCount(document);
+		}
+	}
+
+	public static nint FPDF_LoadPage(nint document, int page_index)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDF_LoadPage(document, page_index);
+		}
+	}
+
+	public static void FPDF_ClosePage(nint page)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_ClosePage(page);
+		}
+	}
+
+	public static double FPDF_GetPageWidth(nint page)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDF_GetPageWidth(page);
+		}
+	}
+
+	public static double FPDF_GetPageHeight(nint page)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDF_GetPageHeight(page);
+		}
+	}
+
+	public static nint FPDFBitmap_CreateEx(int width, int height, int format, nint first_scan, int stride)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFBitmap_CreateEx(width, height, format, first_scan, stride);
+		}
+	}
+
+	public static void FPDFBitmap_FillRect(nint bitmap, int left, int top, int width, int height, uint color)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDFBitmap_FillRect(bitmap, left, top, width, height, color);
+		}
+	}
+
+	public static void FPDF_RenderPageBitmap(nint bitmap, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_RenderPageBitmap(bitmap, page, start_x, start_y, size_x, size_y, rotate, flags);
+		}
+	}
+
+	public static void FPDF_RenderPage(nint dc, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDF_RenderPage(dc, page, start_x, start_y, size_x, size_y, rotate, flags);
+		}
+	}
+
+	public static void FPDFBitmap_Destroy(nint bitmap)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDFBitmap_Destroy(bitmap);
+		}
+	}
+
+	public static nint FPDFText_LoadPage(nint page)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFText_LoadPage(page);
+		}
+	}
+
+	public static void FPDFText_ClosePage(nint text_page)
+	{
+		lock (RenderLock)
+		{
+			Native.FPDFText_ClosePage(text_page);
+		}
+	}
+
+	public static int FPDFText_CountChars(nint text_page)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFText_CountChars(text_page);
+		}
+	}
+
+	public static int FPDFText_GetText(nint text_page, int start_index, int count, StringBuilder result)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFText_GetText(text_page, start_index, count, result);
+		}
+	}
+
+	public static int FPDFText_GetCharIndexAtPos(nint text_page, double x, double y, double xTolerance, double yTolerance)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFText_GetCharIndexAtPos(text_page, x, y, xTolerance, yTolerance);
+		}
+	}
+
+	public static bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top)
+	{
+		lock (RenderLock)
+		{
+			return Native.FPDFText_GetCharBox(text_page, index, out left, out right, out bottom, out top);
+		}
+	}
 
 	public static void Initialize()
 	{
@@ -91,7 +254,7 @@ public static class PdfiumEngine
 		{
 			if (!_initialized)
 			{
-				FPDF_InitLibrary();
+				Native.FPDF_InitLibrary();
 				_initialized = true;
 			}
 		}
@@ -103,7 +266,7 @@ public static class PdfiumEngine
 		{
 			if (_initialized)
 			{
-				FPDF_DestroyLibrary();
+				Native.FPDF_DestroyLibrary();
 				_initialized = false;
 			}
 		}
@@ -117,7 +280,7 @@ public static class PdfiumEngine
 		}
 		lock (RenderLock)
 		{
-			FPDF_CloseDocument(document);
+			Native.FPDF_CloseDocument(document);
 		}
 	}
 
@@ -131,7 +294,7 @@ public static class PdfiumEngine
 		Initialize();
 		lock (RenderLock)
 		{
-			nint num = FPDF_LoadDocument(filePath, null);
+			nint num = Native.FPDF_LoadDocument(filePath, null);
 			if (num == IntPtr.Zero)
 			{
 				return null;
@@ -142,7 +305,7 @@ public static class PdfiumEngine
 			}
 			finally
 			{
-				FPDF_CloseDocument(num);
+				Native.FPDF_CloseDocument(num);
 			}
 		}
 	}
@@ -166,7 +329,7 @@ public static class PdfiumEngine
 		}
 		lock (RenderLock)
 		{
-			nint num3 = FPDF_LoadPage(document, pageIndex);
+			nint num3 = Native.FPDF_LoadPage(document, pageIndex);
 			if (num3 == IntPtr.Zero)
 			{
 				return null;
@@ -187,12 +350,12 @@ public static class PdfiumEngine
 				try
 				{
 					nint first_scan = gCHandle.AddrOfPinnedObject();
-					nint num5 = FPDFBitmap_CreateEx(targetWidth, targetHeight, 4, first_scan, num4);
+					nint num5 = Native.FPDFBitmap_CreateEx(targetWidth, targetHeight, 4, first_scan, num4);
 					if (num5 != IntPtr.Zero)
 					{
-						FPDFBitmap_FillRect(num5, 0, 0, targetWidth, targetHeight, uint.MaxValue);
-						FPDF_RenderPageBitmap(num5, num3, 0, 0, targetWidth, targetHeight, 0, 3);
-						FPDFBitmap_Destroy(num5);
+						Native.FPDFBitmap_FillRect(num5, 0, 0, targetWidth, targetHeight, uint.MaxValue);
+						Native.FPDF_RenderPageBitmap(num5, num3, 0, 0, targetWidth, targetHeight, 0, 3);
+						Native.FPDFBitmap_Destroy(num5);
 					}
 				}
 				finally
@@ -216,7 +379,7 @@ public static class PdfiumEngine
 			}
 			finally
 			{
-				FPDF_ClosePage(num3);
+				Native.FPDF_ClosePage(num3);
 			}
 		}
 	}
@@ -232,7 +395,7 @@ public static class PdfiumEngine
 		tileHeight = Math.Max(1, Math.Min(tileHeight, fullHeight - tileY));
 		lock (RenderLock)
 		{
-			nint num = FPDF_LoadPage(document, pageIndex);
+			nint num = Native.FPDF_LoadPage(document, pageIndex);
 			if (num == IntPtr.Zero)
 			{
 				return null;
@@ -253,12 +416,12 @@ public static class PdfiumEngine
 				try
 				{
 					nint first_scan = gCHandle.AddrOfPinnedObject();
-					nint num3 = FPDFBitmap_CreateEx(tileWidth, tileHeight, 4, first_scan, num2);
+					nint num3 = Native.FPDFBitmap_CreateEx(tileWidth, tileHeight, 4, first_scan, num2);
 					if (num3 != IntPtr.Zero)
 					{
-						FPDFBitmap_FillRect(num3, 0, 0, tileWidth, tileHeight, uint.MaxValue);
-						FPDF_RenderPageBitmap(num3, num, -tileX, -tileY, fullWidth, fullHeight, 0, 3);
-						FPDFBitmap_Destroy(num3);
+						Native.FPDFBitmap_FillRect(num3, 0, 0, tileWidth, tileHeight, uint.MaxValue);
+						Native.FPDF_RenderPageBitmap(num3, num, -tileX, -tileY, fullWidth, fullHeight, 0, 3);
+						Native.FPDFBitmap_Destroy(num3);
 					}
 				}
 				finally
@@ -282,7 +445,7 @@ public static class PdfiumEngine
 			}
 			finally
 			{
-				FPDF_ClosePage(num);
+				Native.FPDF_ClosePage(num);
 			}
 		}
 	}
@@ -290,15 +453,18 @@ public static class PdfiumEngine
 	public static bool TryGetPageSizeByIndex(nint document, int pageIndex, out double width, out double height)
 	{
 		Initialize();
-		try
+		lock (RenderLock)
 		{
-			return FPDF_GetPageSizeByIndex(document, pageIndex, out width, out height) != 0;
-		}
-		catch (EntryPointNotFoundException)
-		{
-			width = 0.0;
-			height = 0.0;
-			return false;
+			try
+			{
+				return Native.FPDF_GetPageSizeByIndex(document, pageIndex, out width, out height) != 0;
+			}
+			catch (EntryPointNotFoundException)
+			{
+				width = 0.0;
+				height = 0.0;
+				return false;
+			}
 		}
 	}
 }

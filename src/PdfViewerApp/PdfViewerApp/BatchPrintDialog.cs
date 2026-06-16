@@ -194,30 +194,37 @@ public partial class BatchPrintDialog : Window
         await Task.Run(() =>
         {
             PdfiumEngine.Initialize();
-            lock (PdfiumEngine.SyncRoot)
+            foreach (var item in Files.ToList())
             {
-                foreach (var item in Files.ToList())
-                {
-                    if (item.PageCount > 0) continue;
+                if (item.PageCount > 0) continue;
 
+                int pages = 0;
+                bool success = false;
+                lock (PdfiumEngine.SyncRoot)
+                {
                     nint doc = PdfiumEngine.FPDF_LoadDocument(item.FilePath, null);
                     if (doc != IntPtr.Zero)
                     {
-                        int pages = PdfiumEngine.FPDF_GetPageCount(doc);
+                        pages = PdfiumEngine.FPDF_GetPageCount(doc);
                         PdfiumEngine.FPDF_CloseDocument(doc);
-                        Dispatcher.Invoke(() =>
-                        {
-                            item.PageCount = pages;
-                            item.Status = "Sẵn sàng";
-                        });
+                        success = true;
                     }
-                    else
+                }
+
+                if (success)
+                {
+                    Dispatcher.Invoke(() =>
                     {
-                        Dispatcher.Invoke(() =>
-                        {
-                            item.Status = "Lỗi đọc tệp";
-                        });
-                    }
+                        item.PageCount = pages;
+                        item.Status = "Sẵn sàng";
+                    });
+                }
+                else
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        item.Status = "Lỗi đọc tệp";
+                    });
                 }
             }
         });
@@ -356,8 +363,36 @@ public partial class BatchPrintDialog : Window
                 fileItem.Status = "Đang chuẩn bị in...";
                 OverallStatusText.Text = $"Đang in {i + 1}/{Files.Count}: {fileItem.FileName}...";
 
+                // Nếu chưa load xong số trang (do file nặng đang load ngầm hoặc vừa add vào)
+                if (fileItem.PageCount <= 0)
+                {
+                    fileItem.Status = "Đang tải số trang...";
+                    await Task.Run(() =>
+                    {
+                        lock (PdfiumEngine.SyncRoot)
+                        {
+                            nint doc = PdfiumEngine.FPDF_LoadDocument(fileItem.FilePath, null);
+                            if (doc != IntPtr.Zero)
+                            {
+                                int pages = PdfiumEngine.FPDF_GetPageCount(doc);
+                                PdfiumEngine.FPDF_CloseDocument(doc);
+                                Dispatcher.Invoke(() =>
+                                {
+                                    fileItem.PageCount = pages;
+                                });
+                            }
+                        }
+                    });
+                }
+
+                if (fileItem.PageCount <= 0)
+                {
+                    fileItem.Status = "Lỗi đọc tệp (không tìm thấy trang)";
+                    continue;
+                }
+
                 int startPageIndex = 0;
-                int endPageIndex = fileItem.PageCount > 0 ? fileItem.PageCount - 1 : 0;
+                int endPageIndex = fileItem.PageCount - 1;
 
                 if (CustomPagesRadio.IsChecked == true)
                 {
