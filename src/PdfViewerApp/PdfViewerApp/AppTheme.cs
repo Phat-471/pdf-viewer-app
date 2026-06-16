@@ -121,7 +121,7 @@ internal static class AppThemeRegistry
 		new AppThemeDefinition
 		{
 			Name                = Midnight,
-			DisplayName         = "Đêm Tối",
+			DisplayName         = "Tím",
 			Icon                = "🌌",
 			WindowBackground    = "#0D0D1A",
 			TitleBarBackground  = "#12122A",

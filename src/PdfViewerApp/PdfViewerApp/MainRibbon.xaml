@@ -51,7 +51,7 @@
       </Style>
     </fluent:Ribbon.Style>
     <fluent:Ribbon.Menu>
-      <fluent:Backstage Header="Tệp" Background="#0F766E" Foreground="#FFFFFFFF" WindowChrome.IsHitTestVisibleInChrome="True">
+      <fluent:Backstage x:Name="MyBackstage" Header="Tệp" Background="#0F766E" Foreground="#FFFFFFFF" WindowChrome.IsHitTestVisibleInChrome="True">
         <fluent:BackstageTabControl>
           <fluent:Button Header="Mở File PDF" Click="OpenPdf_Click" />
           <fluent:Button Header="Lưu" Click="SavePdf_Click" />

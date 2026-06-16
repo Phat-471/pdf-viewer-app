@@ -187,11 +187,42 @@ public partial class MainRibbon : UserControl
 			ThemeToggleBtn.Header = theme.DisplayName;
 		}
 
+		if (MyBackstage != null)
+		{
+			MyBackstage.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
+			MyBackstage.Foreground = Brushes.White;
+		}
+
 		if (MyRibbon != null)
 		{
-			MyRibbon.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
+			var bgBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
+			MyRibbon.Background = bgBrush;
 			MyRibbon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
 			MyRibbon.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+
+			// Override Fluent.Ribbon resource brushes globally and locally using correct keys
+			string[] keys = new string[]
+			{
+				"Fluent.Ribbon.Brushes.Ribbon.Background",
+				"Fluent.Ribbon.Brushes.RibbonTabControl.Background",
+				"Fluent.Ribbon.Brushes.RibbonTabControl.Content.Background",
+				"Fluent.Ribbon.Brushes.RibbonTabControl.TabsGrid.Background",
+				"Fluent.Ribbon.Brushes.WindowBackground"
+			};
+
+			foreach (var key in keys)
+			{
+				try
+				{
+					Application.Current.Resources[key] = bgBrush;
+				}
+				catch {}
+				try
+				{
+					MyRibbon.Resources[key] = bgBrush;
+				}
+				catch {}
+			}
 		}
 	}
 

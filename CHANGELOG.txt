@@ -1,9 +1,19 @@
+- Bổ sung cửa sổ tính năng "Tách File PDF Nâng Cao" (Split PDF) cao cấp:
+  + Tách một dải trang cụ thể (Trích xuất trang).
+  + Tách mỗi N trang thành 1 file PDF riêng.
+  + Tách toàn bộ các trang thành các file 1 trang đơn lẻ.
+  + Tách theo các nhóm trang tùy ý chỉ định bằng dấu chấm phẩy (ví dụ: 1-3; 4-6).
+  + Xử lý tiến trình chạy nền không đơ UI, hiển thị ProgressBar tiến trình chạy thực tế.
+  + Thiết kế giao diện Premium Dark Theme đồng bộ cao cấp.
+- Nâng cấp phiên bản lên v1.3.7.
+
+(Cập nhật v1.3.6):
 - Khắc phục sự nhầm lẫn giữa công cụ vẽ tĩnh và đo đạc thực tế:
   + Đổi tên nhóm "Công Cụ Vẽ" thành "Vẽ Hình Ghi Chú".
   + Đổi tên các nút vẽ thành: "Vẽ Đường Thẳng", "Vẽ Chữ Nhật", "Vẽ Hình Tròn".
 - Thêm nút "Hướng Dẫn Đo" kèm hộp thoại hướng dẫn từng bước thiết lập tỷ lệ và đo đạc.
 - Cho phép sử dụng các công cụ đo đạc và ký số liên tục (continuous), nhấn ESC hoặc chọn công cụ khác để thoát.
-- Nâng cấp phiên bản lên v1.3.5.
+- Nâng cấp phiên bản lên v1.3.6.
 
 (Cập nhật từ v1.3.4):
 - Khắc phục lỗi fallback AI sang local khi chưa bật Online snapshot hoặc chưa cấu hình API key.

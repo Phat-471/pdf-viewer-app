@@ -57,6 +57,12 @@ internal static class LocalAiInstaller
 
 	public static async Task InitializeAsync()
 	{
+		var settings = AiSettings.Load();
+		if (settings.ProviderMode != "Local")
+		{
+			return;
+		}
+
 		if (GetTotalRamGb() < 7.5)
 		{
 			return;

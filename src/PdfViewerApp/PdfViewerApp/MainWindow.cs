@@ -608,8 +608,18 @@ exit 0
 
 	private void ThemeToggle_Click(object sender, RoutedEventArgs e)
 	{
-		// Toggle giữa Dark và Light
-		string next = _isDarkMode ? AppThemeRegistry.Light : AppThemeRegistry.Dark;
+		var allThemes = AppThemeRegistry.All;
+		int currentIndex = 0;
+		for (int i = 0; i < allThemes.Count; i++)
+		{
+			if (string.Equals(allThemes[i].Name, _appPreferences.ThemeName, StringComparison.OrdinalIgnoreCase))
+			{
+				currentIndex = i;
+				break;
+			}
+		}
+		int nextIndex = (currentIndex + 1) % allThemes.Count;
+		string next = allThemes[nextIndex].Name;
 		SetTheme(next);
 	}
 
@@ -638,6 +648,10 @@ exit 0
 		if (TitleBarGrid != null)
 		{
 			TitleBarGrid.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
+		}
+		if (RibbonHostContainer != null)
+		{
+			RibbonHostContainer.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
 		}
 		if (TitleBarText != null)
 		{
@@ -3261,62 +3275,20 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		SaveAiSettings_Click(sender, new RoutedEventArgs());
 	}
 
-	private async void ExtractPages_Click(object sender, RoutedEventArgs e)
+	private void ExtractPages_Click(object sender, RoutedEventArgs e)
 	{
 		if (!EnsureActivated())
 		{
 			return;
 		}
 		PdfDocumentTab activeTab = GetActiveTab();
-		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath) || activeTab.PageCount <= 0)
+		string? initialFile = activeTab?.CurrentPdfPath;
+
+		SplitDialog splitDialog = new SplitDialog(initialFile) { Owner = this };
+		if (splitDialog.ShowDialog() == true)
 		{
-			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Exclamation);
-			return;
-		}
-		List<int> selectedPages = activeTab.SelectedPageNumbers?.Distinct().ToList() ?? new List<int>();
-		List<int> pagesToKeep;
-		if (selectedPages.Count > 1)
-		{
-			pagesToKeep = selectedPages;
-		}
-		else
-		{
-			string instruction = $"Nhập danh sách trang cần trích xuất từ 1 đến {activeTab.PageCount} (ví dụ: 1;3;5-8):";
-			string text = InputDialog.Show("Trích xuất trang PDF", instruction, $"1-{activeTab.PageCount}");
-			if (string.IsNullOrEmpty(text))
-			{
-				return;
-			}
-			pagesToKeep = ParsePageRange(text, activeTab.PageCount);
-		}
-		if (pagesToKeep.Count == 0)
-		{
-			MessageBox.Show("Danh sách trang cần trích xuất không hợp lệ", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-			return;
-		}
-		SaveFileDialog saveFileDialog = new SaveFileDialog
-		{
-			Filter = "PDF documents (*.pdf)|*.pdf",
-			Title = "Lưu file PDF trích xuất",
-			FileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_trich_xuat.pdf"
-		};
-		if (saveFileDialog.ShowDialog() == true)
-		{
-			string outputPath = saveFileDialog.FileName;
-			LogStatus("Đang trích xuất trang...");
-			string pagesSemicolon = string.Join(";", pagesToKeep);
-			string sourcePath = activeTab.CurrentPdfPath;
-			if (await Task.Run(() => extract_pdf_pages(sourcePath, pagesSemicolon, outputPath)))
-			{
-				MessageBox.Show($"Trích xuất {pagesToKeep.Count} trang thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
-				LogStatus("Đã lưu PDF trích xuất: " + Path.GetFileName(outputPath));
-				OpenPdfTab(outputPath);
-			}
-			else
-			{
-				MessageBox.Show("Không thể trích xuất trang PDF. Vui lòng kiểm tra lại.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-				LogStatus("Trích xuất thất bại");
-			}
+			// If split dialog completes successfully, user might want to check the files
+			// In SplitDialog we show success MessageBox and close.
 		}
 	}
 
