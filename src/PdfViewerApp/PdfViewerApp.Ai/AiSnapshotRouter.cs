@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PdfViewerApp.Ai;
@@ -35,19 +35,23 @@ internal sealed class AiSnapshotRouter
 
 	public Task<string> AskSnapshotAsync(AiSnapshotRequest request, CancellationToken cancellationToken)
 	{
-		if (!_settings.AllowOnlineSnapshot)
+		var provider = ResolveProvider();
+		if (provider == _geminiProvider || provider == _openAiProvider)
 		{
-			return _localProvider.AskSnapshotAsync(request, cancellationToken);
+			if (!_settings.AllowOnlineSnapshot)
+			{
+				return Task.FromResult("Chế độ gửi ảnh trực tuyến (Online snapshot) chưa được bật. Vui lòng tích chọn 'Online snapshot' trong phần cấu hình trợ lý AI để phân tích ảnh chụp bằng mô hình đám mây (Gemini/OpenAI).");
+			}
 		}
-		return ResolveProvider().AskSnapshotAsync(request, cancellationToken);
+		return provider.AskSnapshotAsync(request, cancellationToken);
 	}
 
 	private IAiSnapshotProvider ResolveProvider()
 	{
 		return _settings.ProviderMode switch
 		{
-			"Gemini" => _geminiProvider.IsAvailable ? _geminiProvider : _localProvider, 
-			"OpenAI" => _openAiProvider.IsAvailable ? _openAiProvider : _localProvider, 
+			"Gemini" => _geminiProvider, 
+			"OpenAI" => _openAiProvider, 
 			"Local" => _localProvider, 
 			"Off" => _localProvider, 
 			_ => _geminiProvider.IsAvailable ? _geminiProvider : (_openAiProvider.IsAvailable ? _openAiProvider : _localProvider), 

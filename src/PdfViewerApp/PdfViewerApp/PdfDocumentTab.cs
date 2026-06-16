@@ -227,6 +227,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public string ActiveTool { get; set; } = "Select";
 
+	private bool IsContinuousTool(string tool)
+	{
+		return tool == "ShapeLine" || 
+		       tool == "ShapeRect" || 
+		       tool == "ShapeOval" || 
+		       tool == "MeasureDistance" || 
+		       tool == "MeasureArea" || 
+		       tool == "MeasurePerimeter" || 
+		       tool == "PlaceSignature" || 
+		       tool == "PlaceStamp";
+	}
+
 	public void EnterCalibrateMode()
 	{
 		ActiveTool = "MeasureCalibrate";
@@ -611,8 +623,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(sigAnn);
 				SelectedAnnotation = sigAnn;
-				ActiveTool = "Select";
-				_tempSignatureStrokes = null;
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+					_tempSignatureStrokes = null;
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			e.Handled = true;
@@ -642,8 +657,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			SaveUndoState();
 			Annotations.Add(stampAnn);
 			SelectedAnnotation = stampAnn;
-			ActiveTool = "Select";
-			_tempStampText = null;
+			if (!IsContinuousTool(ActiveTool))
+			{
+				ActiveTool = "Select";
+				_tempStampText = null;
+			}
 			RedrawPageAnnotations(canvas, num);
 			e.Handled = true;
 		}
@@ -962,7 +980,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation);
 				SelectedAnnotation = pdfShapeAnnotation;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			else if (ActiveTool == "ShapeOval" && _tempEllipse != null)
@@ -989,7 +1010,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation2);
 				SelectedAnnotation = pdfShapeAnnotation2;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			else if (ActiveTool == "Callout" && _tempLine != null)
@@ -1022,7 +1046,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation3);
 				SelectedAnnotation = pdfShapeAnnotation3;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			else if (ActiveTool == "MeasureDistance" && _tempLine != null)
@@ -1046,7 +1073,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(measureAnn);
 				SelectedAnnotation = measureAnn;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			else if (ActiveTool == "MeasureCalibrate" && _tempLine != null)

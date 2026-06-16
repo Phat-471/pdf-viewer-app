@@ -286,8 +286,18 @@
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Đo Đạc &amp; Ký Số">
+      <!-- Branding / Logo Group -->
+      <fluent:RibbonGroupBox Header="Công Cụ" Margin="10,0,0,0">
+        <Grid Width="100" HorizontalAlignment="Center">
+          <StackPanel Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED15;" FontSize="28" Foreground="#0F766E" HorizontalAlignment="Center"/>
+            <TextBlock Text="Đo &amp; Ký Số" FontSize="11" FontWeight="Bold" Foreground="#0F766E" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+          </StackPanel>
+        </Grid>
+      </fluent:RibbonGroupBox>
+
       <!-- Clipboard Group -->
-      <fluent:RibbonGroupBox Header="Bộ Nhớ Tạm">
+      <fluent:RibbonGroupBox Header="Bộ Nhớ Tạm" Margin="10,0,0,0">
         <fluent:SplitButton Name="PasteBtn" Header="Dán" Click="Paste_Click" Size="Large" ToolTip="Dán nội dung từ bộ nhớ tạm (Ctrl+V)">
           <fluent:SplitButton.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C5;" FontSize="28" Foreground="#E29C1D" HorizontalAlignment="Center" />
@@ -313,116 +323,55 @@
         </StackPanel>
       </fluent:RibbonGroupBox>
 
-      <!-- Font Group -->
-      <fluent:RibbonGroupBox Header="Phông Chữ">
-        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="6,2,6,2">
-          <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-            <fluent:ComboBox Name="FontFamilyCombo2" Width="120" Height="22" SelectedIndex="0" Margin="0,0,4,0" SelectionChanged="FontFamilyCombo2_SelectionChanged" ToolTip="Chọn phông chữ">
-              <ComboBoxItem Content="Calibri" Tag="Calibri" />
-              <ComboBoxItem Content="Segoe UI" Tag="Segoe UI" />
-              <ComboBoxItem Content="Arial" Tag="Arial" />
-              <ComboBoxItem Content="Times New Roman" Tag="Times New Roman" />
-              <ComboBoxItem Content="Courier New" Tag="Courier New" />
-            </fluent:ComboBox>
-            <fluent:ComboBox Name="FontSizeCombo2" Width="50" Height="22" SelectedIndex="3" Margin="0,0,4,0" SelectionChanged="FontSizeCombo2_SelectionChanged" ToolTip="Chọn cỡ chữ">
-              <ComboBoxItem Content="9" Tag="9" />
-              <ComboBoxItem Content="11" Tag="11" />
-              <ComboBoxItem Content="12" Tag="12" />
-              <ComboBoxItem Content="14" Tag="14" />
-              <ComboBoxItem Content="16" Tag="16" />
-              <ComboBoxItem Content="18" Tag="18" />
-              <ComboBoxItem Content="24" Tag="24" />
-              <ComboBoxItem Content="36" Tag="36" />
-              <ComboBoxItem Content="48" Tag="48" />
-            </fluent:ComboBox>
-            <fluent:Button Name="FontGrowBtn2" Click="FontGrowBtn2_Click" Size="Small" Width="22" Height="22" Margin="2,0,2,0" ToolTip="Tăng kích thước chữ">
-              <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE968;" FontSize="12" Foreground="#38BDF8" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-            <fluent:Button Name="FontShrinkBtn2" Click="FontShrinkBtn2_Click" Size="Small" Width="22" Height="22" ToolTip="Giảm kích thước chữ">
-              <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE967;" FontSize="12" Foreground="#38BDF8" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-            <ToggleButton Name="BoldToggle2" Content="B" FontWeight="Bold" Width="22" Height="22" Style="{StaticResource ThemeToggleButtonStyle}" Click="BoldToggle2_Click" ToolTip="Chữ đậm (Ctrl+B)" />
-            <ToggleButton Name="ItalicToggle2" Content="I" FontStyle="Italic" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="ItalicToggle2_Click" ToolTip="Chữ nghiêng (Ctrl+I)" />
-            <ToggleButton Name="UnderlineToggle2" Content="U" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="UnderlineToggle2_Click" ToolTip="Chữ gạch chân (Ctrl+U)" />
-            <ToggleButton Name="StrikeToggle2" Content="S" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="StrikeToggle2_Click" ToolTip="Chữ gạch ngang" />
-            <ToggleButton Name="SubscriptToggle2" Content="x₂" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="SubscriptToggle2_Click" ToolTip="Chỉ số dưới" />
-            
-            <fluent:DropDownButton Name="HighlightColorBtn2" Width="32" Height="22" Margin="6,0,0,0" ToolTip="Màu nền làm nổi bật chữ">
-              <fluent:DropDownButton.Icon>
-                <Grid>
-                  <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7DC;" FontSize="12" Foreground="#38BDF8" VerticalAlignment="Center"/>
-                  <Border Height="3" VerticalAlignment="Bottom" Background="Yellow" Margin="0,0,0,-1"/>
-                </Grid>
-              </fluent:DropDownButton.Icon>
-              <fluent:MenuItem Header="Vàng" Click="HighlightColor_Click" Tag="Yellow"/>
-              <fluent:MenuItem Header="Xanh Lá" Click="HighlightColor_Click" Tag="LightGreen"/>
-              <fluent:MenuItem Header="Xanh Dương" Click="HighlightColor_Click" Tag="LightSkyBlue"/>
-              <fluent:MenuItem Header="Không màu" Click="HighlightColor_Click" Tag="Transparent"/>
-            </fluent:DropDownButton>
-
-            <fluent:DropDownButton Name="TextColorBtn2" Width="36" Height="22" Margin="4,0,0,0" ToolTip="Màu chữ">
-              <fluent:DropDownButton.Icon>
-                <Grid>
-                  <TextBlock Text="A" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                  <Border Height="3" VerticalAlignment="Bottom" Background="Red" Margin="0,0,0,-1"/>
-                </Grid>
-              </fluent:DropDownButton.Icon>
-              <fluent:MenuItem Header="Đỏ" Click="TextColor_Click" Tag="Red"/>
-              <fluent:MenuItem Header="Xanh Dương" Click="TextColor_Click" Tag="Blue"/>
-              <fluent:MenuItem Header="Đen" Click="TextColor_Click" Tag="Black"/>
-              <fluent:MenuItem Header="Trắng" Click="TextColor_Click" Tag="White"/>
-            </fluent:DropDownButton>
-          </StackPanel>
-        </StackPanel>
-      </fluent:RibbonGroupBox>
-
       <!-- Furation Group -->
-      <fluent:RibbonGroupBox Header="Công Cụ Vẽ">
-        <fluent:SplitButton Name="LineToolBtn2" Header="Khoảng Cách" Click="LineTool_Click" Size="Large" MinWidth="85" ToolTip="Vẽ đường đo khoảng cách giữa hai điểm">
+      <fluent:RibbonGroupBox Header="Vẽ Hình Ghi Chú">
+        <fluent:SplitButton Name="LineToolBtn2" Header="Vẽ Đường Thẳng" Click="LineTool_Click" Size="Large" MinWidth="85" ToolTip="Vẽ đường thẳng chú thích hoặc ghi chú trên tài liệu">
           <fluent:SplitButton.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE94E;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
           </fluent:SplitButton.LargeIcon>
-          <fluent:MenuItem Header="Khoảng Cách" Click="LineTool_Click" />
+          <fluent:MenuItem Header="Vẽ Đường Thẳng" Click="LineTool_Click" />
         </fluent:SplitButton>
-        <fluent:SplitButton Name="RectToolBtn2" Header="Diện Tích" Click="RectTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình hộp chữ nhật để khoanh vùng đo diện tích">
+        <fluent:SplitButton Name="RectToolBtn2" Header="Vẽ Chữ Nhật" Click="RectTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình hộp chữ nhật chú thích">
           <fluent:SplitButton.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C3;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
           </fluent:SplitButton.LargeIcon>
-          <fluent:MenuItem Header="Diện Tích" Click="RectTool_Click" />
+          <fluent:MenuItem Header="Vẽ Chữ Nhật" Click="RectTool_Click" />
         </fluent:SplitButton>
-        <fluent:SplitButton Name="OvalToolBtn2" Header="Chu Vi" Click="OvalTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình elip/tròn để đo chu vi và đường kính">
+        <fluent:SplitButton Name="OvalToolBtn2" Header="Vẽ Hình Tròn" Click="OvalTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình elip/tròn chú thích">
           <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED5C;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE81D;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
           </fluent:SplitButton.LargeIcon>
-          <fluent:MenuItem Header="Chu Vi" Click="OvalTool_Click" />
+          <fluent:MenuItem Header="Vẽ Hình Tròn" Click="OvalTool_Click" />
         </fluent:SplitButton>
       </fluent:RibbonGroupBox>
 
       <!-- Measure Group -->
       <fluent:RibbonGroupBox Header="Đo Đạc">
-        <!-- Hidden toggle buttons to satisfy C# code-behind field dependencies -->
-        <StackPanel Visibility="Collapsed">
-          <fluent:ToggleButton Name="MeasureDistanceToolBtn" Click="MeasureDistanceTool_Click" />
-          <fluent:ToggleButton Name="MeasureAreaToolBtn" Click="MeasureAreaTool_Click" />
-          <fluent:ToggleButton Name="MeasurePerimeterToolBtn" Click="MeasurePerimeterTool_Click" />
-        </StackPanel>
-
-        <!-- Visible DropDownButton that looks 100% like the mockup -->
-        <fluent:DropDownButton Name="MeasureDropDownBtn" Header="Đo Đạc Bản Vẽ" Size="Large" MinWidth="95" ToolTip="Công cụ tính toán kích thước dựa trên tỷ lệ bản vẽ">
-          <fluent:DropDownButton.LargeIcon>
+        <!-- Direct toggle buttons for high visibility -->
+        <fluent:ToggleButton Name="MeasureDistanceToolBtn" Header="Đo Khoảng Cách" Click="MeasureDistanceTool_Click" Size="Large" MinWidth="90" ToolTip="Đo khoảng cách thực tế giữa hai điểm bất kỳ">
+          <fluent:ToggleButton.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED5E;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
-          </fluent:DropDownButton.LargeIcon>
-          <fluent:MenuItem Header="Đo Khoảng Cách" Click="MeasureDistanceTool_Click" ToolTip="Đo khoảng cách thực tế giữa hai điểm bất kỳ"/>
-          <fluent:MenuItem Header="Đo Diện Tích" Click="MeasureAreaTool_Click" ToolTip="Đo diện tích thực tế của vùng được chọn"/>
-          <fluent:MenuItem Header="Đo Chu Vi" Click="MeasurePerimeterTool_Click" ToolTip="Đo tổng chu vi biên dạng thực tế"/>
-        </fluent:DropDownButton>
-        
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+
+        <fluent:ToggleButton Name="MeasureAreaToolBtn" Header="Đo Diện Tích" Click="MeasureAreaTool_Click" Size="Large" MinWidth="85" ToolTip="Đo diện tích thực tế của vùng được chọn">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C3;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+
+        <fluent:ToggleButton Name="MeasurePerimeterToolBtn" Header="Đo Chu Vi" Click="MeasurePerimeterTool_Click" Size="Large" MinWidth="85" ToolTip="Đo tổng chu vi biên dạng thực tế">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE81D;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+
+        <fluent:Button Name="MeasureGuideBtn" Header="Hướng Dẫn Đo" Click="MeasureGuide_Click" Size="Large" ToolTip="Xem hướng dẫn chi tiết cách thiết lập tỷ lệ và đo đạc bản vẽ">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="28" Foreground="#E29C1D" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+
         <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="8,0,4,0">
           <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7F0;" FontSize="12" Style="{StaticResource ThemeTextBlockStyle}" VerticalAlignment="Center" Margin="0,0,4,0"/>

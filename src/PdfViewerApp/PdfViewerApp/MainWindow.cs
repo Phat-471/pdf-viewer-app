@@ -1876,6 +1876,23 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 	}
 
+	private void MeasureGuide_Click(object sender, RoutedEventArgs e)
+	{
+		string guide = "HƯỚNG DẪN ĐO ĐẠC & TÍNH TOÁN TRÊN BẢN VẼ:\n\n" +
+		               "1. Thiết lập Tỷ lệ (Scale):\n" +
+		               "- Sử dụng hộp chọn 'Tỷ Lệ' để chọn tỷ lệ xích thực tế tương ứng của bản vẽ (Ví dụ: 1.30 cm tương ứng 100m thực tế).\n" +
+		               "- Hoặc thực hiện Hiệu chuẩn tỷ lệ tùy chỉnh bằng cách chọn 'Đo Khoảng Cách', vẽ một đoạn thẳng đã biết trước chiều dài thực tế, nhập khoảng cách thực tế và bấm Xác nhận để tự động tính tỷ lệ xích chính xác.\n\n" +
+		               "2. Đo Khoảng Cách (Distance):\n" +
+		               "- Chọn 'Đo Khoảng Cách', nhấp giữ chuột từ điểm bắt đầu đến điểm kết thúc rồi thả chuột. Kết quả đo thực tế sẽ hiển thị trực tiếp trên đường vẽ.\n\n" +
+		               "3. Đo Diện Tích (Area) & Đo Chu Vi (Perimeter):\n" +
+		               "- Chọn 'Đo Diện Tích' hoặc 'Đo Chu Vi'.\n" +
+		               "- Nhấp chuột lần lượt để tạo các đỉnh của đa giác.\n" +
+		               "- Để hoàn tất và đóng kín đa giác đo: Nhấp đúp chuột hoặc nhấp vào điểm đầu tiên. Kết quả sẽ tự động được tính toán và hiển thị.\n\n" +
+		               "*Lưu ý: Bạn có thể nhấn phím ESC để hủy thao tác đo hoặc thoát khỏi chế độ vẽ liên tục bất kỳ lúc nào.";
+
+		MessageBox.Show(this, guide, "Hướng Dẫn Đo Đạc Bản Vẽ", MessageBoxButton.OK, MessageBoxImage.Information);
+	}
+
 	private void HandwriteSign_Click(object sender, RoutedEventArgs e)
 	{
 		PdfDocumentTab activeTab = GetActiveTab();
@@ -3113,6 +3130,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.MeasureDistanceToolRequested += MeasureDistanceTool_Click;
 		_mainRibbon.MeasureAreaToolRequested += MeasureAreaTool_Click;
 		_mainRibbon.MeasurePerimeterToolRequested += MeasurePerimeterTool_Click;
+		_mainRibbon.MeasureGuideRequested += MeasureGuide_Click;
 		_mainRibbon.CalibrateScaleRequested += CalibrateScale_Click;
 		_mainRibbon.HandwriteSignRequested += HandwriteSign_Click;
 		_mainRibbon.StampApproveRequested += StampApprove_Click;
@@ -3230,6 +3248,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	private void AiPanel_SettingsChanged(object? sender, EventArgs e)
 	{
 		_aiSettings = ReadAiSettingsFromUi();
+		_aiSnapshotRouter = new AiSnapshotRouter(_aiSettings);
 	}
 
 	private async void AiPanel_CheckAiRequested(object? sender, EventArgs e)

@@ -1,3 +1,14 @@
-- Khắc phục lỗi lưu và áp dụng giao diện màu sắc trong cài đặt hệ thống.
-- Cập nhật định vị cửa sổ chính (MainWindow) đáng tin cậy hơn.
-- Nâng cấp phiên bản lên v1.3.3.
+- Khắc phục sự nhầm lẫn giữa công cụ vẽ tĩnh và đo đạc thực tế:
+  + Đổi tên nhóm "Công Cụ Vẽ" thành "Vẽ Hình Ghi Chú".
+  + Đổi tên các nút vẽ thành: "Vẽ Đường Thẳng", "Vẽ Chữ Nhật", "Vẽ Hình Tròn".
+- Thêm nút "Hướng Dẫn Đo" kèm hộp thoại hướng dẫn từng bước thiết lập tỷ lệ và đo đạc.
+- Cho phép sử dụng các công cụ đo đạc và ký số liên tục (continuous), nhấn ESC hoặc chọn công cụ khác để thoát.
+- Nâng cấp phiên bản lên v1.3.5.
+
+(Cập nhật từ v1.3.4):
+- Khắc phục lỗi fallback AI sang local khi chưa bật Online snapshot hoặc chưa cấu hình API key.
+- Trả về thông báo lỗi rõ ràng hướng dẫn người dùng bật 'Online snapshot' khi dùng Gemini/OpenAI.
+- Thiết kế lại giao diện tab "Đo Đạc & Ký Số":
+  + Chuyển các chức năng "Đo Khoảng Cách", "Đo Diện Tích", "Đo Chu Vi" thành các nút bấm trực tiếp có kích thước lớn và hiển thị tên rõ ràng thay vì ẩn trong dropdown.
+  + Cập nhật các icon trực quan cho công cụ đo chu vi và đo đạc.
+  + Thêm nhãn nhãn thương hiệu "Công Cụ" thụt lề 10-15% để giao diện thông thoáng hơn.

@@ -203,7 +203,7 @@
                               <Border Grid.Column="1" Height="14" Background="#1F1F45"/>
                               <Border Grid.Column="2" Height="14" CornerRadius="0,3,3,0" Background="#8B5CF6"/>
                             </Grid>
-                            <TextBlock Text="🌌 Tối" Foreground="#EDE9FE" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="🌌 Tím Mộng Mơ" Foreground="#EDE9FE" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                           </StackPanel>
                         </Border>
                         <Border Name="CheckBadge" Width="18" Height="18" CornerRadius="9" Background="#8B5CF6" BorderBrush="#161630" BorderThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-4,0" Visibility="Collapsed">

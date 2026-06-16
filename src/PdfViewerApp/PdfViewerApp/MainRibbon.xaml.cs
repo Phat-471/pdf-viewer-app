@@ -10,6 +10,17 @@ namespace PdfViewerApp;
 
 public partial class MainRibbon : UserControl
 {
+	// Dummy properties for compatibility with deleted Ribbon elements
+	public System.Windows.Controls.ComboBox? FontFamilyCombo2 => null;
+	public System.Windows.Controls.ComboBox? FontSizeCombo2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? BoldToggle2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? ItalicToggle2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? UnderlineToggle2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? StrikeToggle2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? SubscriptToggle2 => null;
+	public System.Windows.Controls.Button? FontGrowBtn2 => null;
+	public System.Windows.Controls.Button? FontShrinkBtn2 => null;
+
 	public event RoutedEventHandler? OpenPdfRequested;
 
 	public event RoutedEventHandler? SavePdfRequested;
@@ -123,6 +134,8 @@ public partial class MainRibbon : UserControl
 	public event RoutedEventHandler? MeasureAreaToolRequested;
 
 	public event RoutedEventHandler? MeasurePerimeterToolRequested;
+
+	public event RoutedEventHandler? MeasureGuideRequested;
 
 	public event RoutedEventHandler? HandwriteSignRequested;
 
@@ -653,6 +666,8 @@ public partial class MainRibbon : UserControl
 	private void MeasureAreaTool_Click(object sender, RoutedEventArgs e) => MeasureAreaToolRequested?.Invoke(this, e);
 
 	private void MeasurePerimeterTool_Click(object sender, RoutedEventArgs e) => MeasurePerimeterToolRequested?.Invoke(this, e);
+
+	private void MeasureGuide_Click(object sender, RoutedEventArgs e) => MeasureGuideRequested?.Invoke(this, e);
 
 	private void FontGrowBtn2_Click(object sender, RoutedEventArgs e)
 	{
