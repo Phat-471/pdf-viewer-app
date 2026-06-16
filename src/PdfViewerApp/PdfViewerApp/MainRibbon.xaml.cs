@@ -185,7 +185,19 @@ public partial class MainRibbon : UserControl
 		bool isDark = !theme.IsLight;
 		if (ThemeToggleIcon != null)
 		{
-			ThemeToggleIcon.Text = (isDark ? "\ue706" : "\ue708");
+			string glyph = theme.Name.ToLower() switch
+			{
+				"dark" => "\ue708",      // Moon
+				"light" => "\ue706",     // Sun
+				"midnight" => "\ue71c",  // Palette / Midnight Purple
+				"forest" => "\ue70e",    // Leaf / Green Forest
+				"sunset" => "\ue78a",    // Sunrise/Sunset
+				"ocean" => "\ue9a1",     // Wave/Water
+				"sakura" => "\uea1f",    // Heart / Pink Sakura
+				"mint" => "\uecc5",      // Mint / Eco Leaf
+				_ => "\ue771"            // Default Color Palette
+			};
+			ThemeToggleIcon.Text = glyph;
 			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
 		}
 
