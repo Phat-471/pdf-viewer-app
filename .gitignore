@@ -37,3 +37,8 @@ libs/pdf_core.dll
 
 # Explicitly keep pdfium.dll as it is a third-party dependency
 !libs/pdfium.dll
+
+# Old/Temp build folders
+obj_old/
+bin_old/
+

@@ -226,6 +226,28 @@
           </fluent:Button.LargeIcon>
         </fluent:Button>
       </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Tiện Ích &amp; Bảo Mật">
+        <fluent:Button Name="WatermarkBtn" Header="Đóng Dấu" Margin="8,0,8,0" Click="Watermark_Click" ToolTip="Thêm nhãn chữ mờ hoặc bản quyền vào PDF (Watermark)">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE91C;" FontSize="32" Foreground="#14B8A6" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="PageNumberingBtn" Header="Đánh Số Trang" Margin="8,0,8,0" Click="PageNumbering_Click" ToolTip="Tự động đánh số trang toàn bộ tài liệu PDF">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xF12D;" FontSize="32" Foreground="#0EA5E9" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="ExtractImagesBtn2" Header="Trích Xuất Ảnh" Margin="8,0,8,0" Click="ExtractImages_Click" ToolTip="Trích xuất tất cả hình ảnh trong PDF ra thư mục">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9F;" FontSize="32" Foreground="#34D399" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="PdfSecurityBtn" Header="Bảo Mật PDF" Margin="8,0,8,0" Click="PdfSecurity_Click" ToolTip="Cài mật khẩu và thiết lập quyền hạn cho PDF">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72E;" FontSize="32" Foreground="#EF4444" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+      </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Chú Thích &amp; AI">
       <fluent:RibbonGroupBox Header="Công Cụ Vẽ &amp; Hình Học">

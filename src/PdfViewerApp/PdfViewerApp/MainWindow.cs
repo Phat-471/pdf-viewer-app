@@ -1605,6 +1605,86 @@ exit 0
 		}
 	}
 
+	private void Watermark_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				MessageBox.Show("Vui lòng mở một file PDF cần đóng dấu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			WatermarkDialog dialog = new WatermarkDialog(activeTab.CurrentPdfPath);
+			dialog.Owner = this;
+			if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.WatermarkedPdfPath))
+			{
+				activeTab.LoadDocument(dialog.WatermarkedPdfPath);
+				LogStatus("Đóng dấu watermark PDF thành công.");
+			}
+		}
+	}
+
+	private void PageNumbering_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				MessageBox.Show("Vui lòng mở một file PDF cần đánh số trang.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			PageNumberingDialog dialog = new PageNumberingDialog(activeTab.CurrentPdfPath);
+			dialog.Owner = this;
+			if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.NumberedPdfPath))
+			{
+				activeTab.LoadDocument(dialog.NumberedPdfPath);
+				LogStatus("Đánh số trang PDF thành công.");
+			}
+		}
+	}
+
+	private void ExtractImages_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				MessageBox.Show("Vui lòng mở một file PDF cần trích xuất hình ảnh.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			ExtractImagesDialog dialog = new ExtractImagesDialog(activeTab.CurrentPdfPath);
+			dialog.Owner = this;
+			dialog.ShowDialog();
+		}
+	}
+
+	private void PdfSecurity_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath))
+			{
+				MessageBox.Show("Vui lòng mở một file PDF cần cài đặt bảo mật.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			PdfSecurityDialog dialog = new PdfSecurityDialog(activeTab.CurrentPdfPath);
+			dialog.Owner = this;
+			if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.SecuredPdfPath))
+			{
+				activeTab.LoadDocument(dialog.SecuredPdfPath);
+				LogStatus("Bảo mật PDF thành công.");
+			}
+		}
+	}
+
 	private void Exit_Click(object sender, RoutedEventArgs e)
 	{
 		Application.Current.Shutdown();
@@ -3095,6 +3175,10 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
 		_mainRibbon.ComparePdfsRequested += ComparePdfs_Click;
 		_mainRibbon.CompressPdfRequested += CompressPdf_Click;
+		_mainRibbon.WatermarkRequested += Watermark_Click;
+		_mainRibbon.PageNumberingRequested += PageNumbering_Click;
+		_mainRibbon.ExtractImagesRequested += ExtractImages_Click;
+		_mainRibbon.PdfSecurityRequested += PdfSecurity_Click;
 		_mainRibbon.ExitRequested += Exit_Click;
 		_mainRibbon.PrintPdfRequested += PrintPdf_Click;
 		_mainRibbon.BatchPrintRequested += BatchPrint_Click;

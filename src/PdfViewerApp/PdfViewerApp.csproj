@@ -31,4 +31,7 @@
       <HintPath>ControlzEx.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="PdfSharp" Version="6.1.1" />
+  </ItemGroup>
 </Project>

@@ -1,0 +1,160 @@
+<Window x:Class="PdfViewerApp.PageNumberingDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Đánh Số Trang Tự Động" Height="420" Width="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0F172A">
+    <Window.Resources>
+        <!-- Custom Styles for Premium UI -->
+        <Style TargetType="Button" x:Key="ModernButton">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#334155"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="TextBlock" x:Key="LabelStyle">
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style TargetType="TextBox" x:Key="ModernTextBox">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Name="Border" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                            <ScrollViewer Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox" x:Key="ModernComboBox">
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <!-- Title -->
+            <RowDefinition Height="Auto"/>
+            <!-- Settings panel -->
+            <RowDefinition Height="*"/>
+            <!-- Actions -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,15">
+            <TextBlock Text="ĐÁNH SỐ TRANG TỰ ĐỘNG" Foreground="#F8FAFC" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="Cấu hình mẫu định dạng và vị trí để tự động đánh số trang toàn bộ tài liệu." Foreground="#94A3B8" FontSize="12" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <!-- Content Panel -->
+        <Border Grid.Row="1" Background="#1E293B" CornerRadius="8" Padding="15" BorderBrush="#334155" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Format string -->
+                <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+                    <TextBlock Text="Định dạng số trang ({n} = số trang hiện tại, {total} = tổng số trang):" Style="{StaticResource LabelStyle}"/>
+                    <TextBox x:Name="FormatTextBox" Style="{StaticResource ModernTextBox}" Text="Trang {n} / {total}" Height="32"/>
+                </StackPanel>
+
+                <!-- Position Selection -->
+                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,12">
+                    <TextBlock Text="Vị trí hiển thị số trang:" Style="{StaticResource LabelStyle}"/>
+                    <ComboBox x:Name="PositionComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0" Height="32">
+                        <ComboBoxItem Content="Dưới - Chính Giữa" Tag="0"/>
+                        <ComboBoxItem Content="Dưới - Góc Trái" Tag="1"/>
+                        <ComboBoxItem Content="Dưới - Góc Phải" Tag="2"/>
+                        <ComboBoxItem Content="Trên - Chính Giữa" Tag="3"/>
+                        <ComboBoxItem Content="Trên - Góc Trái" Tag="4"/>
+                        <ComboBoxItem Content="Trên - Góc Phải" Tag="5"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Font size slider -->
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,12">
+                    <TextBlock Text="Cỡ chữ (Font Size):" Style="{StaticResource LabelStyle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="FontSizeSlider" Minimum="8" Maximum="28" Value="10" TickFrequency="1" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding ElementName=FontSizeSlider, Path=Value, StringFormat={}{0:F0} pt}" Foreground="#38BDF8" Width="50" Margin="8,0,0,0" TextAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Color Selection -->
+                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,12">
+                    <TextBlock Text="Màu sắc chữ:" Style="{StaticResource LabelStyle}"/>
+                    <ComboBox x:Name="ColorComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="3" Height="32">
+                        <ComboBoxItem Content="Đỏ (Red)" Tag="#EF4444"/>
+                        <ComboBoxItem Content="Xanh Dương (Blue)" Tag="#3B82F6"/>
+                        <ComboBoxItem Content="Xanh Lá (Green)" Tag="#10B981"/>
+                        <ComboBoxItem Content="Đen (Black)" Tag="#000000"/>
+                        <ComboBoxItem Content="Xám (Gray)" Tag="#6B7280"/>
+                        <ComboBoxItem Content="Vàng (Yellow)" Tag="#F59E0B"/>
+                    </ComboBox>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Action Buttons -->
+        <Grid Grid.Row="2" Margin="0,15,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Name="StatusTextBlock" Text="Sẵn sàng đánh số trang." Foreground="#94A3B8" VerticalAlignment="Center" TextWrapping="Wrap" Grid.Column="0" Margin="0,0,10,0"/>
+
+            <StackPanel Orientation="Horizontal" Grid.Column="1" HorizontalAlignment="Right">
+                <Button Name="CancelBtn" Style="{StaticResource ModernButton}" Content="Hủy" Click="Cancel_Click" Background="#475569" Margin="0,0,8,0"/>
+                <Button Name="ApplyBtn" Style="{StaticResource ModernButton}" Content="Đánh Số Trang" Click="Apply_Click" Background="#0EA5E9"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

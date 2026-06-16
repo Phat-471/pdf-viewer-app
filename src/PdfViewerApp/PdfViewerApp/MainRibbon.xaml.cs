@@ -63,6 +63,14 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? CompressPdfRequested;
 
+	public event RoutedEventHandler? WatermarkRequested;
+
+	public event RoutedEventHandler? PageNumberingRequested;
+
+	public event RoutedEventHandler? ExtractImagesRequested;
+
+	public event RoutedEventHandler? PdfSecurityRequested;
+
 	public event RoutedEventHandler? RotateLeftRequested;
 
 	public event RoutedEventHandler? RotateLeftAllRequested;
@@ -530,6 +538,14 @@ public partial class MainRibbon : UserControl
 	private void ComparePdfs_Click(object sender, RoutedEventArgs e) => ComparePdfsRequested?.Invoke(this, e);
 
 	private void CompressPdf_Click(object sender, RoutedEventArgs e) => CompressPdfRequested?.Invoke(this, e);
+
+	private void Watermark_Click(object sender, RoutedEventArgs e) => WatermarkRequested?.Invoke(this, e);
+
+	private void PageNumbering_Click(object sender, RoutedEventArgs e) => PageNumberingRequested?.Invoke(this, e);
+
+	private void ExtractImages_Click(object sender, RoutedEventArgs e) => ExtractImagesRequested?.Invoke(this, e);
+
+	private void PdfSecurity_Click(object sender, RoutedEventArgs e) => PdfSecurityRequested?.Invoke(this, e);
 
 	private void RotateLeft_Click(object sender, RoutedEventArgs e) => RotateLeftRequested?.Invoke(this, e);
 

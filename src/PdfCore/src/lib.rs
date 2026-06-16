@@ -822,3 +822,355 @@ pub extern "C" fn compress_pdf(
 
     doc.save(output_str).is_ok()
 }
+
+#[no_mangle]
+pub extern "C" fn add_pdf_watermark(
+    pdf_path: *const c_char,
+    text: *const c_char,
+    angle: f64,
+    opacity: f64,
+    font_size: f64,
+    r: f64,
+    g: f64,
+    b: f64,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let text_str = match to_str(text) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // Create Font resource
+    let mut font_dict = Dictionary::new();
+    font_dict.set("Type", Object::Name("Font".as_bytes().to_vec()));
+    font_dict.set("Subtype", Object::Name("Type1".as_bytes().to_vec()));
+    font_dict.set("BaseFont", Object::Name("Helvetica-Bold".as_bytes().to_vec()));
+    let font_id = doc.add_object(Object::Dictionary(font_dict));
+
+    // Create ExtGState resource for opacity
+    let mut gs_dict = Dictionary::new();
+    gs_dict.set("Type", Object::Name("ExtGState".as_bytes().to_vec()));
+    gs_dict.set("ca", Object::Real(opacity as f32));
+    gs_dict.set("CA", Object::Real(opacity as f32));
+    let gs_id = doc.add_object(Object::Dictionary(gs_dict));
+
+    let pages = doc.get_pages();
+    for (_page_num, page_id) in pages {
+        let mut width = 595.0f64;
+        let mut height = 842.0f64;
+        if let Ok(Object::Dictionary(ref page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Array(ref mb)) = page_dict.get(b"MediaBox") {
+                if mb.len() >= 4 {
+                    let x1 = mb[0].as_float().unwrap_or(0.0) as f64;
+                    let y1 = mb[1].as_float().unwrap_or(0.0) as f64;
+                    let x2 = mb[2].as_float().unwrap_or(595.0) as f64;
+                    let y2 = mb[3].as_float().unwrap_or(842.0) as f64;
+                    width = (x2 - x1).abs();
+                    height = (y2 - y1).abs();
+                }
+            }
+        }
+
+        let angle_rad = angle.to_radians();
+        let cos_a = angle_rad.cos();
+        let sin_a = angle_rad.sin();
+
+        let text_width_approx = text_str.len() as f64 * font_size * 0.28;
+        let tx = (width / 2.0) - (text_width_approx * cos_a / 2.0) + (font_size * sin_a / 4.0);
+        let ty = (height / 2.0) - (text_width_approx * sin_a / 2.0) - (font_size * cos_a / 4.0);
+
+        let escaped_text = text_str.replace('(', "\\(").replace(')', "\\)");
+        let watermark_content = format!(
+            "q\n/GS_Watermark gs\nBT\n/F_Watermark {:.1} Tf\n{:.2} {:.2} {:.2} rg\n{:.4} {:.4} {:.4} {:.4} {:.2} {:.2} Tm\n({}) Tj\nET\nQ\n",
+            font_size, r, g, b, cos_a, sin_a, -sin_a, cos_a, tx, ty, escaped_text
+        );
+
+        let stream = lopdf::Stream::new(Dictionary::new(), watermark_content.into_bytes());
+        let stream_id = doc.add_object(Object::Stream(stream));
+
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            if !page_dict.has(b"Resources") {
+                page_dict.set("Resources", Object::Dictionary(Dictionary::new()));
+            }
+        }
+
+        let mut resources_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Resources") {
+                resources_ref_id = Some(*ref_id);
+            }
+        }
+
+        let resources_target_id = resources_ref_id.unwrap_or(page_id);
+
+        if let Ok(Object::Dictionary(ref mut res_dict)) = doc.get_object_mut(resources_target_id) {
+            let dict = if resources_ref_id.is_some() {
+                res_dict
+            } else {
+                res_dict.get_mut(b"Resources").unwrap().as_dict_mut().unwrap()
+            };
+
+            if !dict.has(b"Font") {
+                dict.set("Font", Object::Dictionary(Dictionary::new()));
+            }
+            if let Ok(ref mut font_res_dict) = dict.get_mut(b"Font").and_then(|o| o.as_dict_mut()) {
+                font_res_dict.set("F_Watermark", Object::Reference(font_id));
+            }
+
+            if !dict.has(b"ExtGState") {
+                dict.set("ExtGState", Object::Dictionary(Dictionary::new()));
+            }
+            if let Ok(ref mut gs_res_dict) = dict.get_mut(b"ExtGState").and_then(|o| o.as_dict_mut()) {
+                gs_res_dict.set("GS_Watermark", Object::Reference(gs_id));
+            }
+        }
+
+        let mut contents_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Contents") {
+                contents_ref_id = Some(*ref_id);
+            }
+        }
+
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            match page_dict.get(b"Contents") {
+                Ok(Object::Array(arr)) => {
+                    let mut new_arr = arr.clone();
+                    new_arr.push(Object::Reference(stream_id));
+                    page_dict.set("Contents", Object::Array(new_arr));
+                }
+                Ok(Object::Reference(_)) => {
+                    if let Some(ref_id) = contents_ref_id {
+                        page_dict.set("Contents", Object::Array(vec![
+                            Object::Reference(ref_id),
+                            Object::Reference(stream_id),
+                        ]));
+                    }
+                }
+                _ => {
+                    page_dict.set("Contents", Object::Reference(stream_id));
+                }
+            }
+        }
+    }
+
+    doc.save(output_str).is_ok()
+}
+
+#[no_mangle]
+pub extern "C" fn add_pdf_page_numbers(
+    pdf_path: *const c_char,
+    format_str: *const c_char,
+    position: i32,
+    font_size: f64,
+    r: f64,
+    g: f64,
+    b: f64,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let fmt_str = match to_str(format_str) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    let mut font_dict = Dictionary::new();
+    font_dict.set("Type", Object::Name("Font".as_bytes().to_vec()));
+    font_dict.set("Subtype", Object::Name("Type1".as_bytes().to_vec()));
+    font_dict.set("BaseFont", Object::Name("Helvetica".as_bytes().to_vec()));
+    let font_id = doc.add_object(Object::Dictionary(font_dict));
+
+    let pages = doc.get_pages();
+    let total_pages = pages.len();
+
+    for (page_idx, page_id) in pages.iter().map(|(&num, &id)| (num as usize, id)) {
+        let mut width = 595.0f64;
+        let mut height = 842.0f64;
+        if let Ok(Object::Dictionary(ref page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Array(ref mb)) = page_dict.get(b"MediaBox") {
+                if mb.len() >= 4 {
+                    let x1 = mb[0].as_float().unwrap_or(0.0) as f64;
+                    let y1 = mb[1].as_float().unwrap_or(0.0) as f64;
+                    let x2 = mb[2].as_float().unwrap_or(595.0) as f64;
+                    let y2 = mb[3].as_float().unwrap_or(842.0) as f64;
+                    width = (x2 - x1).abs();
+                    height = (y2 - y1).abs();
+                }
+            }
+        }
+
+        let label = fmt_str
+            .replace("{n}", &page_idx.to_string())
+            .replace("{total}", &total_pages.to_string());
+
+        let text_width_approx = label.len() as f64 * font_size * 0.28;
+
+        let (tx, ty) = match position {
+            1 => (50.0, 30.0), // Bottom Left
+            2 => (width - 50.0 - text_width_approx, 30.0), // Bottom Right
+            3 => (width / 2.0 - text_width_approx / 2.0, height - 40.0), // Top Center
+            4 => (50.0, height - 40.0), // Top Left
+            5 => (width - 50.0 - text_width_approx, height - 40.0), // Top Right
+            _ => (width / 2.0 - text_width_approx / 2.0, 30.0), // Bottom Center
+        };
+
+        let escaped_text = label.replace('(', "\\(").replace(')', "\\)");
+        let numbering_content = format!(
+            "q\nBT\n/F_Num {:.1} Tf\n{:.2} {:.2} {:.2} rg\n1 0 0 1 {:.2} {:.2} Tm\n({}) Tj\nET\nQ\n",
+            font_size, r, g, b, tx, ty, escaped_text
+        );
+
+        let stream = lopdf::Stream::new(Dictionary::new(), numbering_content.into_bytes());
+        let stream_id = doc.add_object(Object::Stream(stream));
+
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            if !page_dict.has(b"Resources") {
+                page_dict.set("Resources", Object::Dictionary(Dictionary::new()));
+            }
+        }
+
+        let mut resources_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Resources") {
+                resources_ref_id = Some(*ref_id);
+            }
+        }
+
+        let resources_target_id = resources_ref_id.unwrap_or(page_id);
+
+        if let Ok(Object::Dictionary(ref mut res_dict)) = doc.get_object_mut(resources_target_id) {
+            let dict = if resources_ref_id.is_some() {
+                res_dict
+            } else {
+                res_dict.get_mut(b"Resources").unwrap().as_dict_mut().unwrap()
+            };
+
+            if !dict.has(b"Font") {
+                dict.set("Font", Object::Dictionary(Dictionary::new()));
+            }
+            if let Ok(ref mut font_res_dict) = dict.get_mut(b"Font").and_then(|o| o.as_dict_mut()) {
+                font_res_dict.set("F_Num", Object::Reference(font_id));
+            }
+        }
+
+        let mut contents_ref_id = None;
+        if let Ok(Object::Dictionary(page_dict)) = doc.get_object(page_id) {
+            if let Ok(Object::Reference(ref_id)) = page_dict.get(b"Contents") {
+                contents_ref_id = Some(*ref_id);
+            }
+        }
+
+        if let Ok(Object::Dictionary(ref mut page_dict)) = doc.get_object_mut(page_id) {
+            match page_dict.get(b"Contents") {
+                Ok(Object::Array(arr)) => {
+                    let mut new_arr = arr.clone();
+                    new_arr.push(Object::Reference(stream_id));
+                    page_dict.set("Contents", Object::Array(new_arr));
+                }
+                Ok(Object::Reference(_)) => {
+                    if let Some(ref_id) = contents_ref_id {
+                        page_dict.set("Contents", Object::Array(vec![
+                            Object::Reference(ref_id),
+                            Object::Reference(stream_id),
+                        ]));
+                    }
+                }
+                _ => {
+                    page_dict.set("Contents", Object::Reference(stream_id));
+                }
+            }
+        }
+    }
+
+    doc.save(output_str).is_ok()
+}
+
+#[no_mangle]
+pub extern "C" fn extract_pdf_images(
+    pdf_path: *const c_char,
+    output_dir: *const c_char,
+) -> i32 {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return -1,
+    };
+    let out_dir_str = match to_str(output_dir) {
+        Some(s) => s,
+        None => return -1,
+    };
+
+    let doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return -2,
+    };
+
+    let mut image_count = 0;
+    for (_id, object) in doc.objects.iter() {
+        if let Ok(stream) = object.as_stream() {
+            let is_image = stream.dict.get(b"Subtype").ok()
+                .and_then(|o| o.as_name().ok())
+                .map(|n| n == b"Image")
+                .unwrap_or(false);
+            if !is_image {
+                continue;
+            }
+
+            let width = stream.dict.get(b"Width").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
+            let height = stream.dict.get(b"Height").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
+            if width == 0 || height == 0 {
+                continue;
+            }
+
+            image_count += 1;
+            let filter = stream.dict.get(b"Filter").ok().and_then(|o| o.as_name().ok()).unwrap_or(&[]);
+            
+            if filter == b"DCTDecode" {
+                let raw_bytes = &stream.content;
+                let file_name = format!("img_{:03}.jpg", image_count);
+                let out_path = std::path::Path::new(out_dir_str).join(file_name);
+                if std::fs::write(out_path, raw_bytes).is_ok() {
+                    continue;
+                }
+            }
+
+            if let Ok(decompressed) = stream.decompressed_content() {
+                let file_name = format!("img_{:03}.png", image_count);
+                let out_path = std::path::Path::new(out_dir_str).join(file_name);
+
+                let color_space = stream.dict.get(b"ColorSpace").ok().and_then(|o| o.as_name().ok()).unwrap_or(&[]);
+                if color_space == b"DeviceRGB" && decompressed.len() == (width * height * 3) as usize {
+                    let _ = image::save_buffer(&out_path, &decompressed, width, height, image::ColorType::Rgb8);
+                } else if color_space == b"DeviceGray" && decompressed.len() == (width * height) as usize {
+                    let _ = image::save_buffer(&out_path, &decompressed, width, height, image::ColorType::L8);
+                }
+            }
+        }
+    }
+
+    image_count
+}
