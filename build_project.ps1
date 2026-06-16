@@ -51,7 +51,10 @@ if (-not (Test-Path $wpfBin)) {
     New-Item -ItemType Directory -Path $wpfBin -Force | Out-Null
 }
 Copy-Item $dllSrc -Destination (Join-Path $wpfBin "pdf_core.dll") -Force
-Write-Host "    Da sao chep pdf_core.dll vao thu muc dau ra cua C# WPF!" -ForegroundColor Green
+if (Test-Path (Join-Path $scriptDir "libs\pdfium.dll")) {
+    Copy-Item (Join-Path $scriptDir "libs\pdfium.dll") -Destination (Join-Path $wpfBin "pdfium.dll") -Force
+}
+Write-Host "    Da sao chep pdf_core.dll va pdfium.dll vao thu muc dau ra cua C# WPF!" -ForegroundColor Green
 
 # 3. Build WPF Application in Release mode
 Write-Host "`n[3/3] Bien dich ung dung WPF (C#)..." -ForegroundColor Yellow

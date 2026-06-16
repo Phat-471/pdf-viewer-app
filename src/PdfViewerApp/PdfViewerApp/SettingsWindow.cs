@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -96,7 +97,8 @@ public partial class SettingsWindow : Window, IComponentConnector
 		{
 			_selectedThemeName = tagName;
 			// Preview ngay lập tức để người dùng thấy kết quả trước khi nhấn Lưu
-			if (Application.Current.MainWindow is MainWindow mainWindow)
+			var mainWindow = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+			if (mainWindow != null)
 			{
 				mainWindow.PreviewTheme(tagName);
 			}
@@ -156,7 +158,8 @@ public partial class SettingsWindow : Window, IComponentConnector
 		_aiSettings.GeminiModel = string.IsNullOrWhiteSpace(geminiModel) ? "gemini-3.5-flash" : geminiModel.Trim();
 		_aiSettings.Save();
 
-		if (Application.Current.MainWindow is MainWindow mainWindow)
+		var mainWindow = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+		if (mainWindow != null)
 		{
 			mainWindow.UpdatePreferences(_selectedThemeName, allowInstances, ocrLang);
 			mainWindow.ReloadAiSettings();

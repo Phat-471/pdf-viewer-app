@@ -95,6 +95,7 @@ public partial class App : Application
 					await Dispatcher.Yield(DispatcherPriority.Background);
 					PdfiumEngine.Initialize();
 					MainWindow mainWindow = new MainWindow();
+					Application.Current.MainWindow = mainWindow;
 					mainWindow.Show();
 					splashWindow.Close();
 					if (launchNewInstance && args.Length > 0)
@@ -220,6 +221,7 @@ public partial class App : Application
 				PdfiumEngine.Initialize();
 				PdfViewerApp.MainWindow.SkipStartupMergeArgs = true;
 				MainWindow mainWindow = new MainWindow();
+				Application.Current.MainWindow = mainWindow;
 				mainWindow.Show();
 				splashWindow.Close();
 				mainWindow.OpenPdfTab(outputPath);

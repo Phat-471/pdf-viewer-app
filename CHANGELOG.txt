@@ -1,4 +1,3 @@
-- Hoàn thiện tính năng đo Chu vi (Perimeter Measurement) trên bản vẽ thiết kế.
-- Tính toán tổng độ dài của các đường gấp khúc nhiều điểm dựa trên tỷ lệ xích thực tế.
-- Khắc phục lỗi và tối ưu hiệu suất vẽ các đối tượng đo đạc.
-- Nâng cấp phiên bản lên v1.3.2.
+- Khắc phục lỗi lưu và áp dụng giao diện màu sắc trong cài đặt hệ thống.
+- Cập nhật định vị cửa sổ chính (MainWindow) đáng tin cậy hơn.
+- Nâng cấp phiên bản lên v1.3.3.
