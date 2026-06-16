@@ -665,7 +665,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			canvas.Children.Add(_tempLine);
 			e.Handled = true;
 		}
-		else if (ActiveTool == "MeasureArea")
+		else if (ActiveTool == "MeasureArea" || ActiveTool == "MeasurePerimeter")
 		{
 			Point position = e.GetPosition(canvas);
 			if (_pendingAreaAnnotation == null || _activeCanvas != canvas)
@@ -674,7 +674,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_pendingAreaAnnotation = new PdfMeasurementAnnotation
 				{
 					PageIndex = num - 1,
-					MeasurementType = "Area",
+					MeasurementType = ActiveTool == "MeasureArea" ? "Area" : "Perimeter",
 					Scale = CurrentMeasurementScale,
 					StrokeColor = ActiveStrokeColor,
 					Thickness = 2.0
@@ -842,7 +842,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_tempLine.X2 = position6.X;
 				_tempLine.Y2 = position6.Y;
 			}
-			else if (ActiveTool == "MeasureArea" && _pendingAreaAnnotation != null)
+			else if ((ActiveTool == "MeasureArea" || ActiveTool == "MeasurePerimeter") && _pendingAreaAnnotation != null)
 			{
 				int ptCount = _pendingAreaAnnotation.Points.Count;
 				if (ptCount >= 2)
@@ -898,7 +898,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				return;
 			}
-			if (ActiveTool == "MeasureArea")
+			if (ActiveTool == "MeasureArea" || ActiveTool == "MeasurePerimeter")
 			{
 				return;
 			}
@@ -6756,6 +6756,50 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						string labelText = $"{areaSqm:F2} m²";
 						Border labelBorder = CreateMeasurementLabel(labelText, pdfMeasurementAnnotation.StrokeColor);
 						Canvas.SetLeft(labelBorder, cx - 40.0);
+						Canvas.SetTop(labelBorder, cy - 12.0);
+						canvas.Children.Add(labelBorder);
+					}
+					else if (pdfMeasurementAnnotation.MeasurementType == "Perimeter" && pdfMeasurementAnnotation.Points.Count >= 2)
+					{
+						Polyline polyline = new Polyline
+						{
+							Stroke = new SolidColorBrush(pdfMeasurementAnnotation.StrokeColor),
+							StrokeThickness = pdfMeasurementAnnotation.Thickness,
+							Opacity = pdfMeasurementAnnotation.Opacity,
+							Tag = pdfMeasurementAnnotation
+						};
+						foreach (var pt in pdfMeasurementAnnotation.Points)
+						{
+							polyline.Points.Add(new Point(pt.X * canvas.Width, pt.Y * canvas.Height));
+						}
+						canvas.Children.Add(polyline);
+
+						Size pageSize = _pageDimensions[pageNumber - 1];
+						double totalLengthMm = 0.0;
+						for (int i = 0; i < pdfMeasurementAnnotation.Points.Count - 1; i++)
+						{
+							Point pt1 = pdfMeasurementAnnotation.Points[i];
+							Point pt2 = pdfMeasurementAnnotation.Points[i + 1];
+							double dxPoints = (pt2.X - pt1.X) * pageSize.Width;
+							double dyPoints = (pt2.Y - pt1.Y) * pageSize.Height;
+							double distPoints = Math.Sqrt(dxPoints * dxPoints + dyPoints * dyPoints);
+							double distMm = (distPoints / 72.0) * 25.4;
+							totalLengthMm += distMm;
+						}
+						double realMeters = (totalLengthMm / 1000.0) * pdfMeasurementAnnotation.Scale;
+
+						double cx = 0, cy = 0;
+						foreach (var pt in polyline.Points)
+						{
+							cx += pt.X;
+							cy += pt.Y;
+						}
+						cx /= polyline.Points.Count;
+						cy /= polyline.Points.Count;
+
+						string labelText = $"{realMeters:F2} m";
+						Border labelBorder = CreateMeasurementLabel(labelText, pdfMeasurementAnnotation.StrokeColor);
+						Canvas.SetLeft(labelBorder, cx - 30.0);
 						Canvas.SetTop(labelBorder, cy - 12.0);
 						canvas.Children.Add(labelBorder);
 					}

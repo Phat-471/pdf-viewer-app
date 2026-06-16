@@ -1,3 +1,4 @@
-- Khắc phục lỗi trình cài đặt xóa mất file bản quyền và cấu hình cá nhân khi cập nhật.
-- Bảo toàn các file *.json (key kích hoạt, cài đặt giao diện, danh sách file gần đây) khi nâng cấp ứng dụng.
-- Nâng cấp phiên bản lên v1.3.1.
+- Hoàn thiện tính năng đo Chu vi (Perimeter Measurement) trên bản vẽ thiết kế.
+- Tính toán tổng độ dài của các đường gấp khúc nhiều điểm dựa trên tỷ lệ xích thực tế.
+- Khắc phục lỗi và tối ưu hiệu suất vẽ các đối tượng đo đạc.
+- Nâng cấp phiên bản lên v1.3.2.

@@ -1868,7 +1868,12 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 
 	private void MeasurePerimeterTool_Click(object sender, RoutedEventArgs e)
 	{
-		MessageBox.Show("Tính năng Đo Chu vi (Perimeter Measurement) đang được phát triển và sẽ sớm cập nhật trong phiên bản tiếp theo.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "MeasurePerimeter";
+			activeTab.CurrentMeasurementScale = _mainRibbon.GetMeasurementScale();
+		}
 	}
 
 	private void HandwriteSign_Click(object sender, RoutedEventArgs e)
