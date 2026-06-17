@@ -1,6 +1,14 @@
-- Khắc phục lỗi in hàng loạt đối với tệp nặng:
-  + Tự động tải số trang của tệp nguồn ngay trước khi in nếu chưa tải xong, đảm bảo in đầy đủ toàn bộ trang.
-  + Tối ưu hóa lock PDFium để luồng in và luồng tải trang chạy bất đồng bộ mượt mà, tránh nghẽn luồng.
-- Tối ưu hóa hiệu năng và độ ổn định hệ thống (Thread-Safety):
-  + Đồng bộ toàn bộ các cổng gọi hàm native PDFium (P/Invoke) qua lớp trung gian an toàn trong ứng dụng.
-  + Loại bỏ hoàn toàn nguy cơ tranh chấp tài nguyên (race condition) và lỗi truy cập bộ nhớ (access violation) khi thao tác tài liệu trên nhiều cửa sổ hoặc khi prefetch trang chạy ngầm.
+- Nâng cấp bảo mật toàn diện hệ thống bản quyền:
+  + Xóa hoàn toàn Private Key RSA khỏi mã nguồn plugin WordPress — thay bằng sinh key động qua OpenSSL.
+  + Xóa master key bypass (PDFPRO-3A03-3629-06B1-D3AF-2018) trong ứng dụng client.
+  + Cập nhật Public Key RSA mới cho ứng dụng client, đồng bộ với server mới.
+- Thêm Rate Limiting cho API bản quyền:
+  + Giới hạn 5 lần kích hoạt / phút / IP cho endpoint /activate.
+  + Giới hạn 20 lần kiểm tra / phút / IP cho endpoint /check.
+  + Giới hạn 10 lần báo lỗi / phút / IP cho endpoint /report-error.
+  + Trả về HTTP 429 (Too Many Requests) khi vượt giới hạn.
+- Tăng cường bảo mật API:
+  + Sử dụng hash_equals() thay vì so sánh chuỗi thông thường cho token xác thực (chống timing attack).
+  + Thêm file index.php vào thư mục keys/ để chặn directory listing.
+  + Thiết lập quyền file chmod 0600 cho private key trên server.
+- Cập nhật plugin WordPress lên phiên bản 1.1.0.
