@@ -21,7 +21,7 @@ internal static class ActivationLicense
 
 	private const string ActivationSecret = "HPhat.PdfPro.LocalActivation.2026";
 
-	private const string PublicRsaKeyPem = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsMarB9tddpmBY+nmx+L+\na/5c80QBGGkCNvha3Sspp9KpByUOS9icQLm/t8qiDsCBz7hkxpRR5U9oWWyLcxOW\n6plbOTjNUoAa+rG/45GmIJMASOn9DQvWAVzE856CrgMVvESOg3CMdQHBOFE960lW\nHZ6nCG1ebfWLOeH+pf06RhfyX4cV+G/MpGwt1tGZrOGWZae9X6HKpghJ6bid4jPe\nqUlwA4S2jq7xf8+DLGYeTOpIow1ESoGFxaodBPAjYWystsIBpLD9IbRdtVQOUWMw\nZKGGQ4Yy2G3NDY0K3/5qdzIvxl6aUh/hmefn38lhC5OCGBFBexejhO+tORVgFcNL\n/wIDAQAB\n-----END PUBLIC KEY-----";
+	private const string PublicRsaKeyPem = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv3TlzRt2HaxKlM5To13H\nukhl/2G8koY7Umq9CgRGzi7sxwk9x9bAhvJOzyatV3sahF8nOI4uIR9R7xGRDDvU\nQzWbhV5EvzgN4KSPBMRyuDYJidxKmJh0WrLI3dqs82caFWVkw5Y1xLLJeKt8roXa\njTL9xm7JHEMxqUftQDrKTC386EdT1GuVsXfFpXZgSxCfflqh2VWegE6fvlyVvzXI\nWdEF42IX9JWRs4Yiyw2q4vsGMg7lzu3cs2PxgQDv8JtWjAhvJaNoyNJPdw42bWFj\nESdNUBSS2AmkMtXzw5HGJ2FtFyuGIQaMsDcVcX/UofSl70CJ+piITQBb7F/qXMdN\n8wIDAQAB\n-----END PUBLIC KEY-----";
 
 	private const string PublicKeyCacheFileName = "public_key.pem";
 
@@ -290,12 +290,7 @@ internal static class ActivationLicense
 	{
 		string a = NormalizeKey(activationKey);
 		string b = NormalizeKey(GenerateActivationKeyForMachine(machineId));
-		string b2 = NormalizeKey("PDFPRO-3A03-3629-06B1-D3AF-2018");
-		if (!string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
-		{
-			return string.Equals(a, b2, StringComparison.OrdinalIgnoreCase);
-		}
-		return true;
+		return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static ActivationRecord? LoadRecord()

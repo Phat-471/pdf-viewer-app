@@ -7,6 +7,37 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Rate Limiting: Giới hạn số lần gọi API từ cùng một IP.
+ * Sử dụng WordPress transients để lưu trữ bộ đếm.
+ *
+ * @param string $action   Tên hành động (ví dụ: 'activate', 'check')
+ * @param int    $max      Số lần tối đa cho phép trong khoảng thời gian
+ * @param int    $window   Khoảng thời gian tính bằng giây
+ * @return bool|WP_Error   True nếu cho phép, WP_Error nếu vượt giới hạn
+ */
+function pdfpro_licensing_check_rate_limit($action, $max = 10, $window = 60) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $key = 'pdfpro_rl_' . md5($action . '|' . $ip);
+    $current = get_transient($key);
+
+    if ($current === false) {
+        set_transient($key, 1, $window);
+        return true;
+    }
+
+    if ((int) $current >= $max) {
+        return new WP_Error(
+            'rate_limited',
+            'Quá nhiều yêu cầu. Vui lòng thử lại sau ' . $window . ' giây.',
+            array('status' => 429)
+        );
+    }
+
+    set_transient($key, (int) $current + 1, $window);
+    return true;
+}
+
 add_action('rest_api_init', 'pdfpro_licensing_register_routes');
 
 // Hỗ trợ bỏ qua yêu cầu đăng nhập đối với các API endpoint của PDF Pro
@@ -82,6 +113,12 @@ function pdfpro_licensing_register_routes() {
  * Xử lý yêu cầu Kích hoạt bản quyền
  */
 function pdfpro_licensing_api_activate(WP_REST_Request $request) {
+    // Rate limit: tối đa 5 lần kích hoạt / phút / IP
+    $rate_check = pdfpro_licensing_check_rate_limit('activate', 5, 60);
+    if (is_wp_error($rate_check)) {
+        return $rate_check;
+    }
+
     global $wpdb;
     
     $params = $request->get_json_params();
@@ -168,6 +205,12 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
  * Xử lý yêu cầu Kiểm tra trạng thái bản quyền (Heartbeat)
  */
 function pdfpro_licensing_api_check(WP_REST_Request $request) {
+    // Rate limit: tối đa 20 lần check / phút / IP (heartbeat có thể gọi thường xuyên)
+    $rate_check = pdfpro_licensing_check_rate_limit('check', 20, 60);
+    if (is_wp_error($rate_check)) {
+        return $rate_check;
+    }
+
     global $wpdb;
 
     $params = $request->get_json_params();
@@ -317,6 +360,12 @@ function pdfpro_licensing_api_update_check(WP_REST_Request $request) {
  * Xử lý báo cáo lỗi từ ứng dụng Desktop (Telemetry)
  */
 function pdfpro_licensing_api_report_error(WP_REST_Request $request) {
+    // Rate limit: tối đa 10 báo cáo lỗi / phút / IP
+    $rate_check = pdfpro_licensing_check_rate_limit('report_error', 10, 60);
+    if (is_wp_error($rate_check)) {
+        return $rate_check;
+    }
+
     global $wpdb;
     $params = $request->get_json_params();
     $app_version = sanitize_text_field($params['app_version'] ?? 'unknown');
@@ -371,7 +420,7 @@ function pdfpro_licensing_api_update_publish(WP_REST_Request $request) {
         update_option('pdfpro_publish_token', $expected_token);
     }
     
-    if (empty($token) || $token !== $expected_token) {
+    if (empty($token) || !hash_equals($expected_token, $token)) {
         return new WP_Error('unauthorized', 'Token bảo mật không hợp lệ hoặc thiếu.', array('status' => 401));
     }
     
