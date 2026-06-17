@@ -80,6 +80,8 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 	}
 
+	internal PdfSnapshotSelection? SnapshotSelection { get; set; }
+
 	public PrintOptionsDialog(int pageCount, int currentPageNumber)
 		: this(pageCount, currentPageNumber, null)
 	{
@@ -117,8 +119,8 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 		try
 		{
-			// Render snapshot of the entire page at lower DPI for fast preview display
-			var snapshot = new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
+			// Render snapshot of the cropped area if available, else render the entire page
+			var snapshot = SnapshotSelection ?? new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
 			var bitmap = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot, 600, 1000000); // Fast thumbnail size
 			PreviewImage.Source = bitmap;
 			PreviewPlaceholderText.Visibility = Visibility.Collapsed;

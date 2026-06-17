@@ -1,14 +1,3 @@
-- Nâng cấp bảo mật toàn diện hệ thống bản quyền:
-  + Xóa hoàn toàn Private Key RSA khỏi mã nguồn plugin WordPress — thay bằng sinh key động qua OpenSSL.
-  + Xóa master key bypass (PDFPRO-3A03-3629-06B1-D3AF-2018) trong ứng dụng client.
-  + Cập nhật Public Key RSA mới cho ứng dụng client, đồng bộ với server mới.
-- Thêm Rate Limiting cho API bản quyền:
-  + Giới hạn 5 lần kích hoạt / phút / IP cho endpoint /activate.
-  + Giới hạn 20 lần kiểm tra / phút / IP cho endpoint /check.
-  + Giới hạn 10 lần báo lỗi / phút / IP cho endpoint /report-error.
-  + Trả về HTTP 429 (Too Many Requests) khi vượt giới hạn.
-- Tăng cường bảo mật API:
-  + Sử dụng hash_equals() thay vì so sánh chuỗi thông thường cho token xác thực (chống timing attack).
-  + Thêm file index.php vào thư mục keys/ để chặn directory listing.
-  + Thiết lập quyền file chmod 0600 cho private key trên server.
-- Cập nhật plugin WordPress lên phiên bản 1.1.0.
+- Cải tiến tính năng in Snapshot: in sắc nét độ phân giải cao và tự động căn giữa, lấp đầy trang giấy. Hiển thị xem trước ảnh cắt chính xác trong hộp thoại in.
+- Thêm tính năng "Sử dụng liên tục" (Sticky Tools): Giữ các công cụ vẽ nét, hình học, ghi chú, hộp văn bản và snapshot hoạt động liên tục cho đến khi nhấn phím ESC.
+- Sửa lỗi đường dẫn build output và đồng bộ DLL trong run_test.bat.

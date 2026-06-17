@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -179,9 +180,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private readonly Dictionary<int, int> _pageRotations = new Dictionary<int, int>();
 
-	private readonly Dictionary<int, List<OcrTextRegion>> _ocrTextRegions = new Dictionary<int, List<OcrTextRegion>>();
-
-	private readonly HashSet<int> _ocrPagesLoading = new HashSet<int>();
+	private readonly ConcurrentDictionary<int, Task<List<OcrTextRegion>?>> _ocrLoadingTasks = new();
 
 	private readonly List<PendingTextEdit> _pendingTextEdits = new List<PendingTextEdit>();
 
@@ -198,6 +197,15 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private const int MaxLoadedPageDistance = 1;
 
 	private const long MaxBitmapCacheBytes = 402653184L;
+
+	private static readonly SolidColorBrush RulerBrush = CreateFrozenBrush(148, 163, 184);
+
+	private static SolidColorBrush CreateFrozenBrush(byte r, byte g, byte b)
+	{
+		var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+		brush.Freeze();
+		return brush;
+	}
 
 	private const long HighCostRenderPixelThreshold = 12000000L;
 
@@ -227,8 +235,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public string ActiveTool { get; set; } = "Select";
 
+	public bool KeepToolsActive { get; set; }
+
 	private bool IsContinuousTool(string tool)
 	{
+		if (KeepToolsActive && tool != "Select" && tool != "EditText" && tool != "SelectText")
+		{
+			return true;
+		}
 		return tool == "ShapeLine" || 
 		       tool == "ShapeRect" || 
 		       tool == "ShapeOval" || 
@@ -236,7 +250,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		       tool == "MeasureArea" || 
 		       tool == "MeasurePerimeter" || 
 		       tool == "PlaceSignature" || 
-		       tool == "PlaceStamp";
+		       tool == "PlaceStamp" ||
+		       tool == "StickyNote" ||
+		       tool == "TextBox" ||
+		       tool == "Callout" ||
+		       tool == "Snapshot" ||
+		       tool == "AiSnapshot" ||
+		       tool == "Ink";
 	}
 
 	public void EnterCalibrateMode()
@@ -593,7 +613,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			SaveUndoState();
 			Annotations.Add(pdfStickyNoteAnnotation);
 			SelectedAnnotation = pdfStickyNoteAnnotation;
-			ActiveTool = "Select";
+			if (!IsContinuousTool(ActiveTool))
+			{
+				ActiveTool = "Select";
+			}
 			RedrawPageAnnotations(canvas, num);
 			ShowStickyNoteEdit(canvas, pdfStickyNoteAnnotation, num);
 			e.Handled = true;
@@ -940,7 +963,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				double h2 = Math.Max(10.0, Math.Abs(_drawStartPoint.Y - position.Y));
 				Rectangle tempRect = _tempRect;
 				_tempRect = null;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				EndMouseInteraction(canvas);
 				PrintSnapshotSelection(canvas, tempRect, x2, y2, w2, h2, num);
 			}
@@ -952,7 +978,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				double h3 = Math.Max(10.0, Math.Abs(_drawStartPoint.Y - position.Y));
 				Rectangle tempRect2 = _tempRect;
 				_tempRect = null;
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				EndMouseInteraction(canvas);
 				RequestAiSnapshot(canvas, tempRect2, x3, y3, w3, h3, num);
 			}
@@ -1126,7 +1155,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					Annotations.Add(pdfInkAnnotation);
 					SelectedAnnotation = pdfInkAnnotation;
 				}
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, num);
 			}
 			e.Handled = true;
@@ -1185,7 +1217,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		PrintOptionsDialog printOptionsDialog = new PrintOptionsDialog(1, 1, CurrentPdfPath)
 		{
-			Owner = Window.GetWindow(this)
+			Owner = Window.GetWindow(this),
+			SnapshotSelection = snapshot
 		};
 		if (printOptionsDialog.ShowDialog() != true || printOptionsDialog.SelectedPrintQueue == null)
 		{
@@ -1353,8 +1386,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfTextBoxAnnotation);
 				SelectedAnnotation = pdfTextBoxAnnotation;
-				ActiveTool = "Select";
-				LogStatus("Đã tạo hộp văn bản. Công cụ đã quay về Select để kéo hoặc co giãn khung.");
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+					LogStatus("Đã tạo hộp văn bản. Công cụ đã quay về Select để kéo hoặc co giãn khung.");
+				}
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -1423,8 +1459,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfCalloutAnnotation);
 				SelectedAnnotation = pdfCalloutAnnotation;
-				ActiveTool = "Select";
-				LogStatus("Đã tạo mũi tên chỉ dẫn. Công cụ đã quay về Select; muốn tạo mũi tên nữa hãy chọn lại.");
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+					LogStatus("Đã tạo mũi tên chỉ dẫn. Công cụ đã quay về Select; muốn tạo mũi tên nữa hãy chọn lại.");
+				}
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -2058,7 +2097,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void DrawHorizontalRuler(double pageOriginX)
 	{
-		HorizontalRuler.Children.Clear();
 		double width = HorizontalRuler.ActualWidth;
 		if (width <= 0 || PagesHost.ActualWidth <= 0) return;
 
@@ -2083,6 +2121,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		double endPt = (width - pageOriginX) / visualScale;
 		double startAligned = Math.Floor(startPt / subTickStep) * subTickStep;
 
+		var existingLines = HorizontalRuler.Children.OfType<Line>().ToList();
+		var existingTextBlocks = HorizontalRuler.Children.OfType<TextBlock>().ToList();
+		int lineIdx = 0;
+		int textIdx = 0;
+
 		for (double pt = startAligned; pt <= endPt; pt += subTickStep)
 		{
 			double x = pageOriginX + pt * visualScale;
@@ -2091,29 +2134,54 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			bool isMajor = Math.Abs(pt % pointsPerTick) < 0.001 || Math.Abs((pt % pointsPerTick) - pointsPerTick) < 0.001;
 			bool isMedium = Math.Abs(pt % (pointsPerTick / 2.0)) < 0.001 || Math.Abs((pt % (pointsPerTick / 2.0)) - (pointsPerTick / 2.0)) < 0.001;
 
-			Line tick = new Line
+			Line tick;
+			if (lineIdx < existingLines.Count)
 			{
-				X1 = x,
-				X2 = x,
-				Stroke = new SolidColorBrush(Color.FromRgb(148, 163, 184)), // slate-400
-				StrokeThickness = 1
-			};
+				tick = existingLines[lineIdx];
+				tick.Visibility = Visibility.Visible;
+			}
+			else
+			{
+				tick = new Line
+				{
+					Stroke = RulerBrush,
+					StrokeThickness = 1
+				};
+				HorizontalRuler.Children.Add(tick);
+				existingLines.Add(tick);
+			}
+			lineIdx++;
+
+			tick.X1 = x;
+			tick.X2 = x;
 
 			if (isMajor)
 			{
 				tick.Y1 = 8;
 				tick.Y2 = 20;
 
-				TextBlock label = new TextBlock
+				TextBlock label;
+				if (textIdx < existingTextBlocks.Count)
 				{
-					Text = Math.Round(pt).ToString(),
-					Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
-					FontSize = 8,
-					FontWeight = FontWeights.Bold
-				};
+					label = existingTextBlocks[textIdx];
+					label.Visibility = Visibility.Visible;
+				}
+				else
+				{
+					label = new TextBlock
+					{
+						Foreground = RulerBrush,
+						FontSize = 8,
+						FontWeight = FontWeights.Bold
+					};
+					HorizontalRuler.Children.Add(label);
+					existingTextBlocks.Add(label);
+				}
+				textIdx++;
+
+				label.Text = Math.Round(pt).ToString();
 				Canvas.SetLeft(label, x + 2);
 				Canvas.SetTop(label, 0);
-				HorizontalRuler.Children.Add(label);
 			}
 			else if (isMedium)
 			{
@@ -2125,14 +2193,20 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				tick.Y1 = 15;
 				tick.Y2 = 20;
 			}
+		}
 
-			HorizontalRuler.Children.Add(tick);
+		for (int i = lineIdx; i < existingLines.Count; i++)
+		{
+			existingLines[i].Visibility = Visibility.Collapsed;
+		}
+		for (int i = textIdx; i < existingTextBlocks.Count; i++)
+		{
+			existingTextBlocks[i].Visibility = Visibility.Collapsed;
 		}
 	}
 
 	private void DrawVerticalRuler(double pageOriginY)
 	{
-		VerticalRuler.Children.Clear();
 		double height = VerticalRuler.ActualHeight;
 		if (height <= 0 || PagesHost.ActualHeight <= 0) return;
 
@@ -2157,6 +2231,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		double endPt = (height - pageOriginY) / visualScale;
 		double startAligned = Math.Floor(startPt / subTickStep) * subTickStep;
 
+		var existingLines = VerticalRuler.Children.OfType<Line>().ToList();
+		var existingTextBlocks = VerticalRuler.Children.OfType<TextBlock>().ToList();
+		int lineIdx = 0;
+		int textIdx = 0;
+
 		for (double pt = startAligned; pt <= endPt; pt += subTickStep)
 		{
 			double y = pageOriginY + pt * visualScale;
@@ -2165,30 +2244,55 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			bool isMajor = Math.Abs(pt % pointsPerTick) < 0.001 || Math.Abs((pt % pointsPerTick) - pointsPerTick) < 0.001;
 			bool isMedium = Math.Abs(pt % (pointsPerTick / 2.0)) < 0.001 || Math.Abs((pt % (pointsPerTick / 2.0)) - (pointsPerTick / 2.0)) < 0.001;
 
-			Line tick = new Line
+			Line tick;
+			if (lineIdx < existingLines.Count)
 			{
-				Y1 = y,
-				Y2 = y,
-				Stroke = new SolidColorBrush(Color.FromRgb(148, 163, 184)), // slate-400
-				StrokeThickness = 1
-			};
+				tick = existingLines[lineIdx];
+				tick.Visibility = Visibility.Visible;
+			}
+			else
+			{
+				tick = new Line
+				{
+					Stroke = RulerBrush,
+					StrokeThickness = 1
+				};
+				VerticalRuler.Children.Add(tick);
+				existingLines.Add(tick);
+			}
+			lineIdx++;
+
+			tick.Y1 = y;
+			tick.Y2 = y;
 
 			if (isMajor)
 			{
 				tick.X1 = 8;
 				tick.X2 = 20;
 
-				TextBlock label = new TextBlock
+				TextBlock label;
+				if (textIdx < existingTextBlocks.Count)
 				{
-					Text = Math.Round(pt).ToString(),
-					Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
-					FontSize = 8,
-					FontWeight = FontWeights.Bold,
-					LayoutTransform = new RotateTransform(-90)
-				};
+					label = existingTextBlocks[textIdx];
+					label.Visibility = Visibility.Visible;
+				}
+				else
+				{
+					label = new TextBlock
+					{
+						Foreground = RulerBrush,
+						FontSize = 8,
+						FontWeight = FontWeights.Bold,
+						LayoutTransform = new RotateTransform(-90)
+					};
+					VerticalRuler.Children.Add(label);
+					existingTextBlocks.Add(label);
+				}
+				textIdx++;
+
+				label.Text = Math.Round(pt).ToString();
 				Canvas.SetLeft(label, 0);
 				Canvas.SetTop(label, y + 2);
-				VerticalRuler.Children.Add(label);
 			}
 			else if (isMedium)
 			{
@@ -2200,8 +2304,15 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				tick.X1 = 15;
 				tick.X2 = 20;
 			}
+		}
 
-			VerticalRuler.Children.Add(tick);
+		for (int i = lineIdx; i < existingLines.Count; i++)
+		{
+			existingLines[i].Visibility = Visibility.Collapsed;
+		}
+		for (int i = textIdx; i < existingTextBlocks.Count; i++)
+		{
+			existingTextBlocks[i].Visibility = Visibility.Collapsed;
 		}
 	}
 
@@ -2365,6 +2476,43 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				progressDialog.MarkCompleted("Da gui lenh in vao may in.");
 				LogStatus("Print job sent");
 			}
+			else if (optionsDialog.PrintEngineMode == "NativePdfium_Optimized" && !optionsDialog.PrintTestFrame)
+			{
+				if (Annotations.Count > 0)
+				{
+					PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+				}
+				PrintTicket printTicket = printDialog.PrintTicket.Clone();
+				printTicket.CopyCount = 1;
+				string queueName = printDialog.PrintQueue.FullName;
+				byte[] devModeBytes = null;
+				try
+				{
+					using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printDialog.PrintQueue.FullName, printDialog.PrintQueue.ClientPrintSchemaVersion);
+					devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(printTicket, BaseDevModeType.UserDefault);
+				}
+				catch (Exception ex)
+				{
+					PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
+				}
+				int startPageIndex = optionsDialog.StartPageIndex;
+				int endPageIndex = optionsDialog.EndPageIndex;
+				int copies = optionsDialog.Copies;
+				bool fitToPrintableArea = optionsDialog.FitToPrintableArea;
+				bool autoCenter = optionsDialog.AutoCenter;
+				bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
+				bool reversePageOrder = optionsDialog.ReversePageOrder;
+				bool forceRasterize = optionsDialog.OptimizeCadDrawings;
+				Stopwatch nativeSubmitSw = Stopwatch.StartNew();
+				await Task.Run(delegate
+				{
+					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken);
+				});
+				nativeSubmitSw.Stop();
+				PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
+				progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
+				LogStatus("Print job sent");
+			}
 			else if (optionsDialog.PrintEngineMode == "PdfDirect")
 			{
 				string queueName = printDialog.PrintQueue.FullName;
@@ -2375,6 +2523,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
 				});
 				progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
+				LogStatus("Print job sent");
+			}
+			else if (optionsDialog.PrintEngineMode == "PdfDirect_Optimized")
+			{
+				string queueName = printDialog.PrintQueue.FullName;
+				string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
+				progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
+				await Task.Run(delegate
+				{
+					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
+				});
+				progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
 				LogStatus("Print job sent");
 			}
 			else
@@ -2579,8 +2739,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			num6 = num4 - 1;
 		}
 		SolidColorBrush fill = new SolidColorBrush(Color.FromArgb(90, 51, 153, byte.MaxValue));
+		fill.Freeze();
+
+		var mergedRects = new List<Rect>();
 		lock (PdfiumEngine.SyncRoot)
 		{
+			Rect currentRect = Rect.Empty;
 			for (int i = num5; i <= num6; i++)
 			{
 				if (PdfiumEngine.FPDFText_GetCharBox(textPage, i, out var left, out var right, out var bottom, out var top))
@@ -2589,28 +2753,58 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					{
 						continue;
 					}
-					double num7 = canvasRect.Width;
-					double num8 = canvasRect.Height;
-					if (num7 <= 0.0)
+
+					if (canvasRect.Width <= 0.0) canvasRect.Width = 6.0;
+					if (canvasRect.Height <= 0.0) canvasRect.Height = 12.0;
+
+					if (currentRect.IsEmpty)
 					{
-						num7 = 6.0;
+						currentRect = canvasRect;
 					}
-					if (num8 <= 0.0)
+					else
 					{
-						num8 = 12.0;
+						double verticalDistance = Math.Abs(canvasRect.Y - currentRect.Y);
+						double heightDifference = Math.Abs(canvasRect.Height - currentRect.Height);
+						double horizontalGap = canvasRect.X - (currentRect.X + currentRect.Width);
+
+						double heightThreshold = Math.Max(currentRect.Height, canvasRect.Height);
+						if (verticalDistance < heightThreshold * 0.4 && 
+						    heightDifference < heightThreshold * 0.4 && 
+						    horizontalGap >= -2.0 && 
+						    horizontalGap < heightThreshold * 3.0)
+						{
+							double minX = Math.Min(currentRect.X, canvasRect.X);
+							double maxX = Math.Max(currentRect.X + currentRect.Width, canvasRect.X + canvasRect.Width);
+							double minY = Math.Min(currentRect.Y, canvasRect.Y);
+							double maxY = Math.Max(currentRect.Y + currentRect.Height, canvasRect.Y + canvasRect.Height);
+							currentRect = new Rect(minX, minY, maxX - minX, maxY - minY);
+						}
+						else
+						{
+							mergedRects.Add(currentRect);
+							currentRect = canvasRect;
+						}
 					}
-					Rectangle element = new Rectangle
-					{
-						Width = Math.Max(0.5, num7),
-						Height = Math.Max(0.5, num8),
-						Fill = fill,
-						IsHitTestVisible = false
-					};
-					Canvas.SetLeft(element, canvasRect.X);
-					Canvas.SetTop(element, canvasRect.Y);
-					canvas.Children.Add(element);
 				}
 			}
+			if (!currentRect.IsEmpty)
+			{
+				mergedRects.Add(currentRect);
+			}
+		}
+
+		foreach (var rect in mergedRects)
+		{
+			Rectangle element = new Rectangle
+			{
+				Width = Math.Max(0.5, rect.Width),
+				Height = Math.Max(0.5, rect.Height),
+				Fill = fill,
+				IsHitTestVisible = false
+			};
+			Canvas.SetLeft(element, rect.X);
+			Canvas.SetTop(element, rect.Y);
+			canvas.Children.Add(element);
 		}
 	}
 
@@ -3343,35 +3537,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	private async Task<List<OcrTextRegion>?> EnsureOcrRegionsAsync(int pageNumber)
+	private Task<List<OcrTextRegion>?> EnsureOcrRegionsAsync(int pageNumber)
 	{
-		if (_ocrTextRegions.TryGetValue(pageNumber, out List<OcrTextRegion>? cached))
-		{
-			return cached;
-		}
-		while (_ocrPagesLoading.Contains(pageNumber))
-		{
-			await Task.Delay(100);
-			if (_ocrTextRegions.TryGetValue(pageNumber, out cached))
-			{
-				return cached;
-			}
-		}
-		_ocrPagesLoading.Add(pageNumber);
-		try
-		{
-			List<OcrTextRegion>? recognized = await RecognizeOcrRegionsAsync(pageNumber);
-			if (recognized == null)
-			{
-				return null;
-			}
-			_ocrTextRegions[pageNumber] = recognized;
-			return recognized;
-		}
-		finally
-		{
-			_ocrPagesLoading.Remove(pageNumber);
-		}
+		return _ocrLoadingTasks.GetOrAdd(pageNumber, page => RecognizeOcrRegionsAsync(page));
 	}
 
 	private async Task<List<OcrTextRegion>?> RecognizeOcrRegionsAsync(int pageNumber)
@@ -3884,7 +4052,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			ScrollToKeepHostPointAtViewport(_smoothZoomHostAnchor, _smoothZoomAnchor, ratio, updateLayout: false);
 		};
 		_viewportTimer = new DispatcherTimer();
-		_viewportTimer.Interval = TimeSpan.FromMilliseconds(50.0);
+		_viewportTimer.Interval = TimeSpan.FromMilliseconds(100.0);
 		_viewportTimer.Tick += delegate
 		{
 			_viewportTimer.Stop();
@@ -3945,6 +4113,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_selectedPages.Clear();
 		_selectionAnchorPage = 1;
 		_pageRotations.Clear();
+		_ocrLoadingTasks.Clear();
 		_recentPages.Clear();
 		_bookmarkedPages.Clear();
 		RefreshRecentPagesPanel();

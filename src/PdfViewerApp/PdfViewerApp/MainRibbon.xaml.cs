@@ -24,6 +24,18 @@ public partial class MainRibbon : UserControl
 	public System.Windows.Controls.Button? FontGrowBtn2 => null;
 	public System.Windows.Controls.Button? FontShrinkBtn2 => null;
 
+	public bool KeepToolsActive
+	{
+		get => KeepToolsActiveCheckBox?.IsChecked == true;
+		set
+		{
+			if (KeepToolsActiveCheckBox != null)
+			{
+				KeepToolsActiveCheckBox.IsChecked = value;
+			}
+		}
+	}
+
 	public event RoutedEventHandler? OpenPdfRequested;
 
 	public event RoutedEventHandler? SavePdfRequested;
@@ -121,6 +133,8 @@ public partial class MainRibbon : UserControl
 	public event RoutedEventHandler? SnapshotToolRequested;
 
 	public event RoutedEventHandler? AiSnapshotToolRequested;
+
+	public event RoutedEventHandler? KeepToolsActiveChanged;
 
 	public event RoutedEventHandler? ActivationRequested;
 
@@ -796,6 +810,8 @@ public partial class MainRibbon : UserControl
 	private void MeasurePerimeterTool_Click(object sender, RoutedEventArgs e) => MeasurePerimeterToolRequested?.Invoke(this, e);
 
 	private void MeasureGuide_Click(object sender, RoutedEventArgs e) => MeasureGuideRequested?.Invoke(this, e);
+
+	private void KeepToolsActiveCheckBox_Click(object sender, RoutedEventArgs e) => KeepToolsActiveChanged?.Invoke(this, e);
 
 	private void FontGrowBtn2_Click(object sender, RoutedEventArgs e)
 	{

@@ -1114,6 +1114,7 @@ exit 0
 			}
 		}
 		PdfDocumentTab pdfDocumentTab2 = new PdfDocumentTab(path);
+		pdfDocumentTab2.KeepToolsActive = (_mainRibbon != null && _mainRibbon.KeepToolsActive);
 		pdfDocumentTab2.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
 		pdfDocumentTab2.StatusChanged += DocTab_StatusChanged;
 		pdfDocumentTab2.ZoomChanged += DocTab_ZoomChanged;
@@ -1209,6 +1210,10 @@ exit 0
 		{
 			UpdateStatusBarFromActiveTab();
 			PdfDocumentTab activeTab = GetActiveTab();
+			if (activeTab != null)
+			{
+				activeTab.KeepToolsActive = (_mainRibbon != null && _mainRibbon.KeepToolsActive);
+			}
 			_mainRibbon?.SetContextualTabVisibility(activeTab?.SelectedAnnotation != null);
 		}
 	}
@@ -3238,10 +3243,21 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.FormatRequested += Format_Click;
 		_mainRibbon.MeasurementScaleChanged += MeasurementScale_Changed;
 		_mainRibbon.SettingsChanged += MainRibbon_SettingsChanged;
+		_mainRibbon.KeepToolsActiveChanged += KeepToolsActive_Changed;
 		_mainRibbon.OpenUrlRequested += OpenUrl;
 		_mainRibbon.PageOrganizerRequested += PageOrganizer_Click;
 		_mainRibbon.BulletListRequested += BulletList_Click;
 		_mainRibbon.NumberListRequested += NumberList_Click;
+	}
+
+	private void KeepToolsActive_Changed(object? sender, RoutedEventArgs e)
+	{
+		bool active = _mainRibbon?.KeepToolsActive == true;
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.KeepToolsActive = active;
+		}
 	}
 
 	private void MainRibbon_SettingsChanged(object? sender, EventArgs e)

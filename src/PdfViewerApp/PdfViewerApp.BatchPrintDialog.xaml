@@ -369,7 +369,7 @@
             <!-- Engine options -->
             <TextBlock Text="Cơ chế in (Print Engine)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
             <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
-              <ComboBoxItem Content="Native PDFium (Tốc độ cao, siêu nét)" Tag="NativePdfium" />
+              <ComboBoxItem Content="Native PDFium (Tốc độ cao, siêu nét)" Tag="NativePdfium_Optimized" />
               <ComboBoxItem Content="WPF Bitmap (Tương thích cao)" Tag="WpfBitmap" />
             </ComboBox>
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Printing;
 using System.Printing.Interop;
@@ -68,24 +68,33 @@ internal static class PdfSnapshotPrinter
 				}
 				try
 				{
-					double num10 = PdfiumEngine.FPDF_GetPageWidth(num9);
-					double num11 = PdfiumEngine.FPDF_GetPageHeight(num9);
-					double num12 = num10 / 72.0 * (double)num5;
-					double num13 = num11 / 72.0 * (double)num6;
-					double num14 = Math.Max(1.0, num12 * snapshot.Width);
-					double num15 = Math.Max(1.0, num13 * snapshot.Height);
-					double num16 = Math.Min((double)num7 / num14, (double)num8 / num15);
-					int num17 = Math.Max(1, (int)Math.Round(num12 * num16));
-					int num18 = Math.Max(1, (int)Math.Round(num13 * num16));
-					int num19 = (int)Math.Round(snapshot.X * (double)num17);
-					int num20 = (int)Math.Round(snapshot.Y * (double)num18);
-					int num21 = (int)Math.Round(snapshot.Width * (double)num17);
-					int num22 = (int)Math.Round(snapshot.Height * (double)num18);
-					int num23 = Math.Max(0, (num7 - num21) / 2);
-					int num24 = Math.Max(0, (num8 - num22) / 2);
-					int num25 = num23 - num19;
-					int num26 = num24 - num20;
-					PdfPerfLogger.Log($"Snapshot render: fullPage={num17}x{num18}, cropTarget={num21}x{num22}, start={num25},{num26}, scale={num16}");
+					double pagePdfWidth = PdfiumEngine.FPDF_GetPageWidth(num9);
+					double pagePdfHeight = PdfiumEngine.FPDF_GetPageHeight(num9);
+					
+					double cropPdfWidth = Math.Max(0.001, snapshot.Width * pagePdfWidth);
+					double cropPdfHeight = Math.Max(0.001, snapshot.Height * pagePdfHeight);
+					
+					double cropPixelWidthAtDpi = cropPdfWidth / 72.0 * (double)num5;
+					double cropPixelHeightAtDpi = cropPdfHeight / 72.0 * (double)num6;
+					
+					double scale = Math.Min((double)num7 / cropPixelWidthAtDpi, (double)num8 / cropPixelHeightAtDpi);
+					
+					int printWidth = Math.Max(1, (int)Math.Round(cropPixelWidthAtDpi * scale));
+					int printHeight = Math.Max(1, (int)Math.Round(cropPixelHeightAtDpi * scale));
+					
+					int drawX = Math.Max(0, (num7 - printWidth) / 2);
+					int drawY = Math.Max(0, (num8 - printHeight) / 2);
+					
+					int fullWidth = Math.Max(1, (int)Math.Round((pagePdfWidth / 72.0 * (double)num5) * scale));
+					int fullHeight = Math.Max(1, (int)Math.Round((pagePdfHeight / 72.0 * (double)num6) * scale));
+					
+					int tileX = Math.Max(0, (int)Math.Round(snapshot.X * (double)fullWidth));
+					int tileY = Math.Max(0, (int)Math.Round(snapshot.Y * (double)fullHeight));
+					int tileWidth = Math.Min(printWidth, fullWidth - tileX);
+					int tileHeight = Math.Min(printHeight, fullHeight - tileY);
+
+					PdfPerfLogger.Log($"Snapshot render: fullPage={fullWidth}x{fullHeight}, printArea={printWidth}x{printHeight}, tile=({tileX},{tileY},{tileWidth},{tileHeight}), draw=({drawX},{drawY})");
+					
 					DOCINFO lpdi = new DOCINFO
 					{
 						cbSize = Marshal.SizeOf<DOCINFO>(),
@@ -105,7 +114,80 @@ internal static class PdfSnapshotPrinter
 						throw new InvalidOperationException("Snapshot StartPage failed: " + GetLastErrorMessage());
 					}
 					PatBlt(num2, 0, 0, num3, num4, 16711778);
-					PdfiumEngine.FPDF_RenderPage(num2, num9, num25, num26, num17, num18, 0, 2049);
+					
+					int stride = tileWidth * 4;
+					byte[] array = new byte[stride * tileHeight];
+					GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
+					try
+					{
+						nint first_scan = gCHandle.AddrOfPinnedObject();
+						nint num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(tileWidth, tileHeight, 4, first_scan, stride);
+						if (num5_bmp != IntPtr.Zero)
+						{
+							PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, tileWidth, tileHeight, uint.MaxValue);
+							PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num9, -tileX, -tileY, fullWidth, fullHeight, 0, 2049);
+							PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
+						}
+					}
+					finally
+					{
+						gCHandle.Free();
+					}
+					
+					int stride24 = ((tileWidth * 3 + 3) / 4) * 4;
+					byte[] array24 = new byte[stride24 * tileHeight];
+					for (int y = 0; y < tileHeight; y++)
+					{
+						int srcRowOffset = y * stride;
+						int destRowOffset = y * stride24;
+						for (int x = 0; x < tileWidth; x++)
+						{
+							int srcIndex = srcRowOffset + x * 4;
+							int destIndex = destRowOffset + x * 3;
+							array24[destIndex] = array[srcIndex];       // B
+							array24[destIndex + 1] = array[srcIndex + 1]; // G
+							array24[destIndex + 2] = array[srcIndex + 2]; // R
+						}
+					}
+					
+					GCHandle gCHandle24 = GCHandle.Alloc(array24, GCHandleType.Pinned);
+					try
+					{
+						nint first_scan24 = gCHandle24.AddrOfPinnedObject();
+						BITMAPINFO bmi = default(BITMAPINFO);
+						bmi.bmiHeader.biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>();
+						bmi.bmiHeader.biWidth = tileWidth;
+						bmi.bmiHeader.biHeight = -tileHeight;
+						bmi.bmiHeader.biPlanes = 1;
+						bmi.bmiHeader.biBitCount = 24;
+						bmi.bmiHeader.biCompression = 0; // BI_RGB
+						bmi.bmiHeader.biSizeImage = (uint)(stride24 * tileHeight);
+
+						int result = StretchDIBits(
+							num2,
+							drawX,
+							drawY,
+							tileWidth,
+							tileHeight,
+							0,
+							0,
+							tileWidth,
+							tileHeight,
+							first_scan24,
+							ref bmi,
+							0, // DIB_RGB_COLORS
+							13369376 // SRCCOPY
+						);
+						if (result == -1)
+						{
+							PdfPerfLogger.Log($"Snapshot StretchDIBits failed: {GetLastErrorMessage()}");
+						}
+					}
+					finally
+					{
+						gCHandle24.Free();
+					}
+					
 					if (EndPage(num2) <= 0)
 					{
 						throw new InvalidOperationException("Snapshot EndPage failed: " + GetLastErrorMessage());
@@ -193,6 +275,46 @@ internal static class PdfSnapshotPrinter
 		}
 		return "unknown error";
 	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct BITMAPINFOHEADER
+	{
+		public uint biSize;
+		public int biWidth;
+		public int biHeight;
+		public ushort biPlanes;
+		public ushort biBitCount;
+		public uint biCompression;
+		public uint biSizeImage;
+		public int biXPelsPerMeter;
+		public int biYPelsPerMeter;
+		public uint biClrUsed;
+		public uint biClrImportant;
+	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct BITMAPINFO
+	{
+		public BITMAPINFOHEADER bmiHeader;
+		public uint bmiColors;
+	}
+
+	[DllImport("gdi32.dll", SetLastError = true)]
+	private static extern int StretchDIBits(
+		nint hdc,
+		int xDest,
+		int yDest,
+		int destWidth,
+		int destHeight,
+		int xSrc,
+		int ySrc,
+		int srcWidth,
+		int srcHeight,
+		nint lpBits,
+		[In] ref BITMAPINFO lpbmi,
+		uint iUsage,
+		uint dwRop
+	);
 
 	[DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 	private static extern nint CreateDC(string? lpszDriver, string lpszDevice, string? lpszOutput, nint lpInitData);

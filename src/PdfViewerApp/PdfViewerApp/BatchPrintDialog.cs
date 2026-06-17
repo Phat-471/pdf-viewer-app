@@ -450,6 +450,27 @@ public partial class BatchPrintDialog : Window
                                 token);
                             success = true;
                         }
+                        else if (printEngine == "NativePdfium_Optimized")
+                        {
+                            NativePdfPrinter.PrintOptimized(
+                                fileItem.FilePath,
+                                printerQueueName,
+                                devModeBytes,
+                                startPageIndex,
+                                endPageIndex,
+                                copies,
+                                fitToPrintableArea,
+                                autoCenter,
+                                profile.DriverAlreadyOffsetsPrintableArea,
+                                profile.RightSafetyPadding,
+                                profile.BottomSafetyPadding,
+                                separatePageJobs,
+                                false,
+                                forceRasterize,
+                                itemProgress,
+                                token);
+                            success = true;
+                        }
                         else
                         {
                             // WPF Bitmap Printing Fallback

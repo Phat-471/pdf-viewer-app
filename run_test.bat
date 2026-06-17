@@ -48,17 +48,22 @@ echo   Loi Rust bien dich thanh cong!
 :: 3. Copy binaries to WPF output
 echo.
 echo [Buoc 3/4] Dang dong bo DLL vao thu muc dau ra WPF...
+if not exist "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0" (
+    mkdir "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0"
+)
 if not exist "src\PdfViewerApp\bin\Release\net8.0-windows" (
     mkdir "src\PdfViewerApp\bin\Release\net8.0-windows"
 )
 if exist "src\PdfCore\target\release\pdf_core.dll" (
     xcopy "src\PdfCore\target\release\pdf_core.dll" "libs\" /Y /D
+    xcopy "src\PdfCore\target\release\pdf_core.dll" "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\" /Y /D
     xcopy "src\PdfCore\target\release\pdf_core.dll" "src\PdfViewerApp\bin\Release\net8.0-windows\" /Y /D
     echo   Da sao chep pdf_core.dll.
 ) else (
     echo   [CANH BAO] Khong tim thay pdf_core.dll vua build!
 )
 if exist "libs\pdfium.dll" (
+    xcopy "libs\pdfium.dll" "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\" /Y /D
     xcopy "libs\pdfium.dll" "src\PdfViewerApp\bin\Release\net8.0-windows\" /Y /D
     echo   Da sao chep pdfium.dll.
 )
@@ -83,7 +88,11 @@ if %ERRORLEVEL% neq 0 (
 echo ===================================================
 echo [PDF HPhat] Bien dich thanh cong! Dang khoi chay...
 echo ===================================================
-cd bin\Release\net8.0-windows
+if exist "bin\Release\net8.0-windows10.0.26100.0\PdfViewerApp.exe" (
+    cd bin\Release\net8.0-windows10.0.26100.0
+) else (
+    cd bin\Release\net8.0-windows
+)
 if exist "PdfViewerApp.exe" (
     echo   Dang mo PdfViewerApp.exe...
     start PdfViewerApp.exe
