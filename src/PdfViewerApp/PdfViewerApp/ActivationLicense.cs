@@ -210,7 +210,12 @@ internal static class ActivationLicense
 		}
 		catch (Exception ex)
 		{
-			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + ex.Message);
+			string cleanMsg = ex.Message;
+			if (cleanMsg.Contains("hongmien.vn") || cleanMsg.Contains("No such host") || cleanMsg.Contains("host") || cleanMsg.Contains("connection") || cleanMsg.Contains("connect"))
+			{
+				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng kiểm tra lại kết nối mạng.");
+			}
+			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + cleanMsg);
 		}
 	}
 
@@ -570,28 +575,60 @@ internal static class ActivationLicense
 			}), Encoding.UTF8, "application/json");
 
 			HttpResponseMessage response = await client.PostAsync("https://hongmien.vn/wp-json/pdfpro/v1/check", content);
+			string json = await response.Content.ReadAsStringAsync();
+			bool isActivated = false;
 			if (response.IsSuccessStatusCode)
 			{
-				string json = await response.Content.ReadAsStringAsync();
-				using JsonDocument doc = JsonDocument.Parse(json);
-				bool success = doc.RootElement.GetProperty("success").GetBoolean();
-				string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
-
-				if (success && status == "activated")
+				try
 				{
-					record.LastOnlineCheckTime = DateTimeOffset.Now;
-					if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
+					using JsonDocument doc = JsonDocument.Parse(json);
+					bool success = doc.RootElement.GetProperty("success").GetBoolean();
+					string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+
+					if (success && status == "activated")
 					{
-						record.Payload = payloadVal.GetString() ?? record.Payload;
-						record.Signature = sigVal.GetString() ?? record.Signature;
+						isActivated = true;
+						record.LastOnlineCheckTime = DateTimeOffset.Now;
+						if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
+						{
+							record.Payload = payloadVal.GetString() ?? record.Payload;
+							record.Signature = sigVal.GetString() ?? record.Signature;
+						}
+						
+						File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
+						{
+							WriteIndented = true
+						}), Encoding.UTF8);
 					}
-					
-					File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
-					{
-						WriteIndented = true
-					}), Encoding.UTF8);
+				}
+				catch
+				{
+				}
+			}
+
+			if (!isActivated)
+			{
+				bool shouldDeactivate = false;
+				if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500)
+				{
+					shouldDeactivate = true;
 				}
 				else
+				{
+					try
+					{
+						using JsonDocument doc = JsonDocument.Parse(json);
+						if (doc.RootElement.TryGetProperty("success", out var successVal) && !successVal.GetBoolean())
+						{
+							shouldDeactivate = true;
+						}
+					}
+					catch
+					{
+					}
+				}
+
+				if (shouldDeactivate)
 				{
 					Deactivate();
 				}
