@@ -10,6 +10,9 @@ namespace PdfViewerApp;
 
 public partial class MainRibbon : UserControl
 {
+	// Lưu theme hiện tại để có thể re-apply sau khi Ribbon render
+	private AppThemeDefinition? _currentTheme;
+
 	// Dummy properties for compatibility with deleted Ribbon elements
 	public System.Windows.Controls.ComboBox? FontFamilyCombo2 => null;
 	public System.Windows.Controls.ComboBox? FontSizeCombo2 => null;
@@ -182,7 +185,10 @@ public partial class MainRibbon : UserControl
 
 	internal void ApplyTheme(AppThemeDefinition theme)
 	{
+		_currentTheme = theme;
 		bool isDark = !theme.IsLight;
+		PdfPerfLogger.Log($"ApplyTheme: Starting theme update to {theme.Name} (isDark={isDark}, AccentColor={theme.AccentColor})");
+
 		if (ThemeToggleIcon != null)
 		{
 			string glyph = theme.Name.ToLower() switch
@@ -199,18 +205,21 @@ public partial class MainRibbon : UserControl
 			};
 			ThemeToggleIcon.Text = glyph;
 			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
+			PdfPerfLogger.Log("ApplyTheme: ThemeToggleIcon updated.");
 		}
 
 		if (ThemeToggleBtn != null)
 		{
 			ThemeToggleBtn.IsChecked = isDark;
 			ThemeToggleBtn.Header = theme.DisplayName;
+			PdfPerfLogger.Log("ApplyTheme: ThemeToggleBtn updated.");
 		}
 
 		if (MyBackstage != null)
 		{
 			MyBackstage.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
 			MyBackstage.Foreground = Brushes.White;
+			PdfPerfLogger.Log("ApplyTheme: MyBackstage background updated.");
 		}
 
 		if (MyRibbon != null)
@@ -236,13 +245,72 @@ public partial class MainRibbon : UserControl
 				{
 					Application.Current.Resources[key] = bgBrush;
 				}
-				catch {}
+				catch (Exception ex)
+				{
+					PdfPerfLogger.Log($"ApplyTheme Error setting global resource key {key}: {ex.Message}");
+				}
 				try
 				{
 					MyRibbon.Resources[key] = bgBrush;
 				}
-				catch {}
+				catch (Exception ex)
+				{
+					PdfPerfLogger.Log($"ApplyTheme Error setting local resource key {key}: {ex.Message}");
+				}
 			}
+			PdfPerfLogger.Log("ApplyTheme: MyRibbon base colors and resources updated.");
+
+			// CRITICAL FIX: Schedule icon color update via Dispatcher to ensure all tabs are rendered first.
+			// Fluent Ribbon uses virtualization - tabs not yet activated may not have visual tree.
+			var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
+			Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+			{
+				ApplyIconColors(accentBrush);
+			}));
+		}
+	}
+
+	/// <summary>Cập nhật màu foreground cho tất cả icon TextBlock trong Ribbon.</summary>
+	private void ApplyIconColors(SolidColorBrush accentBrush)
+	{
+		if (MyRibbon == null) return;
+		try
+		{
+			var textBlocks = FindVisualChildren<TextBlock>(MyRibbon).ToList();
+			PdfPerfLogger.Log($"ApplyIconColors: Found {textBlocks.Count} TextBlocks in visual tree.");
+			int updatedIconsCount = 0;
+			foreach (var tb in textBlocks)
+			{
+				string? fontSource = tb.FontFamily?.Source;
+				if (fontSource == null) continue;
+
+				bool isMdl2 = fontSource.IndexOf("Segoe MDL2 Assets", StringComparison.OrdinalIgnoreCase) >= 0;
+				bool isSegoeUi = fontSource.IndexOf("Segoe UI", StringComparison.OrdinalIgnoreCase) >= 0;
+
+				if (isMdl2)
+				{
+					// Segoe MDL2 Assets = all icon font, always update foreground
+					tb.Foreground = accentBrush;
+					updatedIconsCount++;
+				}
+				else if (isSegoeUi && !string.IsNullOrEmpty(tb.Text))
+				{
+					// Segoe UI: only update if text contains unicode symbols (code point > U+00FF)
+					// Skip plain ASCII labels like "REV", "0", text descriptions, etc.
+					bool hasUnicodeSymbol = false;
+					foreach (char c in tb.Text) { if (c > 0xFF) { hasUnicodeSymbol = true; break; } }
+					if (hasUnicodeSymbol)
+					{
+						tb.Foreground = accentBrush;
+						updatedIconsCount++;
+					}
+				}
+			}
+			PdfPerfLogger.Log($"ApplyIconColors: Successfully updated {updatedIconsCount} icon TextBlock foregrounds.");
+		}
+		catch (Exception ex)
+		{
+			PdfPerfLogger.Log($"ApplyIconColors: Error updating TextBlock icon foregrounds: {ex.Message}");
 		}
 	}
 
@@ -250,7 +318,8 @@ public partial class MainRibbon : UserControl
 	{
 		if (MyRibbon != null)
 		{
-			MyRibbon.SelectedTabIndex = 3;
+			// Tab index changes due to insertion of a new tab
+			MyRibbon.SelectedTabIndex = 4;
 		}
 	}
 

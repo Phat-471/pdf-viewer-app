@@ -135,7 +135,7 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Biên Tập &amp; Tổ Chức">
+    <fluent:RibbonTabItem Header="Biên Tập Trang">
       <fluent:RibbonGroupBox Header="Xoay Trang">
         <fluent:SplitButton Header="Xoay Trái 90°" Margin="8,0,8,0" Click="RotateLeft_Click" ToolTip="Xoay trang hiện tại hoặc tất cả các trang sang trái 90 độ">
           <fluent:SplitButton.LargeIcon>
@@ -204,7 +204,9 @@
           </fluent:Button.LargeIcon>
         </fluent:Button>
       </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Xử Lý Nâng Cao">
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Xử Lý Nâng Cao">
+      <fluent:RibbonGroupBox Header="Ghép &amp; So Sánh">
         <fluent:Button Name="MergeFilesBtn" Header="Ghép Nhiều File" Margin="8,0,8,0" Click="MergeFiles_Click" ToolTip="Hợp nhất các tài liệu PDF đang mở lại thành một file duy nhất">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
