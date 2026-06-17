@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Markup;
@@ -13,6 +13,17 @@ public partial class ActivationDialog : Window, IComponentConnector
 	{
 		InitializeComponent();
 		RefreshState();
+		ForceCheckLicenseAsync();
+	}
+
+	private async void ForceCheckLicenseAsync()
+	{
+		try
+		{
+			await ActivationLicense.CheckHeartbeatOnlineAsync(force: true);
+			RefreshState();
+		}
+		catch {}
 	}
 
 	private void RefreshState()

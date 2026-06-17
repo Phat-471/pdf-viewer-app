@@ -542,7 +542,7 @@ internal static class ActivationLicense
 		return false;
 	}
 
-	public static async Task CheckHeartbeatOnlineAsync()
+	public static async Task CheckHeartbeatOnlineAsync(bool force = false)
 	{
 		ActivationRecord record = LoadRecord();
 		if (record == null || string.IsNullOrEmpty(record.ActivationKey))
@@ -550,10 +550,13 @@ internal static class ActivationLicense
 			return;
 		}
 
-		double daysSinceCheck = (DateTimeOffset.Now - record.LastOnlineCheckTime).TotalDays;
-		if (daysSinceCheck < 7.0)
+		if (!force)
 		{
-			return;
+			double daysSinceCheck = (DateTimeOffset.Now - record.LastOnlineCheckTime).TotalDays;
+			if (daysSinceCheck < 7.0)
+			{
+				return;
+			}
 		}
 
 		try

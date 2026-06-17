@@ -1,3 +1,4 @@
+- Khắc phục lỗi hiển thị thời hạn bản quyền: Tự động gửi yêu cầu kiểm tra trực tuyến và đồng bộ trạng thái mới từ máy chủ bản quyền ngay khi người dùng mở cửa sổ kích hoạt bản quyền (thay vì đợi thời gian kiểm tra định kỳ 7 ngày).
 - Cải tiến tính năng in Snapshot: in sắc nét độ phân giải cao và tự động căn giữa, lấp đầy trang giấy. Hiển thị xem trước ảnh cắt chính xác trong hộp thoại in.
 - Thêm tính năng "Sử dụng liên tục" (Sticky Tools): Giữ các công cụ vẽ nét, hình học, ghi chú, hộp văn bản và snapshot hoạt động liên tục cho đến khi nhấn phím ESC.
 - Sửa lỗi đường dẫn build output và đồng bộ DLL trong run_test.bat.
