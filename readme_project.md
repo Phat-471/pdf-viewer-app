@@ -143,3 +143,59 @@ This project now has a small runtime audit path to help you check what is actual
 - `Auto` uses the detected profile, `WPF Offset` is a manual override, and `Physical` uses raw coordinates.
 - `Canon iX6770 / iX6700` has its own safety padding profile.
 - `Print test frame` is a diagnostic mode that prints border guides so clipping can be identified directly on paper.
+
+Phương án 1 (Khuyên dùng): Sử dụng Inno Setup để tạo file Setup.exe
+Inno Setup là công cụ tạo file cài đặt cho Windows miễn phí, mạnh mẽ và phổ biến nhất. Nó sẽ gom toàn bộ thư mục phát hành (publish) của bạn thành 1 file cài đặt duy nhất, tự động đăng ký với hệ thống để có thể gỡ cài đặt trong Control Panel.
+
+Các bước thực hiện:
+Tải và cài đặt Inno Setup (bản Stable) từ trang chủ: jrsoftware.org.
+Tạo một tệp kịch bản Inno Setup (ví dụ: đặt tên là installer.iss) trong thư mục dự án với nội dung cấu hình dưới đây.
+Dưới đây là file cấu hình Inno Setup mẫu được viết sẵn tối ưu riêng cho PDF Pro:
+
+ini
+; installer.iss
+#define MyAppName "PDF Pro"
+#define MyAppVersion "1.5.0"
+#define MyAppPublisher "HPhat Edition"
+#define MyAppExeName "PdfViewerApp.exe"
+#define MyPublishDir "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\win-x64\publish"
+[Setup]
+AppId={{D3B16A74-7D68-4EA4-BD4D-B66AEFA1FA3C}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={localappdata}\{#MyAppName}
+DisableDirPage=yes
+DefaultGroupName={#MyAppName}
+DisableProgramGroupPage=yes
+OutputDir=releases
+OutputBaseFilename=PDFPro_Setup_v{#MyAppVersion}
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+; Đăng ký hiển thị trong Control Panel (Add/Remove Programs)
+UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayName={#MyAppName} - {#MyAppPublisher}
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+[Files]
+; Copy tất cả các file đã publish (bao gồm cả dll native và file thực thi)
+Source: "{#MyPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+[Icons]
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+[Registry]
+; Đăng ký Menu chuột phải "Ghép PDF"
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Ghép PDF bằng PDF HPhat"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Player"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge"; ValueType: string; ValueName: "Position"; ValueData: "Top"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"" --merge --exit-after-merge"; Flags: uninsdeletekey
+; Hiệp hội mở tệp PDF mặc định
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "PDF Pro - {#MyAppPublisher}"; Flags: uninsdeletekey
+Mở Inno Setup Compiler, load tệp installer.iss lên và bấm Build (phím F9). File cài đặt duy nhất PDFPro_Setup_v1.5.0.exe sẽ được tạo ra trong thư mục releases/. Khi chạy file này, ứng dụng sẽ được cài đặt và tự động xuất hiện trong Control Panel để gỡ cài đặt sạch sẽ.
