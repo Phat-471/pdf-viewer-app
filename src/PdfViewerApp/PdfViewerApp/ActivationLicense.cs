@@ -19,17 +19,17 @@ internal static class ActivationLicense
 
 	private const string KeyPrefix = "PDFPRO";
 
-	private const string ActivationSecret = "HPhat.PdfPro.LocalActivation.2026";
+	private static string ActivationSecret => SecurityHelper.Decrypt("GBQuMSZhACAgACAgfggpMzMjEScyOSQuJC0pPnx9YHZw");
 
-	private const string PublicRsaKeyPem = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv3TlzRt2HaxKlM5To13H\nukhl/2G8koY7Umq9CgRGzi7sxwk9x9bAhvJOzyatV3sahF8nOI4uIR9R7xGRDDvU\nQzWbhV5EvzgN4KSPBMRyuDYJidxKmJh0WrLI3dqs82caFWVkw5Y1xLLJeKt8roXa\njTL9xm7JHEMxqUftQDrKTC386EdT1GuVsXfFpXZgSxCfflqh2VWegE6fvlyVvzXI\nWdEF42IX9JWRs4Yiyw2q4vsGMg7lzu3cs2PxgQDv8JtWjAhvJaNoyNJPdw42bWFj\nESdNUBSS2AmkMtXzw5HGJ2FtFyuGIQaMsDcVcX/UofSl70CJ+piITQBb7F/qXMdN\n8wIDAQAB\n-----END PUBLIC KEY-----";
+	private static string PublicRsaKeyPem => SecurityHelper.Decrypt("fWlrfX8NFQMPHnIfBQYKGRFvGwEffX9ifWlMHRsGEg0sERwNNy83ODkmF30xYBAOAQEAERMAEwUXaBMCGQ0EEzUEEwUXFRM5YxAqKgA7YgwnKBkjHXESP2N8GE4zOzojf3YBaDkgCXMTPSN2EyMUFygmZzc+Jzl2KH0kETo5Ggs8KTM7Bnc1MToJaCoJGWY6GRZ/AmU3FxYCFCQaWhU8BzAnBnEDJigoHnANAwINHRY/JRYWGi0iKBkiGix2ByADGXciISF3YicnFgUZOzNzCWM3HAgMNRk7aDYpCDNFOhAKaSoiZw4OFR83IREgJAMLIg8SE2F3ZgEiBGMIJRI1CDQJIBwcNwE3EyIgPCMnYhIRNTUKZiIwPCsZJj4eGVgYNAEAZGAGCH0MBwA8ZB0vKSV9IXAwIxUCN3MqKid8Mzd0ACooAQAwaBg7By4HOCQFMQopKRwFACAxZGAtBwIsWhccNAoTEgEcYgUrOx87CD4xZRoIGnYAJBQ2JQMPATMCIwAlBjEXfxEpNgEjZ3QFGnk/OQ0SARAtZwJpIQoCNApMaCUGFAUXERBFfWlrfX8KHgBmAAcNHA0FcBkKCWlrfX9i");
 
 	private const string PublicKeyCacheFileName = "public_key.pem";
 
-	public const string ApiActivateUrl = "https://hongmien.vn/wp-json/pdfpro/v1/activate";
+	public static string ApiActivateUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsnMyYmJiUyNQ==");
 
-	public static string ApiPublicKeyUrl => ApiActivateUrl.Replace("/activate", "/public-key");
+	public static string ApiPublicKeyUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs2JTAjOSdrOzc2");
 
-	public static string ApiUpdateUrl => ApiActivateUrl.Replace("/activate", "/update-check");
+	public static string ApiUpdateUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWszIDYuJCFrMzoqMy8=");
 
 	public static string LicenseDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfPro");
 
@@ -164,7 +164,7 @@ internal static class ActivationLicense
 				machine_id = MachineId,
 				machine_name = Environment.MachineName
 			}), Encoding.UTF8, "application/json");
-			HttpResponseMessage response = await client.PostAsync("https://hongmien.vn/wp-json/pdfpro/v1/activate", content);
+			HttpResponseMessage response = await client.PostAsync(ApiActivateUrl, content);
 			string json = await response.Content.ReadAsStringAsync();
 			if (!response.IsSuccessStatusCode)
 			{
@@ -188,7 +188,6 @@ internal static class ActivationLicense
 			if (VerifySignature(payload, text, publicKeyPem))
 			{
 				SaveCachedPublicKeyPem(publicKeyPem);
-				Directory.CreateDirectory(LicenseDirectory);
 				ActivationRecord value2 = new ActivationRecord
 				{
 					ActivationKey = FormatActivationKey(normalizedKey),
@@ -200,22 +199,22 @@ internal static class ActivationLicense
 					ActivatedAt = DateTimeOffset.Now,
 					LastOnlineCheckTime = DateTimeOffset.Now
 				};
-				File.WriteAllText(LicensePath, JsonSerializer.Serialize(value2, new JsonSerializerOptions
-				{
-					WriteIndented = true
-				}), Encoding.UTF8);
+				SaveRecord(value2);
 				return (Success: true, Message: "Đã kích hoạt bản quyền thành công!");
 			}
 			return (Success: false, Message: "Xác minh chữ ký số thất bại. Chi tiết lỗi:\n" + LastVerifyError);
 		}
 		catch (Exception ex)
 		{
-			string cleanMsg = ex.Message;
-			if (cleanMsg.Contains("hongmien.vn") || cleanMsg.Contains("No such host") || cleanMsg.Contains("host") || cleanMsg.Contains("connection") || cleanMsg.Contains("connect"))
+			if (ex is HttpRequestException || ex is System.Net.Sockets.SocketException || ex.Message.Contains("hongmien.vn") || ex.Message.Contains("No such host") || ex.Message.Contains("connection") || ex.Message.Contains("connect"))
 			{
-				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng kiểm tra lại kết nối mạng.");
+				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng mở kết nối Internet (Wifi hoặc mạng dây) để thực hiện kích hoạt.");
 			}
-			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + cleanMsg);
+			if (ex is JsonException || ex is NotSupportedException)
+			{
+				return (Success: false, Message: "Lỗi xử lý dữ liệu kích hoạt từ máy chủ. Vui lòng liên hệ với quản trị viên để hỗ trợ.");
+			}
+			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + ex.Message);
 		}
 	}
 
@@ -266,7 +265,7 @@ internal static class ActivationLicense
 									license_key = key,
 									machine_id = MachineId
 								}), Encoding.UTF8, "application/json");
-								await client.PostAsync("https://hongmien.vn/wp-json/pdfpro/v1/deactivate", content);
+								await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsiNTMsJC0wMSYq"), content);
 							}
 							catch
 							{
@@ -298,6 +297,24 @@ internal static class ActivationLicense
 		return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 	}
 
+	private static void SaveRecord(ActivationRecord record)
+	{
+		try
+		{
+			string originalKey = record.ActivationKey;
+			record.ActivationKey = SecurityHelper.Encrypt(originalKey);
+			Directory.CreateDirectory(LicenseDirectory);
+			File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
+			{
+				WriteIndented = true
+			}), Encoding.UTF8);
+			record.ActivationKey = originalKey;
+		}
+		catch
+		{
+		}
+	}
+
 	private static ActivationRecord? LoadRecord()
 	{
 		try
@@ -306,7 +323,20 @@ internal static class ActivationLicense
 			{
 				return null;
 			}
-			return JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(LicensePath, Encoding.UTF8));
+			var record = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(LicensePath, Encoding.UTF8));
+			if (record != null && !string.IsNullOrEmpty(record.ActivationKey))
+			{
+				try
+				{
+					string decrypted = SecurityHelper.Decrypt(record.ActivationKey);
+					if (!string.IsNullOrEmpty(decrypted))
+					{
+						record.ActivationKey = decrypted;
+					}
+				}
+				catch {}
+			}
+			return record;
 		}
 		catch
 		{
@@ -574,7 +604,7 @@ internal static class ActivationLicense
 				machine_id = MachineId
 			}), Encoding.UTF8, "application/json");
 
-			HttpResponseMessage response = await client.PostAsync("https://hongmien.vn/wp-json/pdfpro/v1/check", content);
+			HttpResponseMessage response = await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWslODcsOw=="), content);
 			string json = await response.Content.ReadAsStringAsync();
 			bool isActivated = false;
 			if (response.IsSuccessStatusCode)
@@ -595,10 +625,7 @@ internal static class ActivationLicense
 							record.Signature = sigVal.GetString() ?? record.Signature;
 						}
 						
-						File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
-						{
-							WriteIndented = true
-						}), Encoding.UTF8);
+						SaveRecord(record);
 					}
 				}
 				catch

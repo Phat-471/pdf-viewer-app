@@ -125,7 +125,7 @@ public partial class MainWindow : Window, IComponentConnector
 			{
 				try
 				{
-					await ActivationLicense.CheckHeartbeatOnlineAsync();
+					await ActivationLicense.CheckHeartbeatOnlineAsync(force: true);
 					await base.Dispatcher.InvokeAsync(delegate
 					{
 						ApplyAppActivationState();

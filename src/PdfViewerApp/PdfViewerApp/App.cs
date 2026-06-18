@@ -25,6 +25,7 @@ public partial class App : Application
 	{
 		base.Startup += async delegate(object sender, StartupEventArgs e)
 		{
+			SecurityHelper.CheckIntegrity();
 			string[] args = e.Args;
 			bool flag = args.Any((string arg) => arg.Equals("--merge", StringComparison.OrdinalIgnoreCase));
 			bool flag2 = args.Any((string arg) => arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase));
@@ -171,7 +172,7 @@ public partial class App : Application
 						os_version = Environment.OSVersion.VersionString,
 						timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 					}), Encoding.UTF8, "application/json");
-					string requestUri = "https://hongmien.vn/wp-json/pdfpro/v1/report-error";
+					string requestUri = SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs0NSIgIjBrNSA9PzY=");
 					await client.PostAsync(requestUri, content);
 				}
 				catch

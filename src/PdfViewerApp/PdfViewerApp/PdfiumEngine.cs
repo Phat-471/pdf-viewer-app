@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Threading;
 
 namespace PdfViewerApp;
 
@@ -19,6 +20,7 @@ public static class PdfiumEngine
 	private static bool _initialized;
 
 	private static readonly object RenderLock = new object();
+	private static readonly ReaderWriterLockSlim LockSlim = new ReaderWriterLockSlim();
 
 	public static object SyncRoot => RenderLock;
 
@@ -90,167 +92,268 @@ public static class PdfiumEngine
 
 	public static void FPDF_InitLibrary()
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_InitLibrary();
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDF_DestroyLibrary()
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_DestroyLibrary();
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static nint FPDF_LoadDocument(string file_path, string? password)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			return Native.FPDF_LoadDocument(file_path, password);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDF_CloseDocument(nint document)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_CloseDocument(document);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static int FPDF_GetPageCount(nint document)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDF_GetPageCount(document);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static nint FPDF_LoadPage(nint document, int page_index)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			return Native.FPDF_LoadPage(document, page_index);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDF_ClosePage(nint page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_ClosePage(page);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static double FPDF_GetPageWidth(nint page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDF_GetPageWidth(page);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static double FPDF_GetPageHeight(nint page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDF_GetPageHeight(page);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static nint FPDFBitmap_CreateEx(int width, int height, int format, nint first_scan, int stride)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			return Native.FPDFBitmap_CreateEx(width, height, format, first_scan, stride);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDFBitmap_FillRect(nint bitmap, int left, int top, int width, int height, uint color)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDFBitmap_FillRect(bitmap, left, top, width, height, color);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDF_RenderPageBitmap(nint bitmap, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_RenderPageBitmap(bitmap, page, start_x, start_y, size_x, size_y, rotate, flags);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDF_RenderPage(nint dc, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_RenderPage(dc, page, start_x, start_y, size_x, size_y, rotate, flags);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDFBitmap_Destroy(nint bitmap)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDFBitmap_Destroy(bitmap);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static nint FPDFText_LoadPage(nint page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			return Native.FPDFText_LoadPage(page);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static void FPDFText_ClosePage(nint text_page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDFText_ClosePage(text_page);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
 	public static int FPDFText_CountChars(nint text_page)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDFText_CountChars(text_page);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static int FPDFText_GetText(nint text_page, int start_index, int count, StringBuilder result)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDFText_GetText(text_page, start_index, count, result);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static int FPDFText_GetCharIndexAtPos(nint text_page, double x, double y, double xTolerance, double yTolerance)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDFText_GetCharIndexAtPos(text_page, x, y, xTolerance, yTolerance);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top)
 	{
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			return Native.FPDFText_GetCharBox(text_page, index, out left, out right, out bottom, out top);
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 
 	public static void Initialize()
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			if (!_initialized)
 			{
@@ -258,17 +361,26 @@ public static class PdfiumEngine
 				_initialized = true;
 			}
 		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
+		}
 	}
 
 	public static void Shutdown()
 	{
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			if (_initialized)
 			{
 				Native.FPDF_DestroyLibrary();
 				_initialized = false;
 			}
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
@@ -278,9 +390,14 @@ public static class PdfiumEngine
 		{
 			return;
 		}
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			Native.FPDF_CloseDocument(document);
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
@@ -292,7 +409,8 @@ public static class PdfiumEngine
 	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight, long maxPixels, bool invertColors = false)
 	{
 		Initialize();
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			nint num = Native.FPDF_LoadDocument(filePath, null);
 			if (num == IntPtr.Zero)
@@ -307,6 +425,10 @@ public static class PdfiumEngine
 			{
 				Native.FPDF_CloseDocument(num);
 			}
+		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
 		}
 	}
 
@@ -327,7 +449,8 @@ public static class PdfiumEngine
 			targetWidth = Math.Max(1, (int)((double)targetWidth * num2));
 			targetHeight = Math.Max(1, (int)((double)targetHeight * num2));
 		}
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			nint num3 = Native.FPDF_LoadPage(document, pageIndex);
 			if (num3 == IntPtr.Zero)
@@ -365,11 +488,25 @@ public static class PdfiumEngine
 
 				if (invertColors)
 				{
-					for (int i = 0; i < array.Length; i += 4)
+					unsafe
 					{
-						array[i] = (byte)(255 - array[i]);       // B
-						array[i + 1] = (byte)(255 - array[i + 1]); // G
-						array[i + 2] = (byte)(255 - array[i + 2]); // R
+						fixed (byte* p = array)
+						{
+							uint* pCol = (uint*)p;
+							int len = array.Length / 4;
+							int j = 0;
+							for (; j <= len - 4; j += 4)
+							{
+								pCol[j] ^= 0x00FFFFFF;
+								pCol[j + 1] ^= 0x00FFFFFF;
+								pCol[j + 2] ^= 0x00FFFFFF;
+								pCol[j + 3] ^= 0x00FFFFFF;
+							}
+							for (; j < len; j++)
+							{
+								pCol[j] ^= 0x00FFFFFF;
+							}
+						}
 					}
 				}
 
@@ -382,6 +519,10 @@ public static class PdfiumEngine
 				Native.FPDF_ClosePage(num3);
 			}
 		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
+		}
 	}
 
 	public static BitmapSource? RenderPageTileToBitmap(nint document, int pageIndex, int fullWidth, int fullHeight, int tileX, int tileY, int tileWidth, int tileHeight, bool invertColors = false)
@@ -393,7 +534,8 @@ public static class PdfiumEngine
 		tileY = Math.Max(0, tileY);
 		tileWidth = Math.Max(1, Math.Min(tileWidth, fullWidth - tileX));
 		tileHeight = Math.Max(1, Math.Min(tileHeight, fullHeight - tileY));
-		lock (RenderLock)
+		LockSlim.EnterWriteLock();
+		try
 		{
 			nint num = Native.FPDF_LoadPage(document, pageIndex);
 			if (num == IntPtr.Zero)
@@ -431,11 +573,25 @@ public static class PdfiumEngine
 
 				if (invertColors)
 				{
-					for (int i = 0; i < array.Length; i += 4)
+					unsafe
 					{
-						array[i] = (byte)(255 - array[i]);       // B
-						array[i + 1] = (byte)(255 - array[i + 1]); // G
-						array[i + 2] = (byte)(255 - array[i + 2]); // R
+						fixed (byte* p = array)
+						{
+							uint* pCol = (uint*)p;
+							int len = array.Length / 4;
+							int j = 0;
+							for (; j <= len - 4; j += 4)
+							{
+								pCol[j] ^= 0x00FFFFFF;
+								pCol[j + 1] ^= 0x00FFFFFF;
+								pCol[j + 2] ^= 0x00FFFFFF;
+								pCol[j + 3] ^= 0x00FFFFFF;
+							}
+							for (; j < len; j++)
+							{
+								pCol[j] ^= 0x00FFFFFF;
+							}
+						}
 					}
 				}
 
@@ -448,12 +604,17 @@ public static class PdfiumEngine
 				Native.FPDF_ClosePage(num);
 			}
 		}
+		finally
+		{
+			LockSlim.ExitWriteLock();
+		}
 	}
 
 	public static bool TryGetPageSizeByIndex(nint document, int pageIndex, out double width, out double height)
 	{
 		Initialize();
-		lock (RenderLock)
+		LockSlim.EnterReadLock();
+		try
 		{
 			try
 			{
@@ -465,6 +626,10 @@ public static class PdfiumEngine
 				height = 0.0;
 				return false;
 			}
+		}
+		finally
+		{
+			LockSlim.ExitReadLock();
 		}
 	}
 }

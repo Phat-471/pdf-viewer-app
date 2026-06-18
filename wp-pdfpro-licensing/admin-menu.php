@@ -996,14 +996,36 @@ function pdfpro_licensing_render_errors_page() {
     $errors = $table_exists ? $wpdb->get_results("SELECT * FROM $table_errors ORDER BY reported_at DESC LIMIT 100") : array();
     ?>
     <div class="wrap pdfpro-admin-wrap">
-        <h1 class="wp-heading-inline">PDF Pro Licensing Server - Nhật Ký Lỗi Telemetry</h1>
+        <h1 class="wp-heading-inline">PDF Pro Licensing Server - Nhật Ký Lỗi Telemetry & Bảo Mật</h1>
         <hr class="wp-header-end">
 
         <div style="margin-top: 20px; max-width: 100%;">
+            
+            <!-- Trình tạo mã mở khóa theo Machine ID -->
+            <div class="card" style="padding: 24px; max-width: 600px; margin-bottom: 24px; background: #111827; border: 1px solid #1E293B; border-radius: 10px;">
+                <h2>Trình Tạo Mã Mở Khóa Khẩn Cấp (Bypass Key Generator)</h2>
+                <p style="font-size: 13px; color: #94A3B8; margin-bottom: 15px;">
+                    Nhập Machine ID của thiết bị bị khóa để tự động tạo mã mở khóa khôi phục (Bypass Key). Cung cấp mã này cho người dùng để kích hoạt chạy lại app bình thường.
+                </p>
+                <div style="margin-bottom: 12px;">
+                    <label><strong>Mã máy (Machine ID):</strong></label><br>
+                    <input type="text" id="pdfpro_bypass_machine_id" placeholder="Ví dụ: DCA6-8A6C-9FD7-CDFD" style="width: 100%; margin-top: 6px; margin-bottom: 12px; text-transform: uppercase;">
+                    <button type="button" class="button button-primary" id="pdfpro_btn_generate_bypass" style="background: #D97706 !important; border-color: #D97706 !important; width: 100%; font-weight: 700; height: 40px;">TẠO MÃ MỞ KHÓA</button>
+                </div>
+                <div id="pdfpro_bypass_result_area" style="display: none; margin-top: 15px; background: #1E293B; border: 1px solid #334155; border-radius: 8px; padding: 16px;">
+                    <span style="font-size: 12px; color: #94A3B8; font-weight: 600;">Mã khôi phục mở khóa cho thiết bị này:</span>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px;">
+                        <strong style="font-size: 18px; color: #F59E0B; font-family: monospace; letter-spacing: 1px;" id="pdfpro_bypass_key_output"></strong>
+                        <button type="button" class="button button-small" id="pdfpro_btn_copy_bypass" style="background: #334155; border-color: #475569; color: #FFF;">Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danh sách log telemetry -->
             <div class="card" style="padding: 20px;">
                 <h2>Telemetry Crash & Runtime Error Logs</h2>
-                <p style="font-size: 13px; color: #666; margin-bottom: 20px;">
-                    Nhật ký các lỗi runtime/crash được tự động báo cáo về từ ứng dụng Desktop của khách hàng để lập trình viên theo dõi và gỡ lỗi (debug).
+                <p style="font-size: 13px; color: #94A3B8; margin-bottom: 20px;">
+                    Nhật ký các lỗi runtime/crash và báo động bảo mật được tự động báo cáo về từ ứng dụng Desktop của khách hàng.
                 </p>
 
                 <?php if (empty($errors)) : ?>
@@ -1018,21 +1040,32 @@ function pdfpro_licensing_render_errors_page() {
                                     <th style="width: 110px;">Thiết bị (Machine)</th>
                                     <th style="width: 160px;">Hệ điều hành</th>
                                     <th>Thông báo lỗi</th>
-                                    <th style="width: 100px;">Hành động</th>
+                                    <th style="width: 180px;">Hành động</th>
                                 </tr>
                             </thead>
                         <tbody>
                             <?php foreach ($errors as $err) : ?>
-                                <tr>
+                                <tr style="<?php echo (strpos($err->error_message, 'SECURITY_VIOLATION') !== false) ? 'background-color: rgba(239, 68, 68, 0.08) !important;' : ''; ?>">
                                     <td><?php echo esc_html(date_i18n('d/m/Y H:i:s', strtotime($err->reported_at))); ?></td>
-                                    <td><span style="background: #e7e7e7; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size:11px;">v<?php echo esc_html($err->app_version); ?></span></td>
+                                    <td><span style="background: #e7e7e7; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size:11px; color:#333;">v<?php echo esc_html($err->app_version); ?></span></td>
                                     <td><code><?php echo esc_html($err->machine_id); ?></code></td>
                                     <td><?php echo esc_html($err->os_version); ?></td>
-                                    <td><strong style="color: #c9302c;"><?php echo esc_html($err->error_message); ?></strong></td>
+                                    <td>
+                                        <?php if (strpos($err->error_message, 'SECURITY_VIOLATION') !== false) : ?>
+                                            <strong style="color: #EF4444; font-weight: 700;"><?php echo esc_html($err->error_message); ?></strong>
+                                        <?php else : ?>
+                                            <strong style="color: #F59E0B;"><?php echo esc_html($err->error_message); ?></strong>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <button type="button" class="button button-small button-secondary" onclick="showStackTrace('<?php echo esc_js('Lỗi thiết bị ' . $err->machine_id . ' (v' . $err->app_version . ')'); ?>', '<?php echo esc_js($err->stack_trace); ?>')">
-                                            Xem chi tiết
+                                            Chi tiết
                                         </button>
+                                        <?php if (strpos($err->error_message, 'SECURITY_VIOLATION') !== false) : ?>
+                                            <button type="button" class="button button-small button-primary pdfpro-generate-bypass" data-machine-id="<?php echo esc_attr($err->machine_id); ?>" style="background: #D97706 !important; border-color: #D97706 !important; margin-left: 4px;">
+                                                Mã mở khóa
+                                            </button>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1076,6 +1109,61 @@ function pdfpro_licensing_render_errors_page() {
             modal.style.display = 'none';
         }
     }
+
+    // Tích hợp xử lý tạo mã mở khóa theo Machine ID bằng Client-side SHA256 Web Crypto
+    jQuery(document).ready(function($) {
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        async function generateUnlockKey(machineId) {
+            machineId = machineId.trim().toUpperCase();
+            if (!machineId) return '';
+            const salt = "HPhat.PdfPro.LockBypass.2026";
+            const input = machineId + salt;
+            const hash = await sha256(input);
+            const part = hash.substring(0, 16);
+            
+            const blocks = [];
+            for (let i = 0; i < part.length; i += 4) {
+                blocks.push(part.substring(i, i + 4));
+            }
+            return "PDFPRO-UNLOCK-" + blocks.join('-');
+        }
+
+        $('#pdfpro_btn_generate_bypass').on('click', async function() {
+            const machineId = $('#pdfpro_bypass_machine_id').val();
+            if (!machineId) {
+                alert('Vui lòng nhập Machine ID.');
+                return;
+            }
+            const key = await generateUnlockKey(machineId);
+            $('#pdfpro_bypass_key_output').text(key);
+            $('#pdfpro_bypass_result_area').slideDown();
+        });
+
+        $('.pdfpro-generate-bypass').on('click', async function() {
+            const machineId = $(this).attr('data-machine-id');
+            $('#pdfpro_bypass_machine_id').val(machineId);
+            const key = await generateUnlockKey(machineId);
+            $('#pdfpro_bypass_key_output').text(key);
+            $('#pdfpro_bypass_result_area').slideDown();
+            $('html, body').animate({
+                scrollTop: $('#pdfpro_bypass_machine_id').offset().top - 50
+            }, 500);
+        });
+
+        $('#pdfpro_btn_copy_bypass').on('click', function() {
+            const text = $('#pdfpro_bypass_key_output').text();
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Đã copy mã mở khóa: ' + text);
+            });
+        });
+    });
     </script>
     <?php
 }

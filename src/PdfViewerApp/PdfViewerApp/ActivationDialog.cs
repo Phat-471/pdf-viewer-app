@@ -31,7 +31,7 @@ public partial class ActivationDialog : Window, IComponentConnector
 		ActivationState activationState = ActivationLicense.LoadState();
 		VersionTextBlock.Text = activationState.AppVersion;
 		MachineIdTextBox.Text = activationState.MachineId;
-		ActivationKeyTextBox.Text = activationState.ActivationKey;
+		ActivationKeyTextBox.Text = SecurityHelper.MaskKey(activationState.ActivationKey);
 		StatusTextBlock.Text = (activationState.IsActivated ? ("Đã kích hoạt (Hạn: " + activationState.ExpirationText + ")") : "Chưa kích hoạt");
 		StatusTextBlock.Foreground = (activationState.IsActivated ? new SolidColorBrush(Color.FromRgb(16, 185, 129)) : new SolidColorBrush(Color.FromRgb(239, 68, 68)));
 	}
