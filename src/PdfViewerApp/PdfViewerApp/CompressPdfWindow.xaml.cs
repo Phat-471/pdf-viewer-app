@@ -14,12 +14,7 @@ namespace PdfViewerApp
 
         public string? CompressedPdfPath { get; private set; }
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool compress_pdf(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
-            byte imageQuality,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
-        );
+
 
         public CompressPdfWindow(string sourcePdfPath)
         {
@@ -61,7 +56,7 @@ namespace PdfViewerApp
             {
                 try
                 {
-                    return compress_pdf(_sourcePdfPath, quality, tempOutFile);
+                    return PdfInterop.PdfCore.compress_pdf(_sourcePdfPath, quality, tempOutFile);
                 }
                 catch
                 {

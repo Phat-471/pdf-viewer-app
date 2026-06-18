@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -14,23 +14,17 @@ namespace PdfViewerApp;
 
 public partial class MergeDialog : Window, IComponentConnector
 {
-	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-	private delegate void MergeProgressCallback(uint current, uint total);
-
 	private readonly HashSet<string> _fileSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
 	private readonly bool _autoStartMerge;
 
 	private bool _mergeInProgress;
 
-	private MergeProgressCallback? _progressCallback;
+	private PdfInterop.PdfCore.MergeProgressCallback? _progressCallback;
 
 	public ObservableCollection<PdfFileItem> Files { get; } = new ObservableCollection<PdfFileItem>();
 
 	public string? MergedFilePath { get; private set; }
-
-	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-	private static extern bool merge_pdfs_with_progress([MarshalAs(UnmanagedType.LPUTF8Str)] string pathsSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath, MergeProgressCallback? progressCallback);
 
 	public MergeDialog()
 		: this(null, autoStartMerge: false, sortInitialFilesByName: false)
@@ -194,7 +188,7 @@ public partial class MergeDialog : Window, IComponentConnector
 					StatusText.Text = "Đang gộp PDF, không tắt ứng dụng trong lúc này.";
 				});
 			};
-			bool num2 = await Task.Run(() => merge_pdfs_with_progress(pathsJoined, targetPath, _progressCallback));
+			bool num2 = await Task.Run(() => PdfInterop.PdfCore.merge_pdfs_with_progress(pathsJoined, targetPath, _progressCallback));
 			mergeSw.Stop();
 			if (num2)
 			{

@@ -18,12 +18,7 @@ public partial class SplitDialog : Window, IComponentConnector
     private int _pageCount = 0;
     private bool _splitInProgress = false;
 
-    [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern bool extract_pdf_pages(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pagesSemicolon,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
-    );
+
 
     public SplitDialog() : this(null)
     {
@@ -208,7 +203,7 @@ public partial class SplitDialog : Window, IComponentConnector
                 SplitProgress.Value = 0;
                 ProgressText.Text = $"Đang trích xuất các trang: {rangeStr}...";
 
-                bool success = await Task.Run(() => extract_pdf_pages(_sourceFile, pagesJoined, outPath));
+                bool success = await Task.Run(() => PdfInterop.PdfCore.extract_pdf_pages(_sourceFile, pagesJoined, outPath));
                 if (success)
                 {
                     SplitProgress.Value = 1;
@@ -245,7 +240,7 @@ public partial class SplitDialog : Window, IComponentConnector
                     string outPath = Path.Combine(outputFolder, $"{baseName}_tách_{rangeLabel}.pdf");
 
                     ProgressText.Text = $"Đang xử lý nhóm trang {rangeLabel} ({filesCreated + 1}/{totalSteps})...";
-                    bool success = await Task.Run(() => extract_pdf_pages(_sourceFile, pagesJoined, outPath));
+                    bool success = await Task.Run(() => PdfInterop.PdfCore.extract_pdf_pages(_sourceFile, pagesJoined, outPath));
                     if (!success)
                     {
                         MessageBox.Show($"Thất bại ở nhóm trang {rangeLabel}.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -271,7 +266,7 @@ public partial class SplitDialog : Window, IComponentConnector
                 {
                     string outPath = Path.Combine(outputFolder, $"{baseName}_trang_{page}.pdf");
                     ProgressText.Text = $"Đang trích xuất trang {page}/{_pageCount}...";
-                    bool success = await Task.Run(() => extract_pdf_pages(_sourceFile, page.ToString(), outPath));
+                    bool success = await Task.Run(() => PdfInterop.PdfCore.extract_pdf_pages(_sourceFile, page.ToString(), outPath));
                     if (!success)
                     {
                         MessageBox.Show($"Thất bại ở trang {page}.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -318,7 +313,7 @@ public partial class SplitDialog : Window, IComponentConnector
                     string outPath = Path.Combine(outputFolder, $"{baseName}_tách_{safeLabel}.pdf");
 
                     ProgressText.Text = $"Đang xử lý nhóm trang {cleanPart} ({groupIndex + 1}/{groupParts.Length})...";
-                    bool success = await Task.Run(() => extract_pdf_pages(_sourceFile, pagesJoined, outPath));
+                    bool success = await Task.Run(() => PdfInterop.PdfCore.extract_pdf_pages(_sourceFile, pagesJoined, outPath));
                     if (!success)
                     {
                         MessageBox.Show($"Thất bại ở nhóm trang '{cleanPart}'.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);

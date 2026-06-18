@@ -16,18 +16,7 @@ namespace PdfViewerApp
 
         public string? WatermarkedPdfPath { get; private set; }
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool add_pdf_watermark(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
-            double angle,
-            double opacity,
-            double fontSize,
-            double r,
-            double g,
-            double b,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
-        );
+
 
         public WatermarkDialog(string sourcePdfPath)
         {
@@ -77,7 +66,7 @@ namespace PdfViewerApp
             {
                 try
                 {
-                    return add_pdf_watermark(_sourcePdfPath, text, angle, opacity, fontSize, r, g, b, tempOutFile);
+                    return PdfInterop.PdfCore.add_pdf_watermark(_sourcePdfPath, text, angle, opacity, fontSize, r, g, b, tempOutFile);
                 }
                 catch
                 {

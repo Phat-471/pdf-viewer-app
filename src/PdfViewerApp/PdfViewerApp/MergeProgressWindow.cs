@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,8 +8,7 @@ namespace PdfViewerApp;
 
 public partial class MergeProgressWindow : Window, IComponentConnector
 {
-	[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-	public delegate void MergeProgressDelegate(uint current, uint total);
+
 
 	private readonly string _pathsSemicolon;
 
@@ -18,9 +17,6 @@ public partial class MergeProgressWindow : Window, IComponentConnector
 	private bool _isCancelled;
 
 	public bool MergeResult { get; private set; }
-
-	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-	public static extern bool merge_pdfs_with_progress([MarshalAs(UnmanagedType.LPUTF8Str)] string pathsSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath, MergeProgressDelegate progressCb);
 
 	public MergeProgressWindow(string pathsSemicolon, string outputPath)
 	{
@@ -36,7 +32,7 @@ public partial class MergeProgressWindow : Window, IComponentConnector
 		{
 			try
 			{
-				return merge_pdfs_with_progress(_pathsSemicolon, _outputPath, delegate(uint current, uint total)
+				return PdfInterop.PdfCore.merge_pdfs_with_progress(_pathsSemicolon, _outputPath, delegate(uint current, uint total)
 				{
 					base.Dispatcher.BeginInvoke((Action)delegate
 					{

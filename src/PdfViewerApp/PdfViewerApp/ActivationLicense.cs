@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Win32;
 
 namespace PdfViewerApp;
@@ -156,15 +157,15 @@ internal static class ActivationLicense
 		}
 		try
 		{
-			using HttpClient client = new HttpClient();
-			client.Timeout = TimeSpan.FromSeconds(15.0);
+			var client = HttpHelper.Client;
+			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15.0));
 			StringContent content = new StringContent(JsonSerializer.Serialize(new
 			{
 				license_key = normalizedKey,
 				machine_id = MachineId,
 				machine_name = Environment.MachineName
 			}), Encoding.UTF8, "application/json");
-			HttpResponseMessage response = await client.PostAsync(ApiActivateUrl, content);
+			HttpResponseMessage response = await client.PostAsync(ApiActivateUrl, content, cts.Token);
 			string json = await response.Content.ReadAsStringAsync();
 			if (!response.IsSuccessStatusCode)
 			{
@@ -258,14 +259,14 @@ internal static class ActivationLicense
 						{
 							try
 							{
-								using HttpClient client = new HttpClient();
-								client.Timeout = TimeSpan.FromSeconds(5.0);
+								var client = HttpHelper.Client;
+								using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
 								StringContent content = new StringContent(JsonSerializer.Serialize(new
 								{
 									license_key = key,
 									machine_id = MachineId
 								}), Encoding.UTF8, "application/json");
-								await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsiNTMsJC0wMSYq"), content);
+								await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsiNTMsJC0wMSYq"), content, cts.Token);
 							}
 							catch
 							{
@@ -415,9 +416,10 @@ internal static class ActivationLicense
 	{
 		try
 		{
-			using HttpClient client = new HttpClient();
-			client.Timeout = TimeSpan.FromSeconds(10.0);
-			string json = await client.GetStringAsync(ApiPublicKeyUrl);
+			var client = HttpHelper.Client;
+			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10.0));
+			HttpResponseMessage response = await client.GetAsync(ApiPublicKeyUrl, cts.Token);
+			string json = await response.Content.ReadAsStringAsync();
 			using JsonDocument jsonDocument = JsonDocument.Parse(json);
 			if (jsonDocument.RootElement.TryGetProperty("public_key", out var value))
 			{
@@ -524,10 +526,10 @@ internal static class ActivationLicense
 		_ = 1;
 		try
 		{
-			using HttpClient client = new HttpClient();
-			client.Timeout = TimeSpan.FromSeconds(10.0);
+			var client = HttpHelper.Client;
+			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10.0));
 			string requestUri = "https://hongmien.vn/wp-json/pdfpro/v1/activate".Replace("/activate", "/update-check");
-			HttpResponseMessage httpResponseMessage = await client.GetAsync(requestUri);
+			HttpResponseMessage httpResponseMessage = await client.GetAsync(requestUri, cts.Token);
 			if (!httpResponseMessage.IsSuccessStatusCode)
 			{
 				return (UpdateAvailable: false, LatestVersion: string.Empty, DownloadUrl: string.Empty, Changelog: string.Empty);
@@ -596,15 +598,15 @@ internal static class ActivationLicense
 
 		try
 		{
-			using HttpClient client = new HttpClient();
-			client.Timeout = TimeSpan.FromSeconds(10.0);
+			var client = HttpHelper.Client;
+			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10.0));
 			StringContent content = new StringContent(JsonSerializer.Serialize(new
 			{
 				license_key = NormalizeKey(record.ActivationKey),
 				machine_id = MachineId
 			}), Encoding.UTF8, "application/json");
 
-			HttpResponseMessage response = await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWslODcsOw=="), content);
+			HttpResponseMessage response = await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWslODcsOw=="), content, cts.Token);
 			string json = await response.Content.ReadAsStringAsync();
 			bool isActivated = false;
 			if (response.IsSuccessStatusCode)

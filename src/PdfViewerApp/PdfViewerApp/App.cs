@@ -161,8 +161,8 @@ public partial class App : Application
 			{
 				try
 				{
-					using HttpClient client = new HttpClient();
-					client.Timeout = TimeSpan.FromSeconds(5.0);
+					var client = HttpHelper.Client;
+					using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
 					StringContent content = new StringContent(JsonSerializer.Serialize(new
 					{
 						app_version = ActivationLicense.AppVersion,
@@ -173,7 +173,7 @@ public partial class App : Application
 						timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 					}), Encoding.UTF8, "application/json");
 					string requestUri = SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs0NSIgIjBrNSA9PzY=");
-					await client.PostAsync(requestUri, content);
+					await client.PostAsync(requestUri, content, cts.Token);
 				}
 				catch
 				{

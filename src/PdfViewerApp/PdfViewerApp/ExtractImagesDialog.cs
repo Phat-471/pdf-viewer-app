@@ -12,11 +12,7 @@ namespace PdfViewerApp
         private readonly string _sourcePdfPath;
         private bool _isWorking;
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern int extract_pdf_images(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputDir
-        );
+
 
         public ExtractImagesDialog(string sourcePdfPath)
         {
@@ -61,7 +57,7 @@ namespace PdfViewerApp
             {
                 try
                 {
-                    return extract_pdf_images(_sourcePdfPath, outDir);
+                    return PdfInterop.PdfCore.extract_pdf_images(_sourcePdfPath, outDir);
                 }
                 catch
                 {

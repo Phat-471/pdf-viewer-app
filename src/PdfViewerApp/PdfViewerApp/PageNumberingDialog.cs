@@ -16,17 +16,7 @@ namespace PdfViewerApp
 
         public string? NumberedPdfPath { get; private set; }
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool add_pdf_page_numbers(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string formatStr,
-            int position,
-            double fontSize,
-            double r,
-            double g,
-            double b,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
-        );
+
 
         public PageNumberingDialog(string sourcePdfPath)
         {
@@ -80,7 +70,7 @@ namespace PdfViewerApp
             {
                 try
                 {
-                    return add_pdf_page_numbers(_sourcePdfPath, format, position, fontSize, r, g, b, tempOutFile);
+                    return PdfInterop.PdfCore.add_pdf_page_numbers(_sourcePdfPath, format, position, fontSize, r, g, b, tempOutFile);
                 }
                 catch
                 {

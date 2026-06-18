@@ -61,17 +61,7 @@ namespace PdfViewerApp
 
         public string? SavedPdfPath { get; private set; }
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool reorder_pdf_pages([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, [MarshalAs(UnmanagedType.LPUTF8Str)] string orderSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool rotate_pdf_page([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, int pageNumber, int rotationDelta, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
-
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool delete_pdf_page([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, int pageNumber, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
-
-        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-        private static extern bool insert_blank_page([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, int targetPage, bool insertBefore, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
         public PageOrganizerWindow(string pdfPath, nint documentHandle)
         {
@@ -327,7 +317,7 @@ namespace PdfViewerApp
                     string step1File = Path.Combine(tempDir, $"{Guid.NewGuid():N}.pdf");
                     if (existingPageOrder.Count > 0)
                     {
-                        reorder_pdf_pages(currentTempFile, orderSemicolon, step1File);
+                        PdfInterop.PdfCore.reorder_pdf_pages(currentTempFile, orderSemicolon, step1File);
                         currentTempFile = step1File;
                     }
 
@@ -343,7 +333,7 @@ namespace PdfViewerApp
                             // insert_blank_page takes 1-based index targetPage
                             // targetPage is the page index where we insert
                             // insertBefore: if true, before i+1 (which is at index i).
-                            insert_blank_page(currentTempFile, i + 1, true, step2File);
+                            PdfInterop.PdfCore.insert_blank_page(currentTempFile, i + 1, true, step2File);
                             currentTempFile = step2File;
                         }
                     }
@@ -355,7 +345,7 @@ namespace PdfViewerApp
                         if (_items[i].RotationAngle != 0)
                         {
                             string step3File = Path.Combine(tempDir, $"{Guid.NewGuid():N}.pdf");
-                            rotate_pdf_page(currentTempFile, i + 1, _items[i].RotationAngle, step3File);
+                            PdfInterop.PdfCore.rotate_pdf_page(currentTempFile, i + 1, _items[i].RotationAngle, step3File);
                             currentTempFile = step3File;
                         }
                     }

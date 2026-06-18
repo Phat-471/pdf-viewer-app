@@ -99,11 +99,7 @@ public partial class MainWindow : Window, IComponentConnector
 		}
 	}
 
-	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-	public static extern bool merge_pdfs([MarshalAs(UnmanagedType.LPUTF8Str)] string pathsSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
-	[DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
-	public static extern bool extract_pdf_pages([MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, [MarshalAs(UnmanagedType.LPUTF8Str)] string pagesSemicolon, [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
 	public MainWindow()
 	{
@@ -181,7 +177,7 @@ public partial class MainWindow : Window, IComponentConnector
 		{
 			try
 			{
-				using var httpClient = new HttpClient();
+				var httpClient = HttpHelper.Client;
 				var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
 				var result = await updateService.CheckAsync();
 				if (result.HasUpdate && !string.IsNullOrEmpty(result.Response.DownloadUrl))
@@ -277,7 +273,7 @@ public partial class MainWindow : Window, IComponentConnector
 		}
 		try
 		{
-			using var client = new HttpClient();
+			var client = HttpHelper.Client;
 			using HttpResponseMessage response = await client.GetAsync(url);
 			if (response.IsSuccessStatusCode)
 			{
@@ -333,7 +329,7 @@ public partial class MainWindow : Window, IComponentConnector
 		LogStatus("Đang kiểm tra cập nhật...");
 		try
 		{
-			using var httpClient = new HttpClient();
+			var httpClient = HttpHelper.Client;
 			var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
 			var result = await updateService.CheckAsync();
 			if (result.HasUpdate)
