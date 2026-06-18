@@ -130,6 +130,12 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
         return new WP_Error('missing_params', 'Yêu cầu điền đầy đủ license_key và machine_id.', array('status' => 400));
     }
 
+    // Kiểm tra thiết bị bị chặn (Blacklist)
+    $blacklisted = get_option('pdfpro_blacklisted_devices', array());
+    if (is_array($blacklisted) && in_array($machine_id, $blacklisted)) {
+        return new WP_Error('device_banned', 'Thiết bị này đã bị khóa do vi phạm bảo mật.', array('status' => 403));
+    }
+
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
 
@@ -239,7 +245,11 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
     }
 
     $status = 'activated';
-    if ($license->status !== 'active') {
+    // Kiểm tra thiết bị bị chặn (Blacklist)
+    $blacklisted = get_option('pdfpro_blacklisted_devices', array());
+    if (is_array($blacklisted) && in_array($machine_id, $blacklisted)) {
+        $status = 'suspended';
+    } elseif ($license->status !== 'active') {
         $status = 'suspended';
     } elseif ($license->expires_at && strtotime($license->expires_at) < time()) {
         $status = 'expired';

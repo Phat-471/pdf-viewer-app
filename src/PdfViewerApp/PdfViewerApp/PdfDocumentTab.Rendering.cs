@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -1023,7 +1023,15 @@ public partial class PdfDocumentTab
 		await Task.Delay(IsHighCostRenderZoom() ? 450 : 150);
 		int pageCount = PageCount;
 		int priority = 10;
-		int maxDistance = (IsHighCostRenderZoom() ? 1 : 2);
+		int maxDistance = 2;
+		if (IsHighCostRenderZoom())
+		{
+			maxDistance = 1;
+		}
+		else if (MaxBitmapCacheBytes > 536870912L) // > 512MB
+		{
+			maxDistance = 4;
+		}
 		foreach (int item in GetProgressivePageOrder(selectedPage, pageCount))
 		{
 			if (renderGeneration != _renderGeneration)

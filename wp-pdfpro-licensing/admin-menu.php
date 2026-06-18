@@ -273,6 +273,48 @@ function pdfpro_licensing_admin_styles() {
         .pdfpro-admin-wrap hr.wp-header-end {
             display: none !important;
         }
+        /* Stats Dashboard Grid */
+        .pdfpro-stats-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+            gap: 20px !important;
+            margin-bottom: 28px !important;
+        }
+        .pdfpro-stat-card {
+            background: #111827 !important;
+            border: 1px solid #1E293B !important;
+            border-radius: 10px !important;
+            padding: 20px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            transition: transform 0.2s ease, border-color 0.2s ease !important;
+        }
+        .pdfpro-stat-card:hover {
+            transform: translateY(-2px) !important;
+            border-color: #334155 !important;
+        }
+        .pdfpro-stat-card .stat-title {
+            font-size: 11px !important;
+            color: #94A3B8 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 1px !important;
+            margin-bottom: 6px !important;
+            font-weight: 700 !important;
+        }
+        .pdfpro-stat-card .stat-number {
+            font-size: 32px !important;
+            color: #F8FAFC !important;
+            font-weight: 800 !important;
+            margin: 0 !important;
+            font-family: Menlo, Monaco, Consolas, monospace !important;
+        }
+        .pdfpro-stat-card .stat-trend {
+            font-size: 11px !important;
+            color: #64748B !important;
+            margin-top: 4px !important;
+        }
     </style>
     <?php
 }
@@ -320,7 +362,17 @@ function pdfpro_licensing_add_admin_menu() {
         'pdfpro_licensing_render_errors_page'
     );
 
-    // Submenu 4: Tạo Key Mới
+    // Submenu 4: Thiết bị bị Khóa
+    add_submenu_page(
+        'pdfpro-licensing',
+        'Thiết bị bị Khóa',
+        'Thiết bị bị Khóa',
+        'manage_options',
+        'pdfpro-blocked-devices',
+        'pdfpro_licensing_render_blocked_devices_page'
+    );
+
+    // Submenu 5: Tạo Key Mới
     add_submenu_page(
         'pdfpro-licensing',
         'Tạo Key Mới',
@@ -526,6 +578,50 @@ function pdfpro_licensing_handle_admin_actions() {
         wp_safe_redirect(add_query_arg('pdfpro_msg', 'logs_cleared', $errors_url));
         exit;
     }
+
+    // I. Xử lý khóa Thiết bị (Blacklist Machine ID)
+    if (isset($_POST['pdfpro_action']) && $_POST['pdfpro_action'] === 'block_device') {
+        $machine_id = sanitize_text_field($_POST['machine_id'] ?? '');
+        if (!empty($machine_id)) {
+            $blacklisted = get_option('pdfpro_blacklisted_devices', array());
+            if (!is_array($blacklisted)) $blacklisted = array();
+            if (!in_array($machine_id, $blacklisted)) {
+                $blacklisted[] = $machine_id;
+                update_option('pdfpro_blacklisted_devices', $blacklisted);
+            }
+            // Xóa khỏi whitelist nếu có
+            $whitelisted = get_option('pdfpro_whitelisted_devices', array());
+            if (is_array($whitelisted) && in_array($machine_id, $whitelisted)) {
+                $whitelisted = array_diff($whitelisted, array($machine_id));
+                update_option('pdfpro_whitelisted_devices', $whitelisted);
+            }
+            $target_url = admin_url('admin.php?page=pdfpro-blocked-devices');
+            wp_safe_redirect(add_query_arg('pdfpro_msg', 'device_blocked', $target_url));
+            exit;
+        }
+    }
+
+    // J. Xử lý mở khóa Thiết bị (Unblock/Whitelist Machine ID)
+    if (isset($_POST['pdfpro_action']) && $_POST['pdfpro_action'] === 'unblock_device') {
+        $machine_id = sanitize_text_field($_POST['machine_id'] ?? '');
+        if (!empty($machine_id)) {
+            $blacklisted = get_option('pdfpro_blacklisted_devices', array());
+            if (is_array($blacklisted) && in_array($machine_id, $blacklisted)) {
+                $blacklisted = array_diff($blacklisted, array($machine_id));
+                update_option('pdfpro_blacklisted_devices', $blacklisted);
+            }
+            // Thêm vào whitelist để chắc chắn hoạt động bình thường
+            $whitelisted = get_option('pdfpro_whitelisted_devices', array());
+            if (!is_array($whitelisted)) $whitelisted = array();
+            if (!in_array($machine_id, $whitelisted)) {
+                $whitelisted[] = $machine_id;
+                update_option('pdfpro_whitelisted_devices', $whitelisted);
+            }
+            $target_url = admin_url('admin.php?page=pdfpro-blocked-devices');
+            wp_safe_redirect(add_query_arg('pdfpro_msg', 'device_unblocked', $target_url));
+            exit;
+        }
+    }
 }
 
 /**
@@ -560,6 +656,12 @@ function pdfpro_licensing_render_notices() {
             break;
         case 'logs_cleared':
             echo '<div class="notice notice-success is-dismissible"><p>Đã xóa sạch nhật ký lỗi thành công!</p></div>';
+            break;
+        case 'device_blocked':
+            echo '<div class="notice notice-warning is-dismissible"><p>Đã chặn thiết bị (Machine ID) thành công!</p></div>';
+            break;
+        case 'device_unblocked':
+            echo '<div class="notice notice-success is-dismissible"><p>Đã hủy chặn và mở khóa cho thiết bị thành công.</p></div>';
             break;
     }
 }
@@ -597,12 +699,54 @@ function pdfpro_licensing_render_licenses_page() {
     if (file_exists(PDFPRO_PUBLIC_KEY_PATH)) {
         $public_key = file_get_contents(PDFPRO_PUBLIC_KEY_PATH);
     }
+    // Tính toán số liệu thống kê cho Dashboard
+    $total_keys = count($licenses);
+    $active_keys = 0;
+    $suspended_keys = 0;
+    foreach ($licenses as $lic) {
+        if ($lic->status === 'active') {
+            $active_keys++;
+        } else {
+            $suspended_keys++;
+        }
+    }
+    $total_devices = $wpdb->get_var("SELECT COUNT(*) FROM $table_activations");
+    
+    $table_errors = $wpdb->prefix . 'pdfpro_errors';
+    $total_security_violations = 0;
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_errors'") === $table_errors) {
+        $total_security_violations = $wpdb->get_var("SELECT COUNT(*) FROM $table_errors WHERE error_message LIKE '%SECURITY_VIOLATION%'");
+    }
     ?>
     <div class="wrap pdfpro-admin-wrap">
         <h1 class="wp-heading-inline">PDF Pro Licensing Server - Quản lý Bản Quyền</h1>
         <hr class="wp-header-end">
 
         <div style="margin-top: 20px;">
+            
+            <!-- Dashboard Grid -->
+            <div class="pdfpro-stats-grid">
+                <div class="pdfpro-stat-card">
+                    <span class="stat-title">Tổng mã bản quyền</span>
+                    <strong class="stat-number"><?php echo esc_html($total_keys); ?></strong>
+                    <span class="stat-trend"><?php echo esc_html($active_keys); ?> đang hoạt động</span>
+                </div>
+                <div class="pdfpro-stat-card">
+                    <span class="stat-title">Thiết bị đã kích hoạt</span>
+                    <strong class="stat-number"><?php echo esc_html($total_devices); ?></strong>
+                    <span class="stat-trend">Trên tổng số máy khách</span>
+                </div>
+                <div class="pdfpro-stat-card" style="border-left: 3px solid #EF4444 !important;">
+                    <span class="stat-title" style="color: #F87171 !important;">Mã bị khóa / Tạm dừng</span>
+                    <strong class="stat-number" style="color: #EF4444 !important;"><?php echo esc_html($suspended_keys); ?></strong>
+                    <span class="stat-trend">Cần kiểm tra hoặc kích hoạt lại</span>
+                </div>
+                <div class="pdfpro-stat-card" style="border-left: 3px solid #F59E0B !important;">
+                    <span class="stat-title" style="color: #FBBF24 !important;">Cảnh báo bảo mật</span>
+                    <strong class="stat-number" style="color: #F59E0B !important;"><?php echo esc_html($total_security_violations); ?></strong>
+                    <span class="stat-trend">Phát hiện dịch ngược hoặc debugger</span>
+                </div>
+            </div>
             
             <!-- Danh sách Licenses -->
             <div class="card" style="max-width: 100%; margin-bottom: 20px; padding: 20px;">
@@ -1255,6 +1399,123 @@ function pdfpro_licensing_render_create_page() {
                     </form>
                 <?php endif; ?>
             </div>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * SUBMENU 4: Hiển thị giao diện quản lý Thiết bị bị Khóa (Blocked Devices)
+ */
+function pdfpro_licensing_render_blocked_devices_page() {
+    // Hiển thị thông báo kết quả hành động
+    pdfpro_licensing_render_notices();
+
+    $blacklisted = get_option('pdfpro_blacklisted_devices', array());
+    if (!is_array($blacklisted)) $blacklisted = array();
+
+    $whitelisted = get_option('pdfpro_whitelisted_devices', array());
+    if (!is_array($whitelisted)) $whitelisted = array();
+    ?>
+    <div class="wrap pdfpro-admin-wrap">
+        <h1 class="wp-heading-inline">PDF Pro Licensing Server - Thiết bị bị Khóa & Whitelist</h1>
+        <hr class="wp-header-end">
+
+        <div style="margin-top: 20px;">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                
+                <!-- Bảng thêm thiết bị thủ công -->
+                <div class="card" style="flex: 1 1 350px; padding: 20px; background: #111827; border: 1px solid #1E293B; border-radius: 10px;">
+                    <h2>Quản lý Thủ Công</h2>
+                    <p style="font-size: 13px; color: #94A3B8;">Thêm thủ công Machine ID vào danh sách đen hoặc danh sách trắng.</p>
+                    <form method="post">
+                        <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
+                        <p>
+                            <label><strong>Mã máy (Machine ID):</strong></label><br>
+                            <input type="text" name="machine_id" placeholder="Ví dụ: DCA6-8A6C-9FD7-CDFD" style="width: 100%; margin-top: 5px; text-transform: uppercase;" required>
+                        </p>
+                        <p style="margin-top: 15px;">
+                            <button type="submit" name="pdfpro_action" value="block_device" class="button button-primary" style="background: #EF4444 !important; border-color: #EF4444 !important;">Chặn Thiết Bị (Blacklist)</button>
+                            <button type="submit" name="pdfpro_action" value="unblock_device" class="button button-secondary" style="margin-left: 5px;">Mở Khóa (Whitelist)</button>
+                        </p>
+                    </form>
+                </div>
+
+                <!-- Thống kê nhỏ -->
+                <div class="card" style="flex: 1 1 250px; padding: 20px; background: #111827; border: 1px solid #1E293B; border-radius: 10px;">
+                    <h2>Trạng thái hệ thống</h2>
+                    <div style="margin-top: 15px;">
+                        <p>🚫 Thiết bị bị chặn: <strong style="color: #EF4444; font-size: 16px;"><?php echo count($blacklisted); ?></strong></p>
+                        <p>✅ Thiết bị whitelist/mở khóa: <strong style="color: #10B981; font-size: 16px;"><?php echo count($whitelisted); ?></strong></p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Danh sách thiết bị bị Chặn -->
+            <div class="card" style="margin-top: 24px; padding: 20px;">
+                <h2>Danh sách thiết bị bị chặn (Blacklist)</h2>
+                <p style="font-size: 13px; color: #94A3B8; margin-bottom: 15px;">Các thiết bị trong danh sách này sẽ không thể chạy ứng dụng dù có License hợp lệ.</p>
+                <?php if (empty($blacklisted)) : ?>
+                    <p>Chưa có thiết bị nào bị chặn.</p>
+                <?php else : ?>
+                    <table class="wp-list-table widefat striped" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="width: 70%;">Machine ID</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($blacklisted as $dev_id) : ?>
+                                <tr>
+                                    <td><code><?php echo esc_html($dev_id); ?></code></td>
+                                    <td>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc chắn muốn mở khóa thiết bị này?');">
+                                            <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
+                                            <input type="hidden" name="machine_id" value="<?php echo esc_attr($dev_id); ?>">
+                                            <button type="submit" name="pdfpro_action" value="unblock_device" class="button button-small button-primary" style="background: #10B981 !important; border-color: #10B981 !important;">Mở khóa (Allow)</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
+            <!-- Danh sách thiết bị Whitelist/Bypass -->
+            <div class="card" style="margin-top: 24px; padding: 20px;">
+                <h2>Danh sách thiết bị được bỏ qua (Whitelist)</h2>
+                <p style="font-size: 13px; color: #94A3B8; margin-bottom: 15px;">Các thiết bị này được bỏ qua kiểm tra vi phạm bảo mật và luôn có quyền chạy.</p>
+                <?php if (empty($whitelisted)) : ?>
+                    <p>Chưa có thiết bị nào được whitelist.</p>
+                <?php else : ?>
+                    <table class="wp-list-table widefat striped" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="width: 70%;">Machine ID</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($whitelisted as $dev_id) : ?>
+                                <tr>
+                                    <td><code><?php echo esc_html($dev_id); ?></code></td>
+                                    <td>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc chắn muốn chặn thiết bị này?');">
+                                            <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
+                                            <input type="hidden" name="machine_id" value="<?php echo esc_attr($dev_id); ?>">
+                                            <button type="submit" name="pdfpro_action" value="block_device" class="button button-small button-primary" style="background: #EF4444 !important; border-color: #EF4444 !important;">Chặn (Block)</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
+
         </div>
     </div>
     <?php

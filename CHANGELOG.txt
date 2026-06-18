@@ -1,4 +1,4 @@
-- Tái cấu trúc mã nguồn (Modularization & Refactoring): Chia nhỏ lớp chính PdfDocumentTab.cs thành các partial class độc lập để dễ bảo trì (Rendering, Annotations, TextSelection).
-- Tập trung khai báo P/Invoke (Native Interop): Chuyển toàn bộ các khai báo [DllImport] của pdfium.dll và pdf_core.dll về lớp static PdfInterop.cs dùng chung.
-- Tối ưu hóa bộ nhớ đệm ảnh động (Dynamic Bitmap Cache): Tự động cấu hình bộ nhớ đệm ảnh dựa trên dung lượng RAM vật lý của hệ thống (dao động từ 256MB đến 1GB).
-- Tối ưu hóa HttpClient kết nối mạng: Chia sẻ một thực thể HttpClient tĩnh qua HttpHelper.cs để tránh lỗi cạn kiệt socket (Socket Exhaustion).
+- Nâng cấp WordPress Licensing Server: Thêm Dashboard thống kê trực quan và Panel quản lý thiết bị bị khóa (Blacklist/Whitelist).
+- Tối ưu hóa trải nghiệm Thu phóng (Zoom): Sử dụng LowQuality/NearestNeighbor rendering tạm thời trong quá trình hoạt họa thu phóng giúp tăng độ mượt mà.
+- Tối ưu hóa nạp trước trang (Prefetching): Tự động nới rộng khoảng cách tải trước trang (lên tới 4 trang) khi bộ nhớ đệm RAM khả dụng lớn (> 512MB).
+- Tích hợp Inno Setup: Tự động phát hiện và biên dịch gói cài đặt Setup.exe trong tiến trình đóng gói.

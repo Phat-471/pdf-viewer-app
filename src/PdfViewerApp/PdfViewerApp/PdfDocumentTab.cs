@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -3385,6 +3385,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_renderGeneration++;
 		_loadingPages.Clear();
 		_zoomTimer.Stop();
+		RenderOptions.SetBitmapScalingMode(PagesHost, System.Windows.Media.BitmapScalingMode.LowQuality);
 		_smoothZoomTimer?.Start();
 	}
 
