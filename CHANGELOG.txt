@@ -1,4 +1,5 @@
-- Cập nhật giao diện nút Theme hiển thị Emoji đầy đủ màu sắc chân thực (🌸, 🍃, 🌑, ☀️).
-- Thiết kế nền badge màu trắng cho tất cả các theme để tăng độ nổi bật và tương phản của icon.
-- Thêm 3 giao diện mới độc đáo: Oải Hương (Lavender), Cà Phê (Mocha), và Đột Phá (Cyberpunk).
+- Cập nhật giao diện theme:
+  + Thêm giao diện Oải Hương (Lavender)
+  + Thêm giao diện Cà Phê (Mocha)
+  + Thêm giao diện Đột Phá (Cyberpunk)
 - Tối ưu hóa hiệu ứng phát sáng và đổ bóng của các badge nút bấm.

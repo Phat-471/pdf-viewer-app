@@ -147,33 +147,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#B45309", // Hổ phách đậm tương phản tốt
 			ThemeBadgeGlowColor   = "#000000",
 		},
-		// ─── 3. TÍM (MIDNIGHT) ─────────────────────────────────────────────────
-		new AppThemeDefinition
-		{
-			Name                  = Midnight,
-			DisplayName           = "Tím",
-			Icon                  = "🌌",
-			WindowBackground      = "#0D0D1A",
-			TitleBarBackground    = "#12122A",
-			PanelBackground       = "#161630",
-			SurfaceBackground     = "#0A0A1A",
-			HoverBackground       = "#1F1F45",
-			BorderColor           = "#2D2B55",
-			AccentColor           = "#8B5CF6",
-			AccentDark            = "#7C3AED",
-			ForegroundPrimary     = "#EDE9FE",
-			ForegroundSecondary   = "#A78BFA",
-			StatusBarStart        = "#12122A",
-			StatusBarMid          = "#1F1F45",
-			FluentTheme           = "Dark.Purple",
-			IsLight               = false,
-			ThemeBadgeIconGlyph   = "\uE735", 
-			ThemeBadgeBackground  = "#1F1F45", 
-			ThemeBadgeBorder      = "#8B5CF6", 
-			ThemeBadgeIconColor   = "#A78BFA", // Lilac rực rỡ
-			ThemeBadgeGlowColor   = "#8B5CF6",
-		},
-		// ─── 4. RỪNG XANH (FOREST) ─────────────────────────────────────────────
+		// ─── 3. RỪNG XANH (FOREST) ─────────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = Forest,
@@ -199,33 +173,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#4ADE80", // Xanh lục non
 			ThemeBadgeGlowColor   = "#22C55E",
 		},
-		// ─── 5. HOÀNG HÔN (SUNSET) ─────────────────────────────────────────────
-		new AppThemeDefinition
-		{
-			Name                  = Sunset,
-			DisplayName           = "Hoàng Hôn",
-			Icon                  = "🌅",
-			WindowBackground      = "#1A0A06",
-			TitleBarBackground    = "#2A1209",
-			PanelBackground       = "#2D1710",
-			SurfaceBackground     = "#170A06",
-			HoverBackground       = "#3D2015",
-			BorderColor           = "#4A2D1E",
-			AccentColor           = "#F97316",
-			AccentDark            = "#EA580C",
-			ForegroundPrimary     = "#FEF3C7",
-			ForegroundSecondary   = "#FCA5A5",
-			StatusBarStart        = "#2A1209",
-			StatusBarMid          = "#3D2015",
-			FluentTheme           = "Dark.Red",
-			IsLight               = false,
-			ThemeBadgeIconGlyph   = "\uE706", // Đã fix icon mặt trời
-			ThemeBadgeBackground  = "#3D2015", 
-			ThemeBadgeBorder      = "#F97316", 
-			ThemeBadgeIconColor   = "#FB923C", // Cam chói neon
-			ThemeBadgeGlowColor   = "#F97316",
-		},
-		// ─── 6. ĐẠI DƯƠNG (OCEAN) ──────────────────────────────────────────────
+		// ─── 4. ĐẠI DƯƠNG (OCEAN) ──────────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = Ocean,
@@ -251,7 +199,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#7DD3FC", // Xanh thiên thanh sáng
 			ThemeBadgeGlowColor   = "#38BDF8",
 		},
-		// ─── 7. ANH ĐÀO (SAKURA) ───────────────────────────────────────────────
+		// ─── 5. ANH ĐÀO (SAKURA) ───────────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = Sakura,
@@ -277,7 +225,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#BE185D", // Đỏ mận đậm
 			ThemeBadgeGlowColor   = "#000000",
 		},
-		// ─── 8. BẠC HÀ (MINT) ──────────────────────────────────────────────────
+		// ─── 6. BẠC HÀ (MINT) ──────────────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = Mint,
@@ -303,7 +251,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#065F46", // Xanh lục bảo sẫm
 			ThemeBadgeGlowColor   = "#000000",
 		},
-		// ─── 9. OẢI HƯƠNG (LAVENDER) - MỚI ─────────────────────────────────────
+		// ─── 7. OẢI HƯƠNG (LAVENDER) - MỚI ─────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = "Lavender",
@@ -329,7 +277,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#7E22CE", // Tím đậm rõ nét
 			ThemeBadgeGlowColor   = "#000000",
 		},
-		// ─── 10. CÀ PHÊ (MOCHA) - MỚI ──────────────────────────────────────────
+		// ─── 8. CÀ PHÊ (MOCHA) - MỚI ──────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = "Mocha",
@@ -355,7 +303,7 @@ internal static class AppThemeRegistry
 			ThemeBadgeIconColor   = "#FBBF24", // Vàng hổ phách sáng
 			ThemeBadgeGlowColor   = "#D97706",
 		},
-		// ─── 11. ĐỘT PHÁ (CYBERPUNK) - MỚI ─────────────────────────────────────
+		// ─── 9. ĐỘT PHÁ (CYBERPUNK) - MỚI ─────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = "Cyberpunk",
