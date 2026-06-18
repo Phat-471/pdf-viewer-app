@@ -125,7 +125,15 @@
       <fluent:RibbonGroupBox Header="Thiết Lập">
         <fluent:ToggleButton Name="ThemeToggleBtn" Header="Tối" Margin="8,0,8,0" IsChecked="True" Click="ThemeToggle_Click" ToolTip="Chuyển đổi chủ đề màu sắc giao diện sáng hoặc tối">
           <fluent:ToggleButton.LargeIcon>
-            <TextBlock Name="ThemeToggleIcon" FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#38BDF8" HorizontalAlignment="Center" />
+            <Border Name="ThemeIconBadge" Width="30" Height="30" CornerRadius="8"
+                    Background="#0D1117" BorderBrush="#14B8A6" BorderThickness="2"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+              <Border.Effect>
+                <DropShadowEffect x:Name="ThemeIconGlow" Color="#14B8A6" BlurRadius="8" ShadowDepth="0" Opacity="0.9" />
+              </Border.Effect>
+              <TextBlock Name="ThemeToggleIcon" Tag="ThemeToggleIcon" FontFamily="Segoe MDL2 Assets" Text="&#xE708;" FontSize="16"
+                         Foreground="#14B8A6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
         <fluent:Button Header="Cài Đặt" Margin="8,0,8,0" Click="Settings_Click" ToolTip="Cài đặt cấu hình hệ thống">

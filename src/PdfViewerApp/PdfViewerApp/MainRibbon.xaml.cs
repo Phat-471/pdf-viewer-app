@@ -205,23 +205,29 @@ public partial class MainRibbon : UserControl
 
 		if (ThemeToggleIcon != null)
 		{
-			string glyph = theme.Name.ToLower() switch
-			{
-				"dark" => "\ue708",      // Moon
-				"light" => "\ue706",     // Sun
-				"midnight" => "\ue71c",  // Palette / Midnight Purple
-				"forest" => "\ue70e",    // Leaf / Green Forest
-				"sunset" => "\ue78a",    // Sunrise/Sunset
-				"ocean" => "\ue9a1",     // Wave/Water
-				"sakura" => "\uea1f",    // Heart / Pink Sakura
-				"mint" => "\uecc5",      // Mint / Eco Leaf
-				_ => "\ue771"            // Default Color Palette
-			};
-			ThemeToggleIcon.Text = glyph;
-			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
-			PdfPerfLogger.Log("ApplyTheme: ThemeToggleIcon updated.");
+			// Đổi font chữ sang font Emoji của Windows
+			ThemeToggleIcon.FontFamily = new FontFamily("Segoe UI Emoji");
+			
+			// Gọi thuộc tính Icon (chứa Emoji "🌅") thay vì Glyph
+			ThemeToggleIcon.Text = theme.Icon; 
+			
+			// Giữ nguyên dòng này hoặc bỏ đi đều được vì Emoji thường có màu sẵn
+			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ThemeBadgeIconColor));
+			
+			PdfPerfLogger.Log("ApplyTheme: ThemeToggleIcon updated with Emoji.");
 		}
 
+		if (ThemeIconBadge != null)
+		{
+			ThemeIconBadge.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ThemeBadgeBackground));
+			ThemeIconBadge.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ThemeBadgeBorder));
+			if (ThemeIconBadge.Effect is System.Windows.Media.Effects.DropShadowEffect glow)
+			{
+				glow.Color = (Color)ColorConverter.ConvertFromString(theme.ThemeBadgeGlowColor);
+				glow.Opacity = theme.IsLight ? 0.15 : 0.8; // Dịu nhẹ bóng đổ trên nền sáng, phát sáng mạnh trên nền tối
+				glow.BlurRadius = theme.IsLight ? 6 : 8;   // Điều chỉnh bán kính mờ phù hợp cho bóng đổ/phát sáng
+			}
+		}
 		if (ThemeToggleBtn != null)
 		{
 			ThemeToggleBtn.IsChecked = isDark;
@@ -295,6 +301,9 @@ public partial class MainRibbon : UserControl
 			int updatedIconsCount = 0;
 			foreach (var tb in textBlocks)
 			{
+				// Bỏ qua ThemeToggleIcon - để giữ đúng emoji màu gốc của theme
+				if (tb.Name == "ThemeToggleIcon" || tb.Tag?.ToString() == "ThemeToggleIcon" || tb == ThemeToggleIcon) continue;
+
 				string? fontSource = tb.FontFamily?.Source;
 				if (fontSource == null) continue;
 
