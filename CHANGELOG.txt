@@ -1,3 +1,4 @@
-- Tối ưu hóa tính năng in ảnh chụp (Snapshot) sắc nét và tự động căn giữa trang.
-- Thêm tùy chọn giữ công cụ hoạt động liên tục (vẽ, ghi chú...) đến khi nhấn phím ESC.
-- Cải tiến cơ chế kiểm tra và cập nhật trạng thái bản quyền trực tuyến.
+- Cập nhật giao diện nút Theme hiển thị Emoji đầy đủ màu sắc chân thực (🌸, 🍃, 🌑, ☀️).
+- Thiết kế nền badge màu trắng cho tất cả các theme để tăng độ nổi bật và tương phản của icon.
+- Thêm 3 giao diện mới độc đáo: Oải Hương (Lavender), Cà Phê (Mocha), và Đột Phá (Cyberpunk).
+- Tối ưu hóa hiệu ứng phát sáng và đổ bóng của các badge nút bấm.
