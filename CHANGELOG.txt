@@ -1,2 +1,2 @@
-- Nâng cấp server.
-- Tối ưu trải nghiệm.
+- Tối ưu vị trí nút chức năng thanh tiêu đề.
+- Tối ưu trải nghiệm sử dụng.

@@ -321,7 +321,7 @@
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
       </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Tùy Chọn">
+      <fluent:RibbonGroupBox Header="Tùy Chọn" Visibility="Collapsed">
         <fluent:CheckBox Name="KeepToolsActiveCheckBox" Header="Sử Dụng Liên Tục" Click="KeepToolsActiveCheckBox_Click" ToolTip="Giữ các công cụ vẽ, chú thích, chụp ảnh hoạt động liên tục cho đến khi nhấn ESC" IsChecked="False" />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>

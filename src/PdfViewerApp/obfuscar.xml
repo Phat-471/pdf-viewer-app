@@ -11,8 +11,8 @@
   <Var name="SuppressIldasm" value="true" />
   <Var name="ReuseNames" value="true" />
 
-  <AssemblySearchPath path="C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.28" />
-  <AssemblySearchPath path="C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.28" />
+  <AssemblySearchPath path="C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App\8.0.27" />
+  <AssemblySearchPath path="C:\Program Files\dotnet\shared\Microsoft.NETCore.App\8.0.27" />
 
   <Module file="$(InPath)\PdfViewerApp.dll">
     <!-- Exclude types used in serialization/reflection to avoid runtime errors -->

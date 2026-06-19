@@ -712,6 +712,22 @@ exit 0
 		Close();
 	}
 
+	private void BtnKeepToolsActive_Click(object sender, RoutedEventArgs e)
+	{
+		if (_mainRibbon != null && BtnKeepToolsActive != null)
+		{
+			_mainRibbon.KeepToolsActive = BtnKeepToolsActive.IsChecked == true;
+		}
+	}
+
+	private void BtnToggleRibbon_Click(object sender, RoutedEventArgs e)
+	{
+		if (_mainRibbon?.MyRibbon != null)
+		{
+			_mainRibbon.MyRibbon.IsMinimized = BtnToggleRibbon.IsChecked == true;
+		}
+	}
+
 	private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
 	{
 		if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.K)
@@ -3294,6 +3310,10 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	private void KeepToolsActive_Changed(object? sender, RoutedEventArgs e)
 	{
 		bool active = _mainRibbon?.KeepToolsActive == true;
+		if (BtnKeepToolsActive != null)
+		{
+			BtnKeepToolsActive.IsChecked = active;
+		}
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab != null)
 		{
@@ -3363,6 +3383,29 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		RibbonHostContainer.Children.Clear();
 		RibbonHostContainer.Children.Add(_mainRibbon);
 		HookMainRibbonEvents();
+
+		// Sync initial state and listen to IsMinimized changes
+		if (BtnKeepToolsActive != null)
+		{
+			BtnKeepToolsActive.IsChecked = _mainRibbon.KeepToolsActive;
+		}
+		if (BtnToggleRibbon != null)
+		{
+			BtnToggleRibbon.IsChecked = _mainRibbon.MyRibbon.IsMinimized;
+		}
+
+		var descriptor = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(
+			Fluent.Ribbon.IsMinimizedProperty, typeof(Fluent.Ribbon));
+		if (descriptor != null)
+		{
+			descriptor.AddValueChanged(_mainRibbon.MyRibbon, (s, ev) =>
+			{
+				if (BtnToggleRibbon != null)
+				{
+					BtnToggleRibbon.IsChecked = _mainRibbon.MyRibbon.IsMinimized;
+				}
+			});
+		}
 	}
 
 	private void WelcomeDashboard_OpenRequested(object? sender, EventArgs e)
