@@ -126,13 +126,23 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     $machine_id = sanitize_text_field($params['machine_id'] ?? '');
     $machine_name = sanitize_text_field($params['machine_name'] ?? '');
 
+    $log_entry = "--- API ACTIVATE ---\n";
+    $log_entry .= "Time: " . date('Y-m-d H:i:s') . "\n";
+    $log_entry .= "Received Key: " . $license_key . "\n";
+    $log_entry .= "Received Machine ID: " . $machine_id . "\n";
+    $log_entry .= "Received Machine Name: " . $machine_name . "\n";
+
     if (empty($license_key) || empty($machine_id)) {
+        $log_entry .= "Error: Missing params\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('missing_params', 'Yêu cầu điền đầy đủ license_key và machine_id.', array('status' => 400));
     }
 
     // Kiểm tra thiết bị bị chặn (Blacklist)
     $blacklisted = get_option('pdfpro_blacklisted_devices', array());
     if (is_array($blacklisted) && in_array($machine_id, $blacklisted)) {
+        $log_entry .= "Error: Device is blacklisted\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('device_banned', 'Thiết bị này đã bị khóa do vi phạm bảo mật.', array('status' => 403));
     }
 
@@ -147,14 +157,22 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     ));
 
     if (!$license) {
+        $log_entry .= "Error: License not found in DB\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('invalid_license', 'Mã bản quyền không tồn tại.', array('status' => 404));
     }
 
+    $log_entry .= "DB License Found: ID=" . $license->id . ", Key=" . $license->license_key . ", Status=" . $license->status . "\n";
+
     if ($license->status !== 'active') {
+        $log_entry .= "Error: License status is not active (" . $license->status . ")\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('license_suspended', 'Mã bản quyền này đã bị khóa hoặc tạm dừng.', array('status' => 403));
     }
 
     if ($license->expires_at && strtotime($license->expires_at) < time()) {
+        $log_entry .= "Error: License expired\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('license_expired', 'Mã bản quyền này đã hết hạn sử dụng.', array('status' => 403));
     }
 
@@ -175,6 +193,8 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
     if (!$is_activated_on_this_machine) {
         // Kiểm tra xem có vượt quá giới hạn thiết bịkhông
         if (count($activations) >= (int)$license->max_devices) {
+            $log_entry .= "Error: Device limit exceeded. Active count: " . count($activations) . " Max: " . $license->max_devices . "\n\n";
+            @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
             return new WP_Error('limit_exceeded', 'Mã bản quyền này đã vượt quá số lượng máy cho phép kích hoạt.', array('status' => 403));
         }
 
@@ -185,6 +205,9 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
             'machine_name' => $machine_name,
             'activated_at' => current_time('mysql')
         ));
+        $log_entry .= "Inserted new activation record for machine_id: " . $machine_id . "\n";
+    } else {
+        $log_entry .= "Machine already activated\n";
     }
 
     // Sinh payload thong tin ban quyen duoc ky so.
@@ -198,6 +221,9 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
 
     $json_payload = json_encode($payload_data);
     $signature = pdfpro_licensing_sign_payload($json_payload);
+
+    $log_entry .= "Activation Success! Payload: " . $json_payload . "\n\n";
+    @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
 
     return array(
         'success'   => true,
@@ -223,7 +249,14 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
     $license_key = sanitize_text_field($params['license_key'] ?? '');
     $machine_id = sanitize_text_field($params['machine_id'] ?? '');
 
+    $log_entry = "--- API CHECK (HEARTBEAT) ---\n";
+    $log_entry .= "Time: " . date('Y-m-d H:i:s') . "\n";
+    $log_entry .= "Received Key: " . $license_key . "\n";
+    $log_entry .= "Received Machine ID: " . $machine_id . "\n";
+
     if (empty($license_key) || empty($machine_id)) {
+        $log_entry .= "Error: Missing params\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('missing_params', 'Yêu cầu điền đầy đủ license_key và machine_id.', array('status' => 400));
     }
 
@@ -232,6 +265,8 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
 
     // Tìm kiếm License và bản ghi kích hoạt (Chuẩn hóa key loại bịdấu gạch ngang)
     $normalized_key = preg_replace('/[^A-Za-z0-9]/', '', $license_key);
+    $log_entry .= "Normalized Key: " . $normalized_key . "\n";
+
     $license = $wpdb->get_row($wpdb->prepare(
         "SELECT l.*, a.id as activation_id FROM $table_licenses l 
          LEFT JOIN $table_activations a ON l.id = a.license_id AND a.machine_id = %s
@@ -241,20 +276,29 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
     ));
 
     if (!$license) {
+        $log_entry .= "Error: License not found in DB\n\n";
+        @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
         return new WP_Error('invalid_license', 'Mã bản quyền không tồn tại.', array('status' => 404));
     }
+
+    $log_entry .= "DB License Found: ID=" . $license->id . ", Key=" . $license->license_key . ", Status=" . $license->status . "\n";
+    $log_entry .= "DB Activation ID: " . ($license->activation_id ?? 'NULL') . "\n";
 
     $status = 'activated';
     // Kiểm tra thiết bị bị chặn (Blacklist)
     $blacklisted = get_option('pdfpro_blacklisted_devices', array());
     if (is_array($blacklisted) && in_array($machine_id, $blacklisted)) {
         $status = 'suspended';
+        $log_entry .= "Status Check: Suspended (Blacklisted device)\n";
     } elseif ($license->status !== 'active') {
         $status = 'suspended';
+        $log_entry .= "Status Check: Suspended (License is not active)\n";
     } elseif ($license->expires_at && strtotime($license->expires_at) < time()) {
         $status = 'expired';
+        $log_entry .= "Status Check: Expired\n";
     } elseif (empty($license->activation_id)) {
         $status = 'unregistered_device';
+        $log_entry .= "Status Check: Unregistered device\n";
     }
 
     $payload_data = array(
@@ -267,6 +311,9 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
 
     $json_payload = json_encode($payload_data);
     $signature = pdfpro_licensing_sign_payload($json_payload);
+
+    $log_entry .= "Status Result: " . $status . " Payload: " . $json_payload . "\n\n";
+    @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
 
     return array(
         'success'   => ($status === 'activated'),
