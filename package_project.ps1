@@ -193,20 +193,22 @@ $summary | Set-Content -LiteralPath $packageSummaryPath -Encoding UTF8
 # 5. Optional: Build Inno Setup Installer (Setup.exe)
 Write-Host "`n[5/5] Building Inno Setup Installer (Optional)..." -ForegroundColor Yellow
 $isccPath = ""
-if (Get-Command iscc -ErrorAction SilentlyContinue) {
-    $isccPath = (Get-Command iscc).Source
-} elseif (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") {
+if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") {
     $isccPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+} elseif (Get-Command iscc -ErrorAction SilentlyContinue) {
+    $isccPath = (Get-Command iscc).Source
 }
 
 if ($isccPath -ne "") {
     Write-Host "    Found Inno Setup Compiler: $isccPath" -ForegroundColor DarkGray
     Write-Host "    Running Inno Setup compiler..." -ForegroundColor Yellow
-    & $isccPath "installer.iss"
+    $absoluteIssPath = Join-Path $scriptDir "installer.iss"
+    & $isccPath $absoluteIssPath
     if ($LASTEXITCODE -eq 0) {
         Write-Host "    Inno Setup package created successfully!" -ForegroundColor Green
     } else {
-        Write-Host "    Warning: Inno Setup compilation failed." -ForegroundColor Red
+        Write-Warning "Inno Setup compilation failed (Optional step). Resetting exit code to avoid failing the build."
+        $global:LASTEXITCODE = 0
     }
 } else {
     Write-Host "    Inno Setup compiler (ISCC.exe) not found. Skipping Setup.exe creation." -ForegroundColor DarkYellow
