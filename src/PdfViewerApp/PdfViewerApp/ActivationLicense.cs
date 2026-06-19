@@ -26,11 +26,18 @@ internal static class ActivationLicense
 
 	private const string PublicKeyCacheFileName = "public_key.pem";
 
-	public static string ApiActivateUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsnMyYmJiUyNQ==");
+	// Tên miền máy chủ bản quyền (Thay đổi tên miền tại đây khi chuyển website mới)
+	public const string ApiDomain = "https://hongmien.vn";
 
-	public static string ApiPublicKeyUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs2JTAjOSdrOzc2");
+	public static string ApiActivateUrl => $"{ApiDomain}/wp-json/pdfpro/v1/activate";
 
-	public static string ApiUpdateUrl => SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWszIDYuJCFrMzoqMy8=");
+	public static string ApiPublicKeyUrl => $"{ApiDomain}/wp-json/pdfpro/v1/public-key";
+
+	public static string ApiUpdateUrl => $"{ApiDomain}/wp-json/pdfpro/v1/update-check";
+
+	public static string ApiCheckUrl => $"{ApiDomain}/wp-json/pdfpro/v1/check";
+
+	public static string ApiDeactivateUrl => $"{ApiDomain}/wp-json/pdfpro/v1/deactivate";
 
 	public static string LicenseDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfPro");
 
@@ -266,7 +273,7 @@ internal static class ActivationLicense
 									license_key = key,
 									machine_id = MachineId
 								}), Encoding.UTF8, "application/json");
-								await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWsiNTMsJC0wMSYq"), content, cts.Token);
+								await client.PostAsync(ApiDeactivateUrl, content, cts.Token);
 							}
 							catch
 							{
@@ -528,7 +535,7 @@ internal static class ActivationLicense
 		{
 			var client = HttpHelper.Client;
 			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10.0));
-			string requestUri = "https://hongmien.vn/wp-json/pdfpro/v1/activate".Replace("/activate", "/update-check");
+			string requestUri = ApiUpdateUrl;
 			HttpResponseMessage httpResponseMessage = await client.GetAsync(requestUri, cts.Token);
 			if (!httpResponseMessage.IsSuccessStatusCode)
 			{
@@ -606,7 +613,7 @@ internal static class ActivationLicense
 				machine_id = MachineId
 			}), Encoding.UTF8, "application/json");
 
-			HttpResponseMessage response = await client.PostAsync(SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWslODcsOw=="), content, cts.Token);
+			HttpResponseMessage response = await client.PostAsync(ApiCheckUrl, content, cts.Token);
 			string json = await response.Content.ReadAsStringAsync();
 			bool isActivated = false;
 			if (response.IsSuccessStatusCode)
@@ -629,37 +636,28 @@ internal static class ActivationLicense
 						
 						SaveRecord(record);
 					}
+					else if (!success)
+					{
+						// Chỉ hủy kích hoạt nếu máy chủ phản hồi thất bại kèm chữ ký số hợp lệ xác nhận tình trạng khóa/hết hạn
+						if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
+						{
+							string payload = payloadVal.GetString() ?? string.Empty;
+							string sig = sigVal.GetString() ?? string.Empty;
+							string publicKeyPem = await GetPublicKeyForActivationAsync();
+							if (VerifySignature(payload, sig, publicKeyPem))
+							{
+								using JsonDocument payloadDoc = JsonDocument.Parse(payload);
+								string payloadStatus = payloadDoc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+								if (payloadStatus == "suspended" || payloadStatus == "expired" || payloadStatus == "unregistered_device")
+								{
+									Deactivate();
+								}
+							}
+						}
+					}
 				}
 				catch
 				{
-				}
-			}
-
-			if (!isActivated)
-			{
-				bool shouldDeactivate = false;
-				if ((int)response.StatusCode >= 400 && (int)response.StatusCode < 500)
-				{
-					shouldDeactivate = true;
-				}
-				else
-				{
-					try
-					{
-						using JsonDocument doc = JsonDocument.Parse(json);
-						if (doc.RootElement.TryGetProperty("success", out var successVal) && !successVal.GetBoolean())
-						{
-							shouldDeactivate = true;
-						}
-					}
-					catch
-					{
-					}
-				}
-
-				if (shouldDeactivate)
-				{
-					Deactivate();
 				}
 			}
 		}

@@ -172,7 +172,7 @@ public partial class App : Application
 						os_version = Environment.OSVersion.VersionString,
 						timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 					}), Encoding.UTF8, "application/json");
-					string requestUri = SecurityHelper.Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs0NSIgIjBrNSA9PzY=");
+					string requestUri = $"{ActivationLicense.ApiDomain}/wp-json/pdfpro/v1/report-error";
 					await client.PostAsync(requestUri, content, cts.Token);
 				}
 				catch

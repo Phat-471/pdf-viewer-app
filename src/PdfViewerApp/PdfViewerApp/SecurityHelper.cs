@@ -284,7 +284,7 @@ internal static class SecurityHelper
 						System.Text.Encoding.UTF8,
 						"application/json"
 					);
-					string requestUri = Decrypt("ODAyICF1f2suPzwoPS0jPnw5PmsxIH8lIysofyIrNjQ0P305YWs0NSIgIjBrNSA9PzY=");
+					string requestUri = $"{ActivationLicense.ApiDomain}/wp-json/pdfpro/v1/report-error";
 					await client.PostAsync(requestUri, content);
 				}
 				catch
