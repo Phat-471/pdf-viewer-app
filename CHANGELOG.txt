@@ -1,2 +1,3 @@
-- Tối ưu vị trí nút chức năng thanh tiêu đề.
-- Tối ưu trải nghiệm sử dụng.
+- Tách file partial PdfDocumentTab.Zoom.cs và PdfDocumentTab.Sidebar.cs để tối ưu hóa cấu trúc code.
+- Tối ưu cơ chế Obfuscar tự động xác định SDK cho mọi môi trường phát triển.
+- Sửa các cảnh báo tương thích nền tảng CA1416.

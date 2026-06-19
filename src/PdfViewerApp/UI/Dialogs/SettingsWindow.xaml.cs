@@ -43,20 +43,9 @@ public partial class SettingsWindow : Window, IComponentConnector
 		OcrLanguageComboBox.Items.Add(defaultItem);
 		OcrLanguageComboBox.SelectedItem = defaultItem;
 
-		try
+		if (OperatingSystem.IsWindows() && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
 		{
-			foreach (var lang in Windows.Media.Ocr.OcrEngine.AvailableRecognizerLanguages)
-			{
-				ComboBoxItem item = new ComboBoxItem { Content = $"{lang.DisplayName} ({lang.LanguageTag})", Tag = lang.LanguageTag };
-				OcrLanguageComboBox.Items.Add(item);
-				if (string.Equals(lang.LanguageTag, _preferences.OcrLanguage, StringComparison.OrdinalIgnoreCase))
-				{
-					OcrLanguageComboBox.SelectedItem = item;
-				}
-			}
-		}
-		catch
-		{
+			LoadOcrLanguages();
 		}
 
 		AiAllowOnlineCheckBox.IsChecked = _aiSettings.AllowOnlineSnapshot;
@@ -78,6 +67,26 @@ public partial class SettingsWindow : Window, IComponentConnector
 	}
 
 	/// <summary>Chọn RadioButton đúng theo tên theme.</summary>
+	[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
+	private void LoadOcrLanguages()
+	{
+		try
+		{
+			foreach (var lang in Windows.Media.Ocr.OcrEngine.AvailableRecognizerLanguages)
+			{
+				ComboBoxItem item = new ComboBoxItem { Content = $"{lang.DisplayName} ({lang.LanguageTag})", Tag = lang.LanguageTag };
+				OcrLanguageComboBox.Items.Add(item);
+				if (string.Equals(lang.LanguageTag, _preferences.OcrLanguage, StringComparison.OrdinalIgnoreCase))
+				{
+					OcrLanguageComboBox.SelectedItem = item;
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private void SelectThemeRadio(string themeName)
 	{
 		if (ThemeDarkRadio != null)    ThemeDarkRadio.IsChecked    = themeName == AppThemeRegistry.Dark;
