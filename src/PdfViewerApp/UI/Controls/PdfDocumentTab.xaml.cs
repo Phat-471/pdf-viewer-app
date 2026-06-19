@@ -171,6 +171,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private DispatcherTimer? _smoothZoomTimer;
 
+	private double _targetVerticalOffset = -1;
+
+	private double _targetHorizontalOffset = -1;
+
+	private DispatcherTimer? _smoothScrollTimer;
+
 	private readonly DispatcherTimer _viewportTimer;
 
 	private double _baseZoomForLayout = 1.0;
@@ -3422,6 +3428,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_loadingPages.Clear();
 		_zoomTimer.Stop();
 		RenderOptions.SetBitmapScalingMode(PagesHost, System.Windows.Media.BitmapScalingMode.LowQuality);
+		SetImagesScalingMode(System.Windows.Media.BitmapScalingMode.LowQuality);
 		_smoothZoomTimer?.Start();
 	}
 
@@ -3545,6 +3552,27 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		PagesHost.Width = double.NaN;
 		PagesHost.Height = double.NaN;
 		RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
+		SetImagesScalingMode(BitmapScalingMode.HighQuality);
+	}
+
+	private void SetImagesScalingMode(BitmapScalingMode scalingMode)
+	{
+		if (PagesHost.Children.Count > 0 && PagesHost.Children[0] is StackPanel stackPanel)
+		{
+			foreach (UIElement child in stackPanel.Children)
+			{
+				if (child is Border border && border.Child is Grid grid)
+				{
+					foreach (UIElement gridChild in grid.Children)
+					{
+						if (gridChild is Image image)
+						{
+							RenderOptions.SetBitmapScalingMode(image, scalingMode);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	private void ApplyPendingZoomScroll()
@@ -3652,6 +3680,75 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				ChangeZoom(factor, e.GetPosition(DocumentScrollViewer));
 			}
 		}
+		else
+		{
+			e.Handled = true;
+			bool scrollHorizontal = (Keyboard.Modifiers & ModifierKeys.Shift) != ModifierKeys.None;
+
+			if (scrollHorizontal)
+			{
+				if (_targetHorizontalOffset < 0)
+				{
+					_targetHorizontalOffset = DocumentScrollViewer.HorizontalOffset;
+				}
+				double step = 150.0 * ((double)e.Delta / 120.0);
+				_targetHorizontalOffset = Math.Clamp(_targetHorizontalOffset - step, 0.0, DocumentScrollViewer.ScrollableWidth);
+			}
+			else
+			{
+				if (_targetVerticalOffset < 0)
+				{
+					_targetVerticalOffset = DocumentScrollViewer.VerticalOffset;
+				}
+				double step = 150.0 * ((double)e.Delta / 120.0);
+				_targetVerticalOffset = Math.Clamp(_targetVerticalOffset - step, 0.0, DocumentScrollViewer.ScrollableHeight);
+			}
+
+			_smoothScrollTimer?.Start();
+		}
+	}
+
+	private void SmoothScrollTimer_Tick(object? sender, EventArgs e)
+	{
+		bool needsMoreVertical = false;
+		bool needsMoreHorizontal = false;
+
+		if (_targetVerticalOffset >= 0)
+		{
+			double current = DocumentScrollViewer.VerticalOffset;
+			double delta = _targetVerticalOffset - current;
+			if (Math.Abs(delta) < 0.5)
+			{
+				DocumentScrollViewer.ScrollToVerticalOffset(_targetVerticalOffset);
+				_targetVerticalOffset = -1;
+			}
+			else
+			{
+				DocumentScrollViewer.ScrollToVerticalOffset(current + delta * 0.2);
+				needsMoreVertical = true;
+			}
+		}
+
+		if (_targetHorizontalOffset >= 0)
+		{
+			double current = DocumentScrollViewer.HorizontalOffset;
+			double delta = _targetHorizontalOffset - current;
+			if (Math.Abs(delta) < 0.5)
+			{
+				DocumentScrollViewer.ScrollToHorizontalOffset(_targetHorizontalOffset);
+				_targetHorizontalOffset = -1;
+			}
+			else
+			{
+				DocumentScrollViewer.ScrollToHorizontalOffset(current + delta * 0.2);
+				needsMoreHorizontal = true;
+			}
+		}
+
+		if (!needsMoreVertical && !needsMoreHorizontal)
+		{
+			_smoothScrollTimer?.Stop();
+		}
 	}
 
 	private void DocumentScrollViewer_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -3709,6 +3806,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		RequestViewportRefresh();
 		UpdateRulers();
+		if (_smoothScrollTimer == null || !_smoothScrollTimer.IsEnabled)
+		{
+			_targetVerticalOffset = e.VerticalOffset;
+			_targetHorizontalOffset = e.HorizontalOffset;
+		}
 	}
 
 	private void ThumbScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -3738,6 +3840,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			_zoomTimer.Stop();
 			RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
+			SetImagesScalingMode(BitmapScalingMode.HighQuality);
 			RenderPdfPages();
 		};
 		_smoothZoomTimer = new DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
@@ -3773,6 +3876,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			_viewportTimer.Stop();
 			UpdateSelectedPageFromViewport();
 		};
+		_smoothScrollTimer = new DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
+		_smoothScrollTimer.Interval = TimeSpan.FromMilliseconds(10.0);
+		_smoothScrollTimer.Tick += SmoothScrollTimer_Tick;
 		DocumentScrollViewer.PreviewMouseWheel += DocumentScrollViewer_PreviewMouseWheel;
 		DocumentScrollViewer.PreviewMouseDown += DocumentScrollViewer_PreviewMouseDown;
 		DocumentScrollViewer.PreviewMouseMove += DocumentScrollViewer_PreviewMouseMove;
@@ -3814,6 +3920,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_baseZoomForLayout = 1.0;
 		_targetZoom = 1.0;
 		_smoothZoomTimer?.Stop();
+		_smoothScrollTimer?.Stop();
+		_targetVerticalOffset = -1;
+		_targetHorizontalOffset = -1;
 		_isFirstLoad = true;
 		if (clearPendingTextEdits)
 		{
@@ -3933,6 +4042,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void CloseActiveDocument()
 	{
 		CloseTextPages();
+		_smoothScrollTimer?.Stop();
+		_targetVerticalOffset = -1;
+		_targetHorizontalOffset = -1;
 		if (_documentHandle != IntPtr.Zero)
 		{
 			PdfiumEngine.CloseDocument(_documentHandle);
