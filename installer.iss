@@ -1,6 +1,6 @@
 ; installer.iss
 #define MyAppName "PDF Pro"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.5.4"
 #define MyAppPublisher "HPhat Edition"
 #define MyAppExeName "PdfViewerApp.exe"
 #define MyPublishDir "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\win-x64\publish"
