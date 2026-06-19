@@ -20,18 +20,14 @@ internal static class ActivationLicense
 
 	private const string KeyPrefix = "PDFPRO";
 
-	private static string ActivationSecret => SecurityHelper.Decrypt("GBQuMSZhACAgACAgfggpMzMjEScyOSQuJC0pPnx9YHZw");
+	// Tên miền máy chủ bản quyền (mặc định)
+	private const string DefaultApiDomain = "https://hongmien.vn";
 
-	private static string PublicRsaKeyPem => SecurityHelper.Decrypt("fWlrfX8NFQMPHnIfBQYKGRFvGwEffX9ifWlMHRsGEg0sERwNNy83ODkmF30xYBAOAQEAERMAEwUXaBMCGQ0EEzUEEwUXFRM8GzY0CmIEaS0saSR8HCAnGzx3Z04uf2U4EXQHBwh3eyZ0NysXNDIgFAR3OXY1FSM/HDN/NAUEKQ8tESYoZDE1aSEuMjEXADwfEQEhOmQCPBQiaBccWnQgITo/YxY+GDYiAxcnMzEuOSkuOwsAaSkSNxoYPCl+AmQ+YAwQOjB/EyAJZjAjBjIDOR8sJSFwADwbZRIpZwRFfywkCWMEB282GxY3e3MlCn0mZikjA2d2H280Zjw5OyE/Egd4Kg4oPhUfNxQtOQp9OicLESAgCgN1ImAnYyEVJlgYHgp+Mzg4NncrGhoXFzN0Ggo1BylyMTQXaDd0MQR2MgscKjQrGzN2GT43PnYTEio+IiwjPxAGZQEvYjEdOAgsWhh6NRcNaRcoBXcXAAgWYAANGx8OJ3x/YxspPhMiOmQDGw0CAhk/AwAOFGEoCDNwOWICIh4iHCo4IgByPzAiHQFMKiUGFAUXERBFfWlrfX8KHgBmAAcNHA0FcBkKCWlrfX9i");
+	private static bool _isOfflineDetected = false;
 
-	private const string PublicKeyCacheFileName = "public_key.pem";
-
-	// Tên miền máy chủ bản quyền (Thay đổi tên miền tại đây khi chuyển website mới)
-	public const string ApiDomain = "https://hongmien.vn";
+	public static string ApiDomain => GetApiDomain();
 
 	public static string ApiActivateUrl => $"{ApiDomain}/wp-json/pdfpro/v1/activate";
-
-	public static string ApiPublicKeyUrl => $"{ApiDomain}/wp-json/pdfpro/v1/public-key";
 
 	public static string ApiUpdateUrl => $"{ApiDomain}/wp-json/pdfpro/v1/update-check";
 
@@ -42,8 +38,6 @@ internal static class ActivationLicense
 	public static string LicenseDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfPro");
 
 	public static string LicensePath { get; } = Path.Combine(LicenseDirectory, "activation.json");
-
-	public static string PublicKeyCachePath { get; } = Path.Combine(LicenseDirectory, PublicKeyCacheFileName);
 
 	public static string AppVersion
 	{
@@ -64,90 +58,150 @@ internal static class ActivationLicense
 
 	public static string LastVerifyError { get; set; } = string.Empty;
 
-	public static ActivationState LoadState()
+	private static string GetApiDomain()
 	{
-		ActivationRecord activationRecord = LoadRecord();
-		bool flag = false;
-		string verifiedPublicKey = string.Empty;
-		string activationKey = string.Empty;
-		DateTimeOffset? expiresAt = null;
-		if (activationRecord != null && !string.IsNullOrEmpty(activationRecord.Payload) && !string.IsNullOrEmpty(activationRecord.Signature))
+		try
 		{
-			foreach (string candidatePublicKey in GetVerificationPublicKeys(activationRecord))
+			string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_config.json");
+			if (File.Exists(configPath))
 			{
-				if (VerifySignature(activationRecord.Payload, activationRecord.Signature, candidatePublicKey))
+				using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(configPath, Encoding.UTF8));
+				if (doc.RootElement.TryGetProperty("api_domain", out var prop))
 				{
-					flag = true;
-					verifiedPublicKey = candidatePublicKey;
-					break;
-				}
-			}
-
-			if (flag)
-			{
-				try
-				{
-					using JsonDocument jsonDocument = JsonDocument.Parse(activationRecord.Payload);
-					string text = jsonDocument.RootElement.GetProperty("license_key").GetString() ?? string.Empty;
-					string? a = jsonDocument.RootElement.GetProperty("machine_id").GetString() ?? string.Empty;
-					string text2 = jsonDocument.RootElement.GetProperty("expires_at").GetString() ?? string.Empty;
-					activationKey = text;
-					if (!string.Equals(a, MachineId, StringComparison.OrdinalIgnoreCase))
+					string domain = prop.GetString() ?? string.Empty;
+					if (!string.IsNullOrWhiteSpace(domain))
 					{
-						flag = false;
+						return domain.TrimEnd('/');
 					}
-					if (flag && text2 != "never" && DateTimeOffset.TryParse(text2, out var result))
-					{
-						expiresAt = result;
-						if (result < DateTimeOffset.Now)
-						{
-							flag = false;
-						}
-					}
-				}
-				catch
-				{
-					flag = false;
 				}
 			}
 		}
+		catch {}
+		return DefaultApiDomain;
+	}
+
+	private static string EncryptWithMachineKey(string plainText, string machineId)
+	{
+		if (string.IsNullOrEmpty(plainText)) return string.Empty;
+		try
+		{
+			byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(machineId + "PDFPRO-OFFLINE-SALT-2026"));
+			using Aes aes = Aes.Create();
+			aes.Key = key;
+			aes.GenerateIV();
+			byte[] iv = aes.IV;
+			
+			using MemoryStream ms = new MemoryStream();
+			ms.Write(iv, 0, iv.Length);
+			
+			using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
+			using (StreamWriter sw = new StreamWriter(cs, Encoding.UTF8))
+			{
+				sw.Write(plainText);
+			}
+			return Convert.ToBase64String(ms.ToArray());
+		}
+		catch
+		{
+			return string.Empty;
+		}
+	}
+
+	private static string DecryptWithMachineKey(string cipherText, string machineId)
+	{
+		if (string.IsNullOrEmpty(cipherText)) return string.Empty;
+		try
+		{
+			byte[] cipherBytes = Convert.FromBase64String(cipherText);
+			byte[] key = SHA256.HashData(Encoding.UTF8.GetBytes(machineId + "PDFPRO-OFFLINE-SALT-2026"));
+			
+			using Aes aes = Aes.Create();
+			aes.Key = key;
+			
+			byte[] iv = new byte[16];
+			Array.Copy(cipherBytes, 0, iv, 0, 16);
+			aes.IV = iv;
+			
+			using MemoryStream ms = new MemoryStream(cipherBytes, 16, cipherBytes.Length - 16);
+			using CryptoStream cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read);
+			using StreamReader sr = new StreamReader(cs, Encoding.UTF8);
+			return sr.ReadToEnd();
+		}
+		catch
+		{
+			return string.Empty;
+		}
+	}
+
+	public static ActivationState LoadState()
+	{
+		ActivationRecord activationRecord = LoadRecord();
+		bool isActivated = false;
+		string activationKey = string.Empty;
+		DateTimeOffset? expiresAt = null;
+		bool needsOnlineVerification = false;
+		string offlineWarningMessage = string.Empty;
+
+		if (activationRecord != null && !string.IsNullOrEmpty(activationRecord.ActivationKey))
+		{
+			if (string.Equals(activationRecord.MachineId, MachineId, StringComparison.OrdinalIgnoreCase))
+			{
+				isActivated = true;
+				activationKey = activationRecord.ActivationKey;
+
+				if (activationRecord.ExpiresAt != "never" && DateTimeOffset.TryParse(activationRecord.ExpiresAt, out var expDate))
+				{
+					expiresAt = expDate;
+					if (expDate < DateTimeOffset.Now)
+					{
+						isActivated = false;
+						LastVerifyError = "Bản quyền đã hết hạn sử dụng.";
+					}
+				}
+
+				if (isActivated)
+				{
+					// Kiểm tra trạng thái offline
+					bool currentlyOffline = _isOfflineDetected || !System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();
+					double daysSinceCheck = (DateTimeOffset.Now - activationRecord.LastOnlineCheckTime).TotalDays;
+
+					if (currentlyOffline)
+					{
+						if (daysSinceCheck >= 15.0)
+						{
+							isActivated = false;
+							LastVerifyError = "Đã quá 15 ngày chưa xác thực trực tuyến. Vui lòng kết nối Internet để tiếp tục sử dụng.";
+						}
+						else
+						{
+							needsOnlineVerification = true;
+							int remainingDays = (int)Math.Max(0, Math.Ceiling(15.0 - daysSinceCheck));
+							offlineWarningMessage = $"Máy tính của bạn hiện không có kết nối Internet. Ứng dụng đang chạy ở chế độ Ngoại tuyến (Hạn dùng offline còn lại: {remainingDays} ngày).";
+						}
+					}
+				}
+			}
+			else
+			{
+				LastVerifyError = "Mã thiết bị không khớp.";
+			}
+		}
+
 		string expirationText = "Vĩnh viễn";
 		if (expiresAt.HasValue)
 		{
 			expirationText = expiresAt.Value.ToString("dd/MM/yyyy HH:mm");
-		}
-		if (flag && !string.IsNullOrWhiteSpace(verifiedPublicKey))
-		{
-			SaveCachedPublicKeyPem(verifiedPublicKey);
-		}
-
-		bool needsOnlineVerification = false;
-		string offlineWarningMessage = string.Empty;
-		if (flag && activationRecord != null)
-		{
-			double daysSinceCheck = (DateTimeOffset.Now - activationRecord.LastOnlineCheckTime).TotalDays;
-			if (daysSinceCheck >= 15.0)
-			{
-				flag = false;
-				LastVerifyError = "Vượt quá thời hạn xác thực ngoại tuyến (15 ngày). Vui lòng kết nối Internet.";
-			}
-			else if (daysSinceCheck >= 7.0)
-			{
-				needsOnlineVerification = true;
-				int remainingDays = (int)Math.Max(1, Math.Ceiling(15.0 - daysSinceCheck));
-				offlineWarningMessage = $"Ứng dụng đang chạy ngoại tuyến. Vui lòng kết nối Internet trong {remainingDays} ngày tới để xác thực bản quyền.";
-			}
 		}
 
 		return new ActivationState
 		{
 			AppVersion = AppVersion,
 			MachineId = MachineId,
-			IsActivated = flag,
+			IsActivated = isActivated,
 			ActivationKey = activationKey,
 			ActivatedAt = activationRecord?.ActivatedAt,
 			LicensePath = LicensePath,
-			StatusText = (flag ? "Activated" : "Not activated"),
+			StatusText = (isActivated ? "Activated" : "Not activated"),
 			ExpiresAt = expiresAt,
 			ExpirationText = expirationText,
 			NeedsOnlineVerification = needsOnlineVerification,
@@ -172,6 +226,7 @@ internal static class ActivationLicense
 				machine_id = MachineId,
 				machine_name = Environment.MachineName
 			}), Encoding.UTF8, "application/json");
+
 			HttpResponseMessage response = await client.PostAsync(ApiActivateUrl, content, cts.Token);
 			string json = await response.Content.ReadAsStringAsync();
 			if (!response.IsSuccessStatusCode)
@@ -179,73 +234,49 @@ internal static class ActivationLicense
 				try
 				{
 					using JsonDocument jsonDocument = JsonDocument.Parse(json);
-					if (jsonDocument.RootElement.TryGetProperty("message", out var value))
+					if (jsonDocument.RootElement.TryGetProperty("message", out var val))
 					{
-						return (Success: false, Message: value.GetString() ?? "Kích hoạt không thành công.");
+						return (Success: false, Message: val.GetString() ?? "Kích hoạt không thành công.");
 					}
 				}
-				catch
-				{
-				}
+				catch {}
 				return (Success: false, Message: $"Yêu cầu kích hoạt bị từ chối: {(int)response.StatusCode}");
 			}
-			using JsonDocument jsonDocument2 = JsonDocument.Parse(json);
-			string payload = jsonDocument2.RootElement.GetProperty("payload").GetString() ?? string.Empty;
-			string text = jsonDocument2.RootElement.GetProperty("signature").GetString() ?? string.Empty;
-			string publicKeyPem = await GetPublicKeyForActivationAsync();
-			if (VerifySignature(payload, text, publicKeyPem))
+
+			using JsonDocument doc = JsonDocument.Parse(json);
+			bool success = doc.RootElement.GetProperty("success").GetBoolean();
+			string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+
+			if (success && status == "activated")
 			{
-				SaveCachedPublicKeyPem(publicKeyPem);
-				ActivationRecord value2 = new ActivationRecord
+				string key = doc.RootElement.GetProperty("license_key").GetString() ?? normalizedKey;
+				string expStr = doc.RootElement.GetProperty("expires_at").GetString() ?? "never";
+
+				ActivationRecord record = new ActivationRecord
 				{
-					ActivationKey = FormatActivationKey(normalizedKey),
-					Payload = payload,
-					Signature = text,
-					PublicKey = publicKeyPem,
+					ActivationKey = FormatActivationKey(key),
 					MachineId = MachineId,
-					Edition = "HPhat Edition",
+					ExpiresAt = expStr,
+					Status = status,
+					Edition = EditionName,
 					ActivatedAt = DateTimeOffset.Now,
 					LastOnlineCheckTime = DateTimeOffset.Now
 				};
-				SaveRecord(value2);
+
+				SaveRecord(record);
+				_isOfflineDetected = false;
 				return (Success: true, Message: "Đã kích hoạt bản quyền thành công!");
 			}
-			return (Success: false, Message: "Xác minh chữ ký số thất bại. Chi tiết lỗi:\n" + LastVerifyError);
+			return (Success: false, Message: "Kích hoạt không thành công. Trạng thái bản quyền không hợp lệ.");
 		}
 		catch (Exception ex)
 		{
-			if (ex is HttpRequestException || ex is System.Net.Sockets.SocketException || ex.Message.Contains("hongmien.vn") || ex.Message.Contains("No such host") || ex.Message.Contains("connection") || ex.Message.Contains("connect"))
+			if (ex is HttpRequestException || ex is System.Net.Sockets.SocketException || ex.Message.Contains(ApiDomain) || ex.Message.Contains("No such host") || ex.Message.Contains("connection") || ex.Message.Contains("connect"))
 			{
-				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng mở kết nối Internet (Wifi hoặc mạng dây) để thực hiện kích hoạt.");
-			}
-			if (ex is JsonException || ex is NotSupportedException)
-			{
-				return (Success: false, Message: "Lỗi xử lý dữ liệu kích hoạt từ máy chủ. Vui lòng liên hệ với quản trị viên để hỗ trợ.");
+				_isOfflineDetected = true;
+				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng kiểm tra lại kết nối Internet.");
 			}
 			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + ex.Message);
-		}
-	}
-
-	private static bool VerifySignature(string payload, string base64Signature, string publicKeyPem)
-	{
-		try
-		{
-			LastVerifyError = "None";
-			byte[] bytes = Encoding.UTF8.GetBytes(payload);
-			byte[] signature = Convert.FromBase64String(base64Signature);
-			using RSA rSA = RSA.Create();
-			rSA.ImportFromPem((string.IsNullOrWhiteSpace(publicKeyPem) ? PublicRsaKeyPem : publicKeyPem).ToCharArray());
-			bool num = rSA.VerifyData(bytes, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-			if (!num)
-			{
-				LastVerifyError = $"Signature mismatch.\nPayload: '{payload}'\nSignature Base64: '{base64Signature}'";
-			}
-			return num;
-		}
-		catch (Exception ex)
-		{
-			LastVerifyError = "Exception: " + ex.Message + "\nStack: " + ex.StackTrace;
-			return false;
 		}
 	}
 
@@ -256,36 +287,29 @@ internal static class ActivationLicense
 			if (File.Exists(LicensePath))
 			{
 				ActivationRecord activationRecord = LoadRecord();
-				if (activationRecord != null && !string.IsNullOrEmpty(activationRecord.Payload))
+				if (activationRecord != null && !string.IsNullOrEmpty(activationRecord.ActivationKey))
 				{
-					using JsonDocument jsonDocument = JsonDocument.Parse(activationRecord.Payload);
-					string key = jsonDocument.RootElement.GetProperty("license_key").GetString() ?? string.Empty;
-					if (!string.IsNullOrEmpty(key))
+					string key = activationRecord.ActivationKey;
+					Task.Run(async delegate
 					{
-						Task.Run(async delegate
+						try
 						{
-							try
+							var client = HttpHelper.Client;
+							using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
+							StringContent content = new StringContent(JsonSerializer.Serialize(new
 							{
-								var client = HttpHelper.Client;
-								using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
-								StringContent content = new StringContent(JsonSerializer.Serialize(new
-								{
-									license_key = key,
-									machine_id = MachineId
-								}), Encoding.UTF8, "application/json");
-								await client.PostAsync(ApiDeactivateUrl, content, cts.Token);
-							}
-							catch
-							{
-							}
-						});
-					}
+								license_key = key,
+								machine_id = MachineId
+							}), Encoding.UTF8, "application/json");
+							await client.PostAsync(ApiDeactivateUrl, content, cts.Token);
+						}
+						catch {}
+					});
 				}
 			}
 		}
-		catch
-		{
-		}
+		catch {}
+
 		if (File.Exists(LicensePath))
 		{
 			File.Delete(LicensePath);
@@ -311,16 +335,15 @@ internal static class ActivationLicense
 		{
 			string originalKey = record.ActivationKey;
 			record.ActivationKey = SecurityHelper.Encrypt(originalKey);
+			
+			string json = JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true });
+			string encrypted = EncryptWithMachineKey(json, MachineId);
+
 			Directory.CreateDirectory(LicenseDirectory);
-			File.WriteAllText(LicensePath, JsonSerializer.Serialize(record, new JsonSerializerOptions
-			{
-				WriteIndented = true
-			}), Encoding.UTF8);
+			File.WriteAllText(LicensePath, encrypted, Encoding.UTF8);
 			record.ActivationKey = originalKey;
 		}
-		catch
-		{
-		}
+		catch {}
 	}
 
 	private static ActivationRecord? LoadRecord()
@@ -331,7 +354,14 @@ internal static class ActivationLicense
 			{
 				return null;
 			}
-			var record = JsonSerializer.Deserialize<ActivationRecord>(File.ReadAllText(LicensePath, Encoding.UTF8));
+			string encrypted = File.ReadAllText(LicensePath, Encoding.UTF8);
+			string decryptedJson = DecryptWithMachineKey(encrypted, MachineId);
+			if (string.IsNullOrEmpty(decryptedJson))
+			{
+				return null;
+			}
+
+			var record = JsonSerializer.Deserialize<ActivationRecord>(decryptedJson);
 			if (record != null && !string.IsNullOrEmpty(record.ActivationKey))
 			{
 				try
@@ -350,98 +380,6 @@ internal static class ActivationLicense
 		{
 			return null;
 		}
-	}
-
-	private static IEnumerable<string> GetVerificationPublicKeys(ActivationRecord? activationRecord)
-	{
-		if (activationRecord != null && !string.IsNullOrWhiteSpace(activationRecord.PublicKey))
-		{
-			yield return activationRecord.PublicKey.Trim();
-		}
-
-		string cachedPublicKey = LoadCachedPublicKeyPem();
-		if (!string.IsNullOrWhiteSpace(cachedPublicKey))
-		{
-			yield return cachedPublicKey;
-		}
-
-		yield return PublicRsaKeyPem;
-	}
-
-	private static string LoadCachedPublicKeyPem()
-	{
-		try
-		{
-			if (!File.Exists(PublicKeyCachePath))
-			{
-				return string.Empty;
-			}
-
-			return File.ReadAllText(PublicKeyCachePath, Encoding.UTF8).Trim();
-		}
-		catch
-		{
-			return string.Empty;
-		}
-	}
-
-	private static void SaveCachedPublicKeyPem(string publicKeyPem)
-	{
-		try
-		{
-			if (string.IsNullOrWhiteSpace(publicKeyPem))
-			{
-				return;
-			}
-
-			Directory.CreateDirectory(LicenseDirectory);
-			File.WriteAllText(PublicKeyCachePath, publicKeyPem.Trim() + Environment.NewLine, Encoding.UTF8);
-		}
-		catch
-		{
-		}
-	}
-
-	private static async Task<string> GetPublicKeyForActivationAsync()
-	{
-		string remotePublicKey = await FetchRemotePublicKeyPemAsync();
-		if (!string.IsNullOrWhiteSpace(remotePublicKey))
-		{
-			return remotePublicKey;
-		}
-
-		string cachedPublicKey = LoadCachedPublicKeyPem();
-		if (!string.IsNullOrWhiteSpace(cachedPublicKey))
-		{
-			return cachedPublicKey;
-		}
-
-		return PublicRsaKeyPem;
-	}
-
-	private static async Task<string> FetchRemotePublicKeyPemAsync()
-	{
-		try
-		{
-			var client = HttpHelper.Client;
-			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10.0));
-			HttpResponseMessage response = await client.GetAsync(ApiPublicKeyUrl, cts.Token);
-			string json = await response.Content.ReadAsStringAsync();
-			using JsonDocument jsonDocument = JsonDocument.Parse(json);
-			if (jsonDocument.RootElement.TryGetProperty("public_key", out var value))
-			{
-				string? text = value.GetString();
-				if (!string.IsNullOrWhiteSpace(text))
-				{
-					return text.Trim();
-				}
-			}
-		}
-		catch
-		{
-		}
-
-		return string.Empty;
 	}
 
 	private static string BuildMachineId()
@@ -530,7 +468,6 @@ internal static class ActivationLicense
 
 	public static async Task<(bool UpdateAvailable, string LatestVersion, string DownloadUrl, string Changelog)> CheckForUpdatesAsync()
 	{
-		_ = 1;
 		try
 		{
 			var client = HttpHelper.Client;
@@ -594,15 +531,6 @@ internal static class ActivationLicense
 			return;
 		}
 
-		if (!force)
-		{
-			double daysSinceCheck = (DateTimeOffset.Now - record.LastOnlineCheckTime).TotalDays;
-			if (daysSinceCheck < 7.0)
-			{
-				return;
-			}
-		}
-
 		try
 		{
 			var client = HttpHelper.Client;
@@ -618,51 +546,39 @@ internal static class ActivationLicense
 			bool isActivated = false;
 			if (response.IsSuccessStatusCode)
 			{
-				try
-				{
-					using JsonDocument doc = JsonDocument.Parse(json);
-					bool success = doc.RootElement.GetProperty("success").GetBoolean();
-					string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
+				using JsonDocument doc = JsonDocument.Parse(json);
+				bool success = doc.RootElement.GetProperty("success").GetBoolean();
+				string status = doc.RootElement.GetProperty("status").GetString() ?? string.Empty;
 
-					if (success && status == "activated")
-					{
-						isActivated = true;
-						record.LastOnlineCheckTime = DateTimeOffset.Now;
-						if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
-						{
-							record.Payload = payloadVal.GetString() ?? record.Payload;
-							record.Signature = sigVal.GetString() ?? record.Signature;
-						}
-						
-						SaveRecord(record);
-					}
-					else if (!success)
-					{
-						// Chỉ hủy kích hoạt nếu máy chủ phản hồi thất bại kèm chữ ký số hợp lệ xác nhận tình trạng khóa/hết hạn
-						if (doc.RootElement.TryGetProperty("payload", out var payloadVal) && doc.RootElement.TryGetProperty("signature", out var sigVal))
-						{
-							string payload = payloadVal.GetString() ?? string.Empty;
-							string sig = sigVal.GetString() ?? string.Empty;
-							string publicKeyPem = await GetPublicKeyForActivationAsync();
-							if (VerifySignature(payload, sig, publicKeyPem))
-							{
-								using JsonDocument payloadDoc = JsonDocument.Parse(payload);
-								string payloadStatus = payloadDoc.RootElement.GetProperty("status").GetString() ?? string.Empty;
-								if (payloadStatus == "suspended" || payloadStatus == "expired" || payloadStatus == "unregistered_device")
-								{
-									Deactivate();
-								}
-							}
-						}
-					}
-				}
-				catch
+				if (success && status == "activated")
 				{
+					isActivated = true;
+					record.LastOnlineCheckTime = DateTimeOffset.Now;
+					record.Status = status;
+					if (doc.RootElement.TryGetProperty("expires_at", out var expVal))
+					{
+						record.ExpiresAt = expVal.GetString() ?? record.ExpiresAt;
+					}
+					SaveRecord(record);
+					_isOfflineDetected = false;
 				}
+				else if (!success)
+				{
+					if (status == "suspended" || status == "expired" || status == "unregistered_device")
+					{
+						Deactivate();
+					}
+				}
+			}
+			else
+			{
+				// Phản hồi lỗi HTTP từ server, xem như offline
+				_isOfflineDetected = true;
 			}
 		}
 		catch
 		{
+			_isOfflineDetected = true;
 		}
 	}
 }

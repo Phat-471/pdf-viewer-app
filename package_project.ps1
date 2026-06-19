@@ -191,6 +191,52 @@ $summary = $summaryTemplate.
 
 $summary | Set-Content -LiteralPath $packageSummaryPath -Encoding UTF8
 
+# 4.5. Optional Auto-Publish to WordPress REST API
+$publishSettingsFile = Join-Path $scriptDir "publish_settings.json"
+if (Test-Path $publishSettingsFile) {
+    Write-Host "`n[Auto-Publish] Found publish_settings.json. Proceeding to sync with WordPress API..." -ForegroundColor Yellow
+    $pubSettings = Get-Content -LiteralPath $publishSettingsFile | ConvertFrom-Json
+    $token = $pubSettings.publish_token
+    $apiDomain = $pubSettings.api_domain
+    $downloadUrlPrefix = $pubSettings.download_url_prefix
+
+    if ([string]::IsNullOrWhiteSpace($token)) {
+        Write-Warning "[Auto-Publish] publish_token is empty. Skipping auto-publish."
+    } else {
+        $downloadUrl = "$downloadUrlPrefix$zipFileName"
+        
+        # Update manifest object in memory and re-save
+        $manifest.download_url = $downloadUrl
+        $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+
+        $body = @{
+            token = $token
+            latest_version = $version
+            download_url = $downloadUrl
+            sha256 = $sha256
+            file_size = $zipItem.Length
+            release_date = $releaseDate
+            mandatory = $false
+            changelog = $changelogText
+        } | ConvertTo-Json
+
+        try {
+            $publishUrl = "$apiDomain/wp-json/pdfpro/v1/update-publish"
+            Write-Host "[Auto-Publish] Sending update metadata to $publishUrl..." -ForegroundColor DarkGray
+            $response = Invoke-RestMethod -Uri $publishUrl -Method Post -ContentType "application/json" -Body $body
+            if ($response.success) {
+                Write-Host "[Auto-Publish] SUCCESS: $($response.message)" -ForegroundColor Green
+            } else {
+                Write-Warning "[Auto-Publish] Failed to publish update: $($response.message)"
+            }
+        } catch {
+            Write-Warning "[Auto-Publish] API Request failed: $_"
+        }
+    }
+} else {
+    Write-Host "`n[Auto-Publish] publish_settings.json not found. Copy publish_settings.json.template to publish_settings.json and fill in your token to enable auto-publishing." -ForegroundColor DarkYellow
+}
+
 # 5. Optional: Build Inno Setup Installer (Setup.exe)
 Write-Host "`n[5/5] Building Inno Setup Installer (Optional)..." -ForegroundColor Yellow
 $isccPath = ""

@@ -45,46 +45,12 @@ public partial class PdfDocumentTab
 
 	private bool TryGetCachedBitmap(string key, out BitmapSource? bitmap)
 	{
-		if (_bitmapCache.TryGetValue(key, out BitmapSource value))
-		{
-			bitmap = value;
-			if (_bitmapCacheNodes.TryGetValue(key, out LinkedListNode<string> value2))
-			{
-				_bitmapCacheOrder.Remove(value2);
-				_bitmapCacheOrder.AddFirst(value2);
-			}
-			return true;
-		}
-		bitmap = null;
-		return false;
-	}
-
-	private void TrimBitmapCache()
-	{
-		while (_bitmapCacheBytes > MaxBitmapCacheBytes && _bitmapCacheOrder.Last != null)
-		{
-			string value = _bitmapCacheOrder.Last.Value;
-			_bitmapCacheOrder.RemoveLast();
-			if (_bitmapCache.TryGetValue(value, out BitmapSource value2))
-			{
-				_bitmapCacheBytes = Math.Max(0L, _bitmapCacheBytes - EstimateBitmapBytes(value2));
-				_bitmapCache.Remove(value);
-			}
-			_bitmapCacheNodes.Remove(value);
-		}
+		return _cacheManager.TryGetCachedBitmap(key, out bitmap);
 	}
 
 	private void ClearBitmapCache()
 	{
-		_bitmapCache.Clear();
-		_bitmapCacheOrder.Clear();
-		_bitmapCacheNodes.Clear();
-		_bitmapCacheBytes = 0L;
-	}
-
-	private static long EstimateBitmapBytes(BitmapSource bitmap)
-	{
-		return (long)Math.Max(1, bitmap.PixelWidth) * (long)Math.Max(1, bitmap.PixelHeight) * 4;
+		_cacheManager.Clear();
 	}
 
 	private void DrawHorizontalRuler(double pageOriginX)
@@ -589,9 +555,61 @@ public partial class PdfDocumentTab
 			if (tempDoc == IntPtr.Zero)
 			{
 				LogStatus("Failed to open document with PDFium");
+				
+				MessageBoxResult result = MessageBox.Show(
+					Application.Current.MainWindow,
+					"Tài liệu PDF này dường như bị lỗi cấu trúc hoặc bị hỏng. Bạn có muốn ứng dụng cố gắng tự động sửa chữa và khôi phục tệp tin này không?",
+					"Phát hiện tệp lỗi",
+					MessageBoxButton.YesNo,
+					MessageBoxImage.Warning);
+				
+				if (result == MessageBoxResult.Yes)
+				{
+					try
+					{
+						string dir = System.IO.Path.GetDirectoryName(CurrentPdfPath) ?? "";
+						string fileName = System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath);
+						string ext = System.IO.Path.GetExtension(CurrentPdfPath);
+						string repairedPath = System.IO.Path.Combine(dir, $"{fileName}_repaired{ext}");
+						
+						bool success = await Task.Run(() => PdfInterop.PdfCore.repair_pdf(CurrentPdfPath, repairedPath));
+						if (success && File.Exists(repairedPath))
+						{
+							MessageBox.Show(
+								Application.Current.MainWindow,
+								"Sửa chữa thành công! Đang tải lại tệp tin đã khôi phục.",
+								"Thành công",
+								MessageBoxButton.OK,
+								MessageBoxImage.Information);
+							
+							LoadDocument(repairedPath);
+							return;
+						}
+						else
+						{
+							MessageBox.Show(
+								Application.Current.MainWindow,
+								"Không thể sửa chữa tệp tin này. Cấu trúc tệp bị hỏng quá nặng.",
+								"Thất bại",
+								MessageBoxButton.OK,
+								MessageBoxImage.Error);
+						}
+					}
+					catch (Exception ex)
+					{
+						MessageBox.Show(
+							Application.Current.MainWindow,
+							$"Lỗi trong quá trình sửa chữa: {ex.Message}",
+							"Lỗi",
+							MessageBoxButton.OK,
+							MessageBoxImage.Error);
+					}
+				}
+
 				EmptyStateText.Visibility = Visibility.Visible;
 				return;
 			}
+
 			int pageCount = 0;
 			List<Size> pageDimensions = new List<Size>();
 			try
@@ -738,15 +756,22 @@ public partial class PdfDocumentTab
 		}
 	}
 
+	private double GetStableRenderScale(double currentZoom)
+	{
+		if (currentZoom <= 1.5) return 1.5;
+		if (currentZoom <= 3.0) return 3.0;
+		return Math.Min(4.0, currentZoom);
+	}
+
 	private async Task LoadPageContent(int pageNumber, Border pageBorder, int renderGeneration)
 	{
-		UIElement child = pageBorder.Child;
-		if (!(child is Grid grid))
+		Grid grid = pageBorder.Child as Grid;
+		if (grid == null)
 		{
 			return;
 		}
 		Image image = grid.Children.OfType<Image>().FirstOrDefault();
-		if (image == null || image.Source != null || !_loadingPages.Add(pageNumber))
+		if (image == null || !_loadingPages.Add(pageNumber))
 		{
 			return;
 		}
@@ -764,8 +789,9 @@ public partial class PdfDocumentTab
 			}
 			double width = _pageDimensions[pageNumber - 1].Width;
 			double height = _pageDimensions[pageNumber - 1].Height;
-			int renderWidth = Math.Max(1, (int)(width * 1.33 * currentZoom));
-			int renderHeight = Math.Max(1, (int)(height * 1.33 * currentZoom));
+			double stableScale = GetStableRenderScale(currentZoom);
+			int renderWidth = Math.Max(1, (int)(width * 1.33 * stableScale));
+			int renderHeight = Math.Max(1, (int)(height * 1.33 * stableScale));
 			string cacheKey = BuildPageCacheKey(pageNumber, renderWidth, renderHeight, isThumbnail: false);
 			if (TryGetCachedBitmap(cacheKey, out BitmapSource bitmap) && bitmap != null)
 			{
@@ -773,13 +799,13 @@ public partial class PdfDocumentTab
 				if (renderGeneration == _renderGeneration)
 				{
 					image.Source = bitmap;
-					image.Width = bitmap.Width;
-					image.Height = bitmap.Height;
+					image.Width = width * 1.33 * currentZoom;
+					image.Height = height * 1.33 * currentZoom;
 					Canvas canvas = grid.Children.OfType<Canvas>().FirstOrDefault();
 					if (canvas != null)
 					{
-						canvas.Width = bitmap.Width;
-						canvas.Height = bitmap.Height;
+						canvas.Width = width * 1.33 * currentZoom;
+						canvas.Height = height * 1.33 * currentZoom;
 						RedrawPageAnnotations(canvas, pageNumber);
 					}
 				}
@@ -813,13 +839,13 @@ public partial class PdfDocumentTab
 				PdfPerfLogger.Log($"Page {pageNumber} render miss ({renderWidth}x{renderHeight}) => {renderSw.ElapsedMilliseconds} ms");
 				StoreBitmap(cacheKey, bitmapSource);
 				image.Source = bitmapSource;
-				image.Width = bitmapSource.Width;
-				image.Height = bitmapSource.Height;
+				image.Width = width * 1.33 * currentZoom;
+				image.Height = height * 1.33 * currentZoom;
 				Canvas canvas2 = grid.Children.OfType<Canvas>().FirstOrDefault();
 				if (canvas2 != null)
 				{
-					canvas2.Width = bitmapSource.Width;
-					canvas2.Height = bitmapSource.Height;
+					canvas2.Width = width * 1.33 * currentZoom;
+					canvas2.Height = height * 1.33 * currentZoom;
 					RedrawPageAnnotations(canvas2, pageNumber);
 				}
 			}

@@ -119,11 +119,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private readonly HashSet<int> _bookmarkedPages = new HashSet<int>();
 
-	private readonly Dictionary<string, BitmapSource> _bitmapCache = new Dictionary<string, BitmapSource>(StringComparer.Ordinal);
-
-	private readonly LinkedList<string> _bitmapCacheOrder = new LinkedList<string>();
-
-	private readonly Dictionary<string, LinkedListNode<string>> _bitmapCacheNodes = new Dictionary<string, LinkedListNode<string>>(StringComparer.Ordinal);
+	private readonly Services.Cache.PdfCacheManager _cacheManager;
 
 	private readonly PriorityQueue<RenderQueueItem, (int Priority, long Sequence)> _renderQueue = new PriorityQueue<RenderQueueItem, (int, long)>();
 
@@ -183,7 +179,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private bool _isFirstLoad = true;
 
-	private long _bitmapCacheBytes;
 
 	private readonly Dictionary<int, int> _pageRotations = new Dictionary<int, int>();
 
@@ -1844,23 +1839,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void StoreBitmap(string key, BitmapSource bitmap)
 	{
-		if (_bitmapCache.ContainsKey(key))
-		{
-			if (_bitmapCacheNodes.TryGetValue(key, out LinkedListNode<string> value))
-			{
-				_bitmapCacheOrder.Remove(value);
-				_bitmapCacheOrder.AddFirst(value);
-			}
-			_bitmapCache[key] = bitmap;
-		}
-		else
-		{
-			_bitmapCache[key] = bitmap;
-			LinkedListNode<string> value2 = _bitmapCacheOrder.AddFirst(key);
-			_bitmapCacheNodes[key] = value2;
-			_bitmapCacheBytes += EstimateBitmapBytes(bitmap);
-			TrimBitmapCache();
-		}
+		_cacheManager.StoreBitmap(key, bitmap);
 	}
 
 	private void DocContextMenu_Opened(object sender, RoutedEventArgs e)
@@ -2994,6 +2973,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		catch { }
 
+		_cacheManager = new Services.Cache.PdfCacheManager(MaxBitmapCacheBytes);
 		InitializeComponent();
 		RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
 		_zoomTimer = new DispatcherTimer();
@@ -4151,7 +4131,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		this.PageChanged?.Invoke(this, EventArgs.Empty);
 	}
 
-	public int BitmapCacheCount => _bitmapCache?.Count ?? 0;
-	public long BitmapCacheBytes => _bitmapCacheBytes;
-
+	public int BitmapCacheCount => _cacheManager?.Count ?? 0;
+	public long BitmapCacheBytes => _cacheManager?.Bytes ?? 0;
+	public Services.Cache.PdfCacheManager CacheManager => _cacheManager;
 }

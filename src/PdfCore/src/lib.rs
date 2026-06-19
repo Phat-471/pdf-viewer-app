@@ -1174,3 +1174,52 @@ pub extern "C" fn extract_pdf_images(
 
     image_count
 }
+
+#[no_mangle]
+pub extern "C" fn repair_pdf(
+    pdf_path: *const c_char,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut bytes = match std::fs::read(pdf_str) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+
+    // 1. Clean up header: Find first %PDF-
+    let pdf_magic = b"%PDF-";
+    if let Some(start_idx) = bytes.windows(pdf_magic.len()).position(|w| w == pdf_magic) {
+        if start_idx > 0 {
+            bytes = bytes[start_idx..].to_vec();
+        }
+    } else {
+        return false; // Not a PDF file
+    }
+
+    // 2. Clean up trailer: Find last %%EOF
+    let eof_magic = b"%%EOF";
+    if let Some(end_idx) = bytes.windows(eof_magic.len()).rposition(|w| w == eof_magic) {
+        let truncate_len = end_idx + eof_magic.len();
+        if truncate_len < bytes.len() {
+            bytes.truncate(truncate_len);
+        }
+    }
+
+    // 3. Load via lopdf
+    let mut doc = match Document::load_mem(&bytes) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // 4. Save to output path - this regenerates the xref table and trailer
+    doc.save(output_str).is_ok()
+}
+

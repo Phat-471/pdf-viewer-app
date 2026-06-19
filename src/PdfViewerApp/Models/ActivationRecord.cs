@@ -8,11 +8,9 @@ internal sealed class ActivationRecord
 
 	public string MachineId { get; set; } = string.Empty;
 
-	public string Payload { get; set; } = string.Empty;
+	public string ExpiresAt { get; set; } = "never";
 
-	public string Signature { get; set; } = string.Empty;
-
-	public string PublicKey { get; set; } = string.Empty;
+	public string Status { get; set; } = "activated";
 
 	public string Edition { get; set; } = string.Empty;
 

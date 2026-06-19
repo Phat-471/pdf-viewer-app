@@ -42,3 +42,11 @@ libs/pdf_core.dll
 obj_old/
 bin_old/
 
+# Publish configuration
+publish_settings.json
+
+# Test outputs
+test_output.txt
+test_output_utf8.txt
+
+

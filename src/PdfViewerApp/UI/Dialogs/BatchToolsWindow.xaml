@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="PdfViewerApp.BatchToolsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bộ Công Cụ Xử Lý Hàng Loạt (Batch Tools)" 
+        Width="1100" Height="700" 
+        MinWidth="1000" MinHeight="620" 
+        WindowStartupLocation="CenterOwner" 
+        Background="#0F172A" Foreground="#F8FAFC" 
+        FontFamily="Segoe UI, Tahoma, Helvetica"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
+  <Window.Resources>
+    <ResourceDictionary>
+      <!-- Premium Button Style -->
+      <Style x:Key="PremiumButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="6" Padding="12,8">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0F766E" Offset="0.0" />
+                    <GradientStop Color="#14B8A6" Offset="1.0" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.9" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.8" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                  <Setter TargetName="Border" Property="Border.Background" Value="#334155" />
+                  <Setter Property="Foreground" Value="#64748B" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <!-- Danger Button Style -->
+      <Style x:Key="DangerButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="6" Padding="12,8">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#B91C1C" Offset="0.0" />
+                    <GradientStop Color="#EF4444" Offset="1.0" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.9" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.8" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <!-- Secondary Button Style -->
+      <Style x:Key="SecondaryButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#94A3B8" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="6" BorderThickness="1.5" BorderBrush="#334155" Background="#1E293B" Padding="10,6">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="Border.BorderBrush" Value="#475569" />
+                  <Setter Property="Foreground" Value="#F8FAFC" />
+                  <Setter TargetName="Border" Property="Border.Background" Value="#334155" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="Border.Background" Value="#0F172A" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <!-- Modern TextBox Style -->
+      <Style x:Key="ModernTextBox" TargetType="{x:Type TextBox}">
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="BorderBrush" Value="#475569" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CaretBrush" Value="#38BDF8" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type TextBox}">
+              <Border Name="Border" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                <ScrollViewer Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="BorderBrush" Value="#64748B" />
+                </Trigger>
+                <Trigger Property="IsFocused" Value="True">
+                  <Setter TargetName="Border" Property="BorderBrush" Value="#38BDF8" />
+                  <Setter Property="Background" Value="#0F172A" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <!-- ComboBox Toggle Button -->
+      <Style x:Key="ModernComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="ClickMode" Value="Press" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type ToggleButton}">
+              <Border Name="templateRoot" SnapsToDevicePixels="True" Background="#1E293B" BorderThickness="1.5" BorderBrush="#475569" CornerRadius="6">
+                <Grid HorizontalAlignment="Right" Width="30">
+                  <Path Name="Arrow" Fill="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z" />
+                </Grid>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="templateRoot" Property="Border.BorderBrush" Value="#64748B" />
+                  <Setter TargetName="Arrow" Property="Shape.Fill" Value="#F8FAFC" />
+                </Trigger>
+                <Trigger Property="ToggleButton.IsChecked" Value="True">
+                  <Setter TargetName="templateRoot" Property="Border.BorderBrush" Value="#38BDF8" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <!-- Modern ComboBox Style -->
+      <Style x:Key="ModernComboBox" TargetType="{x:Type ComboBox}">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="BorderBrush" Value="#475569" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type ComboBox}">
+              <Grid Name="templateRoot" SnapsToDevicePixels="True">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="0" MaxWidth="0" />
+                </Grid.ColumnDefinitions>
+                <ToggleButton Name="ToggleButton" Grid.ColumnSpan="2" Style="{StaticResource ModernComboBoxToggleButton}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                <ContentPresenter Name="contentPresenter" Content="{TemplateBinding ComboBox.SelectionBoxItem}" ContentTemplate="{TemplateBinding ComboBox.SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ComboBox.ItemTemplateSelector}" Margin="{TemplateBinding Padding}" HorizontalAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False" SnapsToDevicePixels="{TemplateBinding UIElement.SnapsToDevicePixels}" />
+                <Popup Name="PART_Popup" AllowsTransparency="True" Grid.ColumnSpan="2" Placement="Bottom" IsOpen="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" PopupAnimation="Slide">
+                  <Border Name="dropDownBorder" Background="#1E293B" BorderThickness="1.5" BorderBrush="#475569" CornerRadius="6" MaxHeight="{TemplateBinding ComboBox.MaxDropDownHeight}" MinWidth="{Binding ElementName=templateRoot, Path=ActualWidth}">
+                    <ScrollViewer Name="ScrollViewer" CanContentScroll="True">
+                      <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" SnapsToDevicePixels="{TemplateBinding UIElement.SnapsToDevicePixels}" />
+                    </ScrollViewer>
+                  </Border>
+                </Popup>
+              </Grid>
+              <ControlTemplate.Triggers>
+                <Trigger Property="ItemsControl.HasItems" Value="False">
+                  <Setter TargetName="dropDownBorder" Property="FrameworkElement.Height" Value="95" />
+                </Trigger>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter Property="BorderBrush" Value="#64748B" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      
+      <!-- Modern CheckBox Style -->
+      <Style TargetType="{x:Type CheckBox}">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,4,0,4" />
+        <Setter Property="Cursor" Value="Hand" />
+      </Style>
+      
+      <!-- TabControl custom style for Dark Theme -->
+      <Style TargetType="{x:Type TabItem}">
+        <Setter Property="Foreground" Value="#94A3B8" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type TabItem}">
+              <Border Name="Border" Background="{TemplateBinding Background}" BorderThickness="0,0,0,3" BorderBrush="Transparent" Padding="{TemplateBinding Padding}">
+                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                  <Setter Property="Foreground" Value="#14B8A6" />
+                  <Setter TargetName="Border" Property="BorderBrush" Value="#14B8A6" />
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                  <Setter Property="Foreground" Value="#F8FAFC" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+    </ResourceDictionary>
+  </Window.Resources>
+
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Header Area -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="26" Foreground="#14B8A6" VerticalAlignment="Center" Margin="0,0,10,0" />
+        <TextBlock Text="Bộ Công Cụ PDF Hàng Loạt" FontSize="20" FontWeight="Bold" Foreground="#F8FAFC" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Text="Chọn nhiều file, sắp xếp và áp dụng các thao tác hàng loạt" Foreground="#94A3B8" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" />
+    </Grid>
+
+    <!-- Main Workspace -->
+    <Grid Grid.Row="1" Margin="0,0,0,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="4.5*" MinWidth="420" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="5.5*" MinWidth="480" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Left Column: File list and queue management -->
+      <Grid Grid.Column="0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Drop area / ListView container -->
+        <Border BorderBrush="#334155" BorderThickness="1.5" CornerRadius="8" Background="#1E293B">
+          <Grid>
+            <!-- Drop files hint -->
+            <StackPanel Name="DropPlaceholder" VerticalAlignment="Center" HorizontalAlignment="Center" Panel.ZIndex="1" IsHitTestVisible="False">
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="48" Foreground="#475569" HorizontalAlignment="Center" Margin="0,0,0,12" />
+              <TextBlock Text="Kéo và thả các tệp PDF vào đây" FontSize="14" FontWeight="SemiBold" Foreground="#94A3B8" HorizontalAlignment="Center" />
+              <TextBlock Text="hoặc bấm nút 'Thêm tệp' phía dưới" FontSize="12" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <ListView Name="FileListView" Background="Transparent" BorderThickness="0" Foreground="#F8FAFC" ScrollViewer.VerticalScrollBarVisibility="Auto">
+              <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                  <Setter Property="Background" Value="Transparent" />
+                  <Setter Property="BorderThickness" Value="0" />
+                  <Setter Property="Margin" Value="0,2" />
+                  <Setter Property="Padding" Value="8" />
+                  <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                  <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter Property="Background" Value="#334155" />
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                      <Setter Property="Background" Value="#0F766E" />
+                    </Trigger>
+                  </Style.Triggers>
+                </Style>
+              </ListView.ItemContainerStyle>
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="STT" Width="40">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Index}" Foreground="#94A3B8" TextAlignment="Center" FontWeight="Medium" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Tên File" Width="190">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding FileName}" Foreground="#F8FAFC" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding FilePath}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Số Trang" Width="65">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding PageCountText}" Foreground="#38BDF8" TextAlignment="Center" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Dung Lượng" Width="80">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding FileSizeText}" Foreground="#94A3B8" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="Trạng Thái" Width="100">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" Foreground="{Binding StatusColor}" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                </GridView>
+              </ListView.View>
+            </ListView>
+          </Grid>
+        </Border>
+
+        <!-- Actions under file list -->
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal" Grid.Column="0">
+            <Button Name="AddFilesBtn" Content=" Thêm tệp" Style="{StaticResource SecondaryButton}" Click="AddFiles_Click" Margin="0,0,8,0" Padding="12,6" />
+            <Button Name="RemoveFileBtn" Content=" Xóa tệp" Style="{StaticResource SecondaryButton}" Click="RemoveFile_Click" Margin="0,0,8,0" Padding="12,6" />
+            <Button Name="ClearAllBtn" Content="Xóa tất cả" Style="{StaticResource SecondaryButton}" Click="ClearAll_Click" Padding="12,6" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Grid.Column="1">
+            <Button Name="MoveUpBtn" Content=" Lên" Style="{StaticResource SecondaryButton}" Click="MoveUp_Click" Margin="0,0,8,0" Padding="12,6" />
+            <Button Name="MoveDownBtn" Content=" Xuống" Style="{StaticResource SecondaryButton}" Click="MoveDown_Click" Padding="12,6" />
+          </StackPanel>
+        </Grid>
+      </Grid>
+
+      <!-- Column Splitter Grid -->
+      <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" />
+
+      <!-- Right Column: TabControl Settings panel -->
+      <Border Grid.Column="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1.5" CornerRadius="8">
+        <TabControl Name="BatchTabControl" Background="Transparent" BorderThickness="0" SelectionChanged="BatchTabControl_SelectionChanged">
+          
+          <!-- TAB 1: PRINT -->
+          <TabItem Header="In Hàng Loạt">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Cấu Hình In Chung" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Select Printer -->
+                <TextBlock Text="Máy in" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="PrinterComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" DisplayMemberPath="FullName" SelectionChanged="PrinterComboBox_SelectionChanged" />
+
+                <!-- Copies -->
+                <TextBlock Text="Số bản in (Copies)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="CopiesTextBox" Text="1" Style="{StaticResource ModernTextBox}" Height="32" VerticalAlignment="Center" HorizontalAlignment="Left" Width="80" Margin="0,0,0,16" KeyDown="NumberValidation_KeyDown" TextAlignment="Center" />
+
+                <!-- Page range -->
+                <TextBlock Text="Phạm vi trang" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <RadioButton Name="AllPagesRadio" Content="Tất cả các trang" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" Checked="PageRangeRadio_Checked" />
+                <RadioButton Name="CustomPagesRadio" Content="Trang chỉ định (ví dụ: 1-5, 8)" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="PageRangeRadio_Checked" />
+                <TextBox Name="PageRangeTextBox" Style="{StaticResource ModernTextBox}" Height="32" Width="180" HorizontalAlignment="Left" Margin="24,0,0,16" IsEnabled="False" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Size options -->
+                <TextBlock Text="Căn chỉnh kích thước" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <RadioButton Name="FitMarginsRadio" Content="Tự động căn vừa vùng in (Fit)" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" />
+                <RadioButton Name="ActualSizeRadio" Content="Kích thước thực tế (Actual size)" Foreground="#F8FAFC" Margin="0,0,0,16" />
+
+                <CheckBox Name="AutoCenterCheckBox" Content="Tự động căn giữa trang in" IsChecked="True" Margin="0,0,0,10" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Engine options -->
+                <TextBlock Text="Cơ chế in (Print Engine)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
+                  <ComboBoxItem Content="Native PDFium (Tốc độ cao, siêu nét)" Tag="NativePdfium_Optimized" />
+                  <ComboBoxItem Content="WPF Bitmap (Tương thích cao)" Tag="WpfBitmap" />
+                </ComboBox>
+
+                <CheckBox Name="OptimizeCadCheckBox" Content="Tối ưu nét in bản vẽ CAD/Vector" IsChecked="True" Margin="0,0,0,8" />
+                <CheckBox Name="SeparateJobsCheckBox" Content="Tách lệnh in từng trang (giảm lag)" IsChecked="False" Margin="0,0,0,8" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 2: ROTATE -->
+          <TabItem Header="Xoay Trang">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Cấu Hình Xoay Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Rotate Angle -->
+                <TextBlock Text="Góc xoay (theo chiều kim đồng hồ)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="RotateAngleComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
+                  <ComboBoxItem Content="Xoay phải 90°" Tag="90" />
+                  <ComboBoxItem Content="Xoay ngược 180°" Tag="180" />
+                  <ComboBoxItem Content="Xoay trái 90° (270°)" Tag="270" />
+                </ComboBox>
+
+                <!-- Page range for rotation -->
+                <TextBlock Text="Áp dụng cho trang" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <RadioButton Name="RotateAllRadio" Content="Tất cả các trang" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
+                <RadioButton Name="RotateOddRadio" Content="Chỉ trang lẻ" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
+                <RadioButton Name="RotateEvenRadio" Content="Chỉ trang chẵn" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
+                <RadioButton Name="RotateCustomRadio" Content="Dải trang chỉ định (ví dụ: 1-3, 5)" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
+                <TextBox Name="RotatePageRangeTextBox" Style="{StaticResource ModernTextBox}" Height="32" Width="180" HorizontalAlignment="Left" Margin="24,0,0,16" IsEnabled="False" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="RotateOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="RotateBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 3: COMPRESS -->
+          <TabItem Header="Nén PDF">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Cấu Hình Nén Dung Lượng Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Compression Quality -->
+                <TextBlock Text="Chất lượng ảnh nén (1-100)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <Slider Name="CompressQualitySlider" Minimum="10" Maximum="100" Value="60" SmallChange="5" LargeChange="10" Grid.Column="0" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding ElementName=CompressQualitySlider, Path=Value, StringFormat={}{0:0}}" Foreground="#38BDF8" FontWeight="Bold" FontSize="14" Width="40" TextAlignment="Right" Grid.Column="1" VerticalAlignment="Center" />
+                </Grid>
+
+                <TextBlock Text="* Giảm chất lượng ảnh sẽ giúp tệp PDF nhẹ hơn đáng kể đối với tài liệu quét (Scan) hoặc chứa nhiều hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="CompressOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="CompressBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 4: EXTRACT -->
+          <TabItem Header="Trích Xuất Trang">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Trích Xuất Trang Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Pages to Extract -->
+                <TextBlock Text="Phạm vi trang cần trích xuất (ví dụ: 1-3, 5)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="ExtractPageRangeTextBox" Text="1" Style="{StaticResource ModernTextBox}" Height="32" Width="220" HorizontalAlignment="Left" Margin="0,0,0,16" />
+
+                <TextBlock Text="* Mỗi tệp đầu vào sẽ được trích xuất các trang tương ứng thành một tệp PDF mới." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="ExtractOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="ExtractBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 5: MERGE -->
+          <TabItem Header="Gộp File">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Gộp Các File PDF Thành Một" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Output File Name -->
+                <TextBlock Text="Tên file kết quả gộp" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="MergeFileNameTextBox" Text="MergedDocument.pdf" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
+
+                <TextBlock Text="* Các file PDF trong danh sách bên trái sẽ được ghép nối theo thứ tự từ trên xuống dưới." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="MergeOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="MergeBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+        </TabControl>
+      </Border>
+    </Grid>
+
+    <!-- Footer: Progress & Submit Buttons -->
+    <Grid Grid.Row="2" Margin="0,8,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Overall progress -->
+      <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+        <TextBlock Name="OverallStatusText" Text="Sẵn sàng" Foreground="#94A3B8" FontSize="13" Margin="0,0,0,6" />
+        <ProgressBar Name="OverallProgressBar" Height="10" Background="#1E293B" Foreground="#14B8A6" BorderThickness="0" Minimum="0" Maximum="100" Value="0" />
+      </StackPanel>
+
+      <!-- Bottom controls -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <Button Name="CancelBtn" Content="Hủy bỏ" Style="{StaticResource DangerButton}" Width="110" Height="38" Click="Cancel_Click" Margin="0,0,10,0" Visibility="Collapsed" />
+        <Button Name="StartBtn" Content="Bắt đầu xử lý" Style="{StaticResource PremiumButton}" Width="140" Height="38" Click="Start_Click" />
+        <Button Name="CloseBtn" Content="Đóng" Style="{StaticResource SecondaryButton}" Width="90" Height="38" Click="Close_Click" Margin="10,0,0,0" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

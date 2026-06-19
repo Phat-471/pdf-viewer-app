@@ -132,7 +132,7 @@ public partial class App : Application
 		base.DispatcherUnhandledException += delegate(object _, DispatcherUnhandledExceptionEventArgs e)
 		{
 			File.WriteAllText("crash.log", e.Exception.ToString());
-			SendCrashTelemetry(e.Exception);
+			PdfViewerApp.Services.Diagnostics.ErrorReportingService.SendCrashTelemetry(e.Exception);
 			MessageBox.Show(e.Exception.ToString(), "Application error", MessageBoxButton.OK, MessageBoxImage.Hand);
 			e.Handled = true;
 			Application.Current.Shutdown();
@@ -143,7 +143,7 @@ public partial class App : Application
 			File.AppendAllText("debug_pdfpro.log", contents);
 			if (e.ExceptionObject is Exception ex)
 			{
-				SendCrashTelemetry(ex);
+				PdfViewerApp.Services.Diagnostics.ErrorReportingService.SendCrashTelemetry(ex);
 			}
 			MessageBox.Show(e.ExceptionObject?.ToString() ?? "Unknown fatal error", "Fatal error", MessageBoxButton.OK, MessageBoxImage.Hand);
 		};
@@ -151,38 +151,7 @@ public partial class App : Application
 
 	public static void SendCrashTelemetry(Exception ex)
 	{
-		try
-		{
-			if (!AiSettings.Load().EnableTelemetry)
-			{
-				return;
-			}
-			Task.Run(async delegate
-			{
-				try
-				{
-					var client = HttpHelper.Client;
-					using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
-					StringContent content = new StringContent(JsonSerializer.Serialize(new
-					{
-						app_version = ActivationLicense.AppVersion,
-						machine_id = ActivationLicense.MachineId,
-						error_message = ex.Message,
-						stack_trace = ex.ToString(),
-						os_version = Environment.OSVersion.VersionString,
-						timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-					}), Encoding.UTF8, "application/json");
-					string requestUri = $"{ActivationLicense.ApiDomain}/wp-json/pdfpro/v1/report-error";
-					await client.PostAsync(requestUri, content, cts.Token);
-				}
-				catch
-				{
-				}
-			});
-		}
-		catch
-		{
-		}
+		PdfViewerApp.Services.Diagnostics.ErrorReportingService.SendCrashTelemetry(ex);
 	}
 
 	public static void HandlePostMergeOpen(string outputPath)

@@ -1439,9 +1439,9 @@ exit 0
 	{
 		if (EnsureActivated())
 		{
-			BatchPrintDialog batchPrintDialog = new BatchPrintDialog();
-			batchPrintDialog.Owner = this;
-			batchPrintDialog.ShowDialog();
+			BatchToolsWindow batchToolsWindow = new BatchToolsWindow();
+			batchToolsWindow.Owner = this;
+			batchToolsWindow.ShowDialog();
 		}
 	}
 

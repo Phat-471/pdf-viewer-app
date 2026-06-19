@@ -191,5 +191,10 @@ public static class PdfInterop
             [MarshalAs(UnmanagedType.LPUTF8Str)] string pathsSemicolon, 
             [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath, 
             MergeProgressCallback? progressCallback);
+
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool repair_pdf(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, 
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
     }
 }

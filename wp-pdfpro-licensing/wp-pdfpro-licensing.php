@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: PDF Pro Licensing Server
- * Description: API Server quản lý, kích hoạt và xác thực bản quyền ứng dụng PDF Pro thông qua chữ ký số RSA.
- * Version: 1.1.0
+ * Description: API Server quản lý, kích hoạt và xác thực bản quyền ứng dụng PDF Pro.
+ * Version: 1.2.0
  * Author: HPhat
  * Text Domain: pdfpro-licensing
  */
@@ -14,15 +14,11 @@ if (!defined('ABSPATH')) {
 // Định nghĩa các hằng số đường dẫn
 define('PDFPRO_LICENSING_DIR', plugin_dir_path(__FILE__));
 define('PDFPRO_LICENSING_URL', plugin_dir_url(__FILE__));
-define('PDFPRO_KEYS_DIR', PDFPRO_LICENSING_DIR . 'keys/');
-define('PDFPRO_PRIVATE_KEY_PATH', PDFPRO_KEYS_DIR . 'private_key.pem');
-define('PDFPRO_PUBLIC_KEY_PATH', PDFPRO_KEYS_DIR . 'public_key.pem');
 
-// 1. Hook kích hoạt plugin (Tạo DB & Sinh cặp khóa bảo mật RSA)
+// 1. Hook kích hoạt plugin (Tạo DB)
 register_activation_hook(__FILE__, 'pdfpro_licensing_activate_plugin');
 
 function pdfpro_licensing_activate_plugin() {
-    // A. Thiết lập cơ sở dữ liệu
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
 
@@ -84,16 +80,6 @@ function pdfpro_licensing_activate_plugin() {
 
     // Lưu phiên bản database mới
     update_option('pdfpro_db_version', '1.0.1');
-
-    // B. Tạo thư mục keys và sinh cặp khóa RSA nếu chưa tồn tại
-    if (!file_exists(PDFPRO_KEYS_DIR)) {
-        @wp_mkdir_p(PDFPRO_KEYS_DIR);
-        // Bảo vệ thư mục keys bằng file .htaccess
-        @file_put_contents(PDFPRO_KEYS_DIR . '.htaccess', "Deny from all");
-        @file_put_contents(PDFPRO_KEYS_DIR . 'index.php', "<?php // Silence is golden.\n");
-    }
-
-    pdfpro_licensing_ensure_rsa_keypair();
 }
 
 // Tự động kiểm tra và nâng cấp CSDL khi admin truy cập
@@ -105,142 +91,5 @@ function pdfpro_licensing_check_db_upgrade() {
     }
 }
 
-
-/**
- * Tạo cặp khóa RSA 2048-bit bằng OpenSSL.
- * Key được sinh ĐỘNG mỗi lần gọi — không hardcode trong source code.
- *
- * @return bool True nếu sinh key thành công, false nếu thất bại.
- */
-function pdfpro_licensing_generate_rsa_keys() {
-    if (!extension_loaded('openssl')) {
-        error_log('[PDF Pro Licensing] OpenSSL extension is not loaded. Cannot generate RSA keys.');
-        return false;
-    }
-
-    // Sinh cặp khóa RSA 2048-bit mới hoàn toàn
-    $config = array(
-        'digest_alg'       => 'sha256',
-        'private_key_bits' => 2048,
-        'private_key_type' => OPENSSL_KEYTYPE_RSA,
-    );
-
-    $res = openssl_pkey_new($config);
-    if (!$res) {
-        error_log('[PDF Pro Licensing] openssl_pkey_new() failed: ' . openssl_error_string());
-        return false;
-    }
-
-    // Xuất Private Key dạng PEM
-    $private_key_pem = '';
-    if (!openssl_pkey_export($res, $private_key_pem)) {
-        error_log('[PDF Pro Licensing] openssl_pkey_export() failed: ' . openssl_error_string());
-        return false;
-    }
-
-    // Xuất Public Key dạng PEM
-    $key_details = openssl_pkey_get_details($res);
-    if (!$key_details || empty($key_details['key'])) {
-        error_log('[PDF Pro Licensing] openssl_pkey_get_details() failed.');
-        return false;
-    }
-    $public_key_pem = $key_details['key'];
-
-    // Đảm bảo thư mục keys tồn tại và được bảo vệ
-    if (!file_exists(PDFPRO_KEYS_DIR)) {
-        @wp_mkdir_p(PDFPRO_KEYS_DIR);
-        @file_put_contents(PDFPRO_KEYS_DIR . '.htaccess', "Deny from all\n");
-        @file_put_contents(PDFPRO_KEYS_DIR . 'index.php', "<?php // Silence is golden.\n");
-    }
-
-    // Lưu key vào file với quyền truy cập tối thiểu
-    $private_written = @file_put_contents(PDFPRO_PRIVATE_KEY_PATH, $private_key_pem);
-    $public_written  = @file_put_contents(PDFPRO_PUBLIC_KEY_PATH, $public_key_pem);
-
-    if ($private_written === false || $public_written === false) {
-        error_log('[PDF Pro Licensing] Failed to write RSA key files to disk.');
-        return false;
-    }
-
-    // Thiết lập quyền file tối thiểu cho private key (chỉ chủ sở hữu đọc được)
-    @chmod(PDFPRO_PRIVATE_KEY_PATH, 0600);
-    @chmod(PDFPRO_PUBLIC_KEY_PATH, 0644);
-
-    // Xác thực lại cặp key vừa sinh bằng cách ký và kiểm tra
-    $test_payload = 'pdfpro-keygen-verify-' . time();
-    $test_signature = '';
-    $priv = openssl_pkey_get_private($private_key_pem);
-    $pub  = openssl_pkey_get_public($public_key_pem);
-
-    if (!$priv || !$pub) {
-        error_log('[PDF Pro Licensing] Generated keys failed to reload.');
-        @unlink(PDFPRO_PRIVATE_KEY_PATH);
-        @unlink(PDFPRO_PUBLIC_KEY_PATH);
-        return false;
-    }
-
-    if (!openssl_sign($test_payload, $test_signature, $priv, OPENSSL_ALGO_SHA256)) {
-        error_log('[PDF Pro Licensing] Self-test signing failed.');
-        @unlink(PDFPRO_PRIVATE_KEY_PATH);
-        @unlink(PDFPRO_PUBLIC_KEY_PATH);
-        return false;
-    }
-
-    if (openssl_verify($test_payload, $test_signature, $pub, OPENSSL_ALGO_SHA256) !== 1) {
-        error_log('[PDF Pro Licensing] Self-test verification failed.');
-        @unlink(PDFPRO_PRIVATE_KEY_PATH);
-        @unlink(PDFPRO_PUBLIC_KEY_PATH);
-        return false;
-    }
-
-    // Lưu fingerprint public key vào wp_options để client có thể verify
-    update_option('pdfpro_public_key_fingerprint', hash('sha256', trim($public_key_pem)));
-
-    return true;
-}
-
-// 2. Nhúng các tệp cấu phần khác
-function pdfpro_licensing_ensure_rsa_keypair() {
-    if (!file_exists(PDFPRO_KEYS_DIR)) {
-        @wp_mkdir_p(PDFPRO_KEYS_DIR);
-        @file_put_contents(PDFPRO_KEYS_DIR . '.htaccess', "Deny from all");
-    }
-
-    if (!pdfpro_licensing_rsa_keypair_is_valid()) {
-        @pdfpro_licensing_generate_rsa_keys();
-    }
-}
-
-function pdfpro_licensing_rsa_keypair_is_valid() {
-    if (!extension_loaded('openssl')) {
-        return false;
-    }
-
-    if (!file_exists(PDFPRO_PRIVATE_KEY_PATH) || !file_exists(PDFPRO_PUBLIC_KEY_PATH)) {
-        return false;
-    }
-
-    $private_key_pem = file_get_contents(PDFPRO_PRIVATE_KEY_PATH);
-    $public_key_pem = file_get_contents(PDFPRO_PUBLIC_KEY_PATH);
-    if ($private_key_pem === false || $public_key_pem === false) {
-        return false;
-    }
-
-    $private_key = openssl_pkey_get_private($private_key_pem);
-    $public_key = openssl_pkey_get_public($public_key_pem);
-    if (!$private_key || !$public_key) {
-        return false;
-    }
-
-    $payload = 'pdfpro-rsa-self-test';
-    $signature = '';
-    if (!openssl_sign($payload, $signature, $private_key, OPENSSL_ALGO_SHA256)) {
-        return false;
-    }
-
-    return openssl_verify($payload, $signature, $public_key, OPENSSL_ALGO_SHA256) === 1;
-}
-
 require_once PDFPRO_LICENSING_DIR . 'api-handlers.php';
 require_once PDFPRO_LICENSING_DIR . 'admin-menu.php';
-require_once PDFPRO_LICENSING_DIR . 'public-key-route.php';

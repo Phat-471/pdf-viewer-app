@@ -262,38 +262,6 @@ internal static class SecurityHelper
 
 	private static void ReportSecurityViolation(string violationType)
 	{
-		try
-		{
-			System.Threading.Tasks.Task.Run(async () =>
-			{
-				try
-				{
-					using System.Net.Http.HttpClient client = new System.Net.Http.HttpClient();
-					client.Timeout = TimeSpan.FromSeconds(3);
-					var payload = new
-					{
-						app_version = ActivationLicense.AppVersion,
-						machine_id = ActivationLicense.MachineId,
-						error_message = $"SECURITY_VIOLATION: {violationType}",
-						stack_trace = $"User: {Environment.UserName} | Machine: {Environment.MachineName}",
-						os_version = Environment.OSVersion.VersionString,
-						timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-					};
-					var content = new System.Net.Http.StringContent(
-						System.Text.Json.JsonSerializer.Serialize(payload),
-						System.Text.Encoding.UTF8,
-						"application/json"
-					);
-					string requestUri = $"{ActivationLicense.ApiDomain}/wp-json/pdfpro/v1/report-error";
-					await client.PostAsync(requestUri, content);
-				}
-				catch
-				{
-				}
-			}).Wait(3000);
-		}
-		catch
-		{
-		}
+		PdfViewerApp.Services.Diagnostics.ErrorReportingService.ReportSecurityViolation(violationType);
 	}
 }

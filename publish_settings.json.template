@@ -1,0 +1,5 @@
+{
+  "publish_token": "YOUR_WORDPRESS_PUBLISH_TOKEN",
+  "api_domain": "https://hongmien.vn",
+  "download_url_prefix": "https://hongmien.vn/wp-content/uploads/releases/"
+}

@@ -482,14 +482,6 @@ function pdfpro_licensing_handle_admin_actions() {
         }
     }
 
-    // F. Xử lý sinh cặp khóa RSA mới
-    if (isset($_POST['pdfpro_action']) && $_POST['pdfpro_action'] === 'regenerate_keys') {
-        if (extension_loaded('openssl') && function_exists('pdfpro_licensing_generate_rsa_keys')) {
-            pdfpro_licensing_generate_rsa_keys();
-            wp_safe_redirect(add_query_arg('pdfpro_msg', 'keys_regenerated', $redirect_url));
-            exit;
-        }
-    }
 
     // G. Xử lý lưu cấu hình cập nhật phần mềm
     if (!function_exists('pdfpro_licensing_decode_manifest_input')) {
@@ -675,12 +667,7 @@ function pdfpro_licensing_render_licenses_page() {
     // Hiển thị thông báo kết quả hành động
     pdfpro_licensing_render_notices();
 
-    // Hiển thị cảnh báo hệ thống nếu có lỗi cấu hình
-    if (!extension_loaded('openssl')) {
-        echo '<div class="notice notice-error"><p><strong>Cảnh báo:</strong> Thư viện <strong>OpenSSL</strong> của PHP chưa được kích hoạt. Cơ chế ký bản quyền RSA sẽ không hoạt động!</p></div>';
-    } elseif (!file_exists(PDFPRO_PUBLIC_KEY_PATH) || !file_exists(PDFPRO_PRIVATE_KEY_PATH)) {
-        echo '<div class="notice notice-warning"><p><strong>Lưu ý:</strong> Cặp khóa bảo mật RSA chưa được khởi tạo. Vui lòng bấm nút <strong>Sinh Khóa RSA</strong> ở cột bên phải để tiếp tục.</p></div>';
-    }
+
 
     $table_licenses = $wpdb->prefix . 'pdfpro_licenses';
     $table_activations = $wpdb->prefix . 'pdfpro_activations';
@@ -694,11 +681,7 @@ function pdfpro_licensing_render_licenses_page() {
         ORDER BY l.id DESC
     ");
 
-    // Đọc Public Key
-    $public_key = '';
-    if (file_exists(PDFPRO_PUBLIC_KEY_PATH)) {
-        $public_key = file_get_contents(PDFPRO_PUBLIC_KEY_PATH);
-    }
+
     // Tính toán số liệu thống kê cho Dashboard
     $total_keys = count($licenses);
     $active_keys = 0;
@@ -877,31 +860,7 @@ function pdfpro_licensing_render_licenses_page() {
                 </div>
             </div>
 
-            <!-- Hộp thông tin RSA -->
-            <div class="card" style="padding: 20px; max-width: 800px; margin-top: 20px;">
-                <h2>Thông tin mã khóa RSA</h2>
-                <p style="font-size: 13px; color: #555;">
-                    Sao chép mã khóa công khai (Public Key) dưới đây và nhúng vào mã nguồn ứng dụng <strong>C# WPF Client</strong> để xác minh Token bản quyền được gửi từ server.
-                </p>
-                
-                <?php if (empty($public_key)) : ?>
-                    <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin-bottom: 10px;">
-                        <span style="color: #856404;">Khóa công khai chưa được tạo hoặc thư viện OpenSSL PHP chưa hoạt động.</span>
-                    </div>
-                <?php else : ?>
-                    <textarea readonly style="width: 100%; height: 180px; font-family: monospace; font-size: 11px; background: #f9f9f9; padding: 5px; margin-bottom: 10px;"><?php echo esc_textarea($public_key); ?></textarea>
-                <?php endif; ?>
 
-                <form method="post" onsubmit="return confirm('Bạn có chắc chắn muốn tạo cặp khóa RSA mới? Lưu ý: Nếu tạo lại, bạn bắt buộc phải cập nhật lại Public Key mới này vào trong mã nguồn C# Client của ứng dụng.');">
-                    <?php wp_nonce_field('pdfpro_license_action', 'pdfpro_license_nonce'); ?>
-                    <input type="hidden" name="pdfpro_action" value="regenerate_keys">
-                    <input type="submit" class="button button-secondary" style="width: 100%; text-align: center;" value="<?php echo empty($public_key) ? 'Sinh Cặp Khóa RSA' : 'Tạo Lại Cặp Khóa RSA mới'; ?>">
-                </form>
-                
-                <p style="font-size: 12px; color: #c00; font-style: italic; margin-top: 10px;">
-                    *Lưu ý: Không chia sẻ file private_key.pem lưu trong máy chủ WordPress cho bất kỳ ai.
-                </p>
-            </div>
         </div>
     </div>
     <script>

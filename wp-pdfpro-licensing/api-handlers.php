@@ -210,7 +210,6 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
         $log_entry .= "Machine already activated\n";
     }
 
-    // Sinh payload thong tin ban quyen duoc ky so.
     $payload_data = array(
         'license_key' => $license->license_key,
         'machine_id'  => $machine_id,
@@ -219,16 +218,15 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
         'timestamp'   => time()
     );
 
-    $json_payload = json_encode($payload_data);
-    $signature = pdfpro_licensing_sign_payload($json_payload);
-
-    $log_entry .= "Activation Success! Payload: " . $json_payload . "\n\n";
+    $log_entry .= "Activation Success! Payload: " . json_encode($payload_data) . "\n\n";
     @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
 
     return array(
         'success'   => true,
-        'payload'   => $json_payload,
-        'signature' => $signature,
+        'status'    => 'activated',
+        'license_key' => $license->license_key,
+        'expires_at'  => $license->expires_at ? date('c', strtotime($license->expires_at)) : 'never',
+        'machine_id'  => $machine_id,
         'message'   => 'Kích hoạt thành công!'
     );
 }
@@ -309,17 +307,15 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
         'timestamp'   => time()
     );
 
-    $json_payload = json_encode($payload_data);
-    $signature = pdfpro_licensing_sign_payload($json_payload);
-
-    $log_entry .= "Status Result: " . $status . " Payload: " . $json_payload . "\n\n";
+    $log_entry .= "Status Result: " . $status . " Payload: " . json_encode($payload_data) . "\n\n";
     @file_put_contents(PDFPRO_LICENSING_DIR . 'error_logs.txt', $log_entry, FILE_APPEND | LOCK_EX);
 
     return array(
         'success'   => ($status === 'activated'),
-        'payload'   => $json_payload,
-        'signature' => $signature,
-        'status'    => $status
+        'status'    => $status,
+        'license_key' => $license->license_key,
+        'expires_at'  => $license->expires_at ? date('c', strtotime($license->expires_at)) : 'never',
+        'machine_id'  => $machine_id
     );
 }
 
@@ -360,34 +356,6 @@ function pdfpro_licensing_api_deactivate(WP_REST_Request $request) {
     );
 }
 
-/**
- * Tạo chữ ký số RSA SHA-256 từ chuỗi Payload bằng Private Key
- */
-function pdfpro_licensing_sign_payload($payload) {
-    if (function_exists('pdfpro_licensing_ensure_rsa_keypair')) {
-        pdfpro_licensing_ensure_rsa_keypair();
-    }
-
-    if (!file_exists(PDFPRO_PRIVATE_KEY_PATH) || filesize(PDFPRO_PRIVATE_KEY_PATH) === 0) {
-        return '';
-    }
-
-    $private_key_pem = file_get_contents(PDFPRO_PRIVATE_KEY_PATH);
-    $private_key = openssl_pkey_get_private($private_key_pem);
-    
-    if (!$private_key) {
-        return '';
-    }
-
-    $signature = '';
-    openssl_sign($payload, $signature, $private_key, OPENSSL_ALGO_SHA256);
-    
-    if (function_exists('openssl_free_key')) {
-        openssl_free_key($private_key);
-    }
-
-    return base64_encode($signature);
-}
 
 /**
  * Xử lý yêu cầu Kiểm tra bản cập nhật
