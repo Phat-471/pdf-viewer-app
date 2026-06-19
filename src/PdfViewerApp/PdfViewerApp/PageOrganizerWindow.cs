@@ -363,5 +363,36 @@ namespace PdfViewerApp
                 _isSaving = false;
             }
         }
+
+        private void QuickRotateLeft_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is PageOrganizerItem item)
+            {
+                item.RotationAngle = (item.RotationAngle - 90) % 360;
+                if (item.RotationAngle < 0) item.RotationAngle += 360;
+                UpdateLabels();
+            }
+        }
+
+        private void QuickRotateRight_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is PageOrganizerItem item)
+            {
+                item.RotationAngle = (item.RotationAngle + 90) % 360;
+                UpdateLabels();
+            }
+        }
+
+        private void QuickDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is PageOrganizerItem item)
+            {
+                if (MessageBox.Show($"Bạn có chắc chắn muốn xóa trang {item.PageNumber}?", "Xác nhận xóa", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    _items.Remove(item);
+                    UpdateLabels();
+                }
+            }
+        }
     }
 }

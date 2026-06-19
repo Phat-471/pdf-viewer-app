@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,17 +34,55 @@ internal sealed class AiSnapshotRouter
 		_openAiProvider = new OpenAiSnapshotProvider(_settings);
 	}
 
-	public Task<string> AskSnapshotAsync(AiSnapshotRequest request, CancellationToken cancellationToken)
+	public async Task<string> AskSnapshotAsync(AiSnapshotRequest request, CancellationToken cancellationToken)
 	{
 		var provider = ResolveProvider();
-		if (provider == _geminiProvider || provider == _openAiProvider)
+		bool isOnline = (provider == _geminiProvider || provider == _openAiProvider);
+		if (isOnline)
 		{
 			if (!_settings.AllowOnlineSnapshot)
 			{
-				return Task.FromResult("Chế độ gửi ảnh trực tuyến (Online snapshot) chưa được bật. Vui lòng tích chọn 'Online snapshot' trong phần cấu hình trợ lý AI để phân tích ảnh chụp bằng mô hình đám mây (Gemini/OpenAI).");
+				if (_localProvider.IsAvailable && _settings.ProviderMode == "Auto")
+				{
+					return await _localProvider.AskSnapshotAsync(request, cancellationToken);
+				}
+				return "Chế độ gửi ảnh trực tuyến (Online snapshot) chưa được bật. Vui lòng tích chọn 'Online snapshot' trong phần cấu hình trợ lý AI để phân tích ảnh chụp bằng mô hình đám mây (Gemini/OpenAI).";
 			}
 		}
-		return provider.AskSnapshotAsync(request, cancellationToken);
+
+		if (_settings.ProviderMode == "Auto" && isOnline)
+		{
+			try
+			{
+				string result = await provider.AskSnapshotAsync(request, cancellationToken);
+				if (result.Contains("lỗi HTTP", StringComparison.OrdinalIgnoreCase) || 
+				    result.Contains("model error", StringComparison.OrdinalIgnoreCase) || 
+				    result.Contains("chua duoc cau hinh", StringComparison.OrdinalIgnoreCase))
+				{
+					if (_localProvider.IsAvailable)
+					{
+						return await _localProvider.AskSnapshotAsync(request, cancellationToken);
+					}
+				}
+				return result;
+			}
+			catch
+			{
+				if (_localProvider.IsAvailable)
+				{
+					try
+					{
+						return await _localProvider.AskSnapshotAsync(request, cancellationToken);
+					}
+					catch
+					{
+						// Ignore and throw original or show error
+					}
+				}
+				throw;
+			}
+		}
+		return await provider.AskSnapshotAsync(request, cancellationToken);
 	}
 
 	private IAiSnapshotProvider ResolveProvider()

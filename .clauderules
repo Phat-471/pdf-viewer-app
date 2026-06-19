@@ -10,7 +10,7 @@ Whenever you finish modifying the codebase (adding features, fixing bugs, or upd
    - By default, bump the Patch version (e.g. `1.2.2` -> `1.2.3`). If it is a major feature/refactoring, bump the Minor version (e.g. `1.2.2` -> `1.3.0`).
    - Write the new version back to `VERSION.txt`.
 2. **Update CHANGELOG.txt**:
-   - Replace the content of `CHANGELOG.txt` with a clear, bullet-pointed summary of the changes you just made.
+   - Replace the content of `CHANGELOG.txt` with an extremely brief and high-level bullet-pointed summary of the changes (e.g., "- Nâng cấp server", "- Tối ưu trải nghiệm"). DO NOT include any technical details or internal structural descriptions to prevent malicious actors from analyzing the system.
 3. **Compile & Package**:
    - Run the packaging script to verify compile and update `AssemblyInfo.cs` and `update-manifest.json`:
      `powershell .\package_project.ps1`

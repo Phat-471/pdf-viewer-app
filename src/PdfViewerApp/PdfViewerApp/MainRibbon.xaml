@@ -303,6 +303,11 @@
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
+        <fluent:ToggleButton Name="HighlightToolBtn" Header="Tô Màu (Highlight)" Margin="8,0,8,0" Click="HighlightTool_Click" ToolTip="Tô màu nền (Highlight) vùng chữ được chọn">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7E6;" FontSize="32" Foreground="#E29C1D" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Chụp Ảnh &amp; AI">
         <fluent:ToggleButton Name="SnapshotToolBtn" Header="Snapshot" Margin="8,0,8,0" Click="SnapshotTool_Click" ToolTip="Chụp một vùng ảnh trên tài liệu và lưu vào bộ nhớ tạm">
@@ -428,6 +433,11 @@
         <fluent:Button Name="HandwriteSignBtn" Header="Ký Vẽ Tay" Margin="6,0,6,0" Click="HandwriteSign_Click" MinWidth="80" ToolTip="Vẽ chữ ký trực tiếp bằng chuột hoặc bút cảm ứng">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED15;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Name="ImageSignBtn" Header="Ký Hình Ảnh" Margin="6,0,6,0" Click="ImageSign_Click" MinWidth="80" ToolTip="Chèn tệp ảnh chữ ký đè lên trang PDF">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9F;" FontSize="28" Foreground="#38BDF8" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
         <fluent:Button Name="StampApproveBtn" Header="Chứng Thư Số" Margin="6,0,6,0" Click="StampApprove_Click" MinWidth="85" ToolTip="Ký tài liệu bằng chứng thư số bảo mật (Certificate)">

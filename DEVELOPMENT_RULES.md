@@ -70,7 +70,8 @@ Mỗi khi hoàn thành công việc sửa đổi mã nguồn:
 >    - Ghi phiên bản mới vào [VERSION.txt](file:///e:/code/pdf/VERSION.txt).
 > 
 > 2. **Cập nhật CHANGELOG.txt:**
->    - Viết nội dung thay đổi chi tiết dưới dạng danh sách gạch đầu dòng vào [CHANGELOG.txt](file:///e:/code/pdf/CHANGELOG.txt). (Lưu ý: Chỉ ghi nội dung thay đổi của phiên bản mới này, ghi đè hoặc ghi đè toàn bộ tệp bằng các thay đổi mới nhất này để công cụ đóng gói đọc chính xác).
+>    - Viết nội dung thay đổi cực kỳ ngắn gọn, khái quát dưới dạng danh sách gạch đầu dòng vào [CHANGELOG.txt](file:///e:/code/pdf/CHANGELOG.txt) (Ví dụ: "- Nâng cấp server", "- Tối ưu trải nghiệm").
+>    - **Lưu ý quan trọng:** Tuyệt đối không ghi chi tiết kỹ thuật hoặc mô tả chi tiết chức năng bên trong (tránh việc kẻ xấu biết rõ cấu trúc hệ thống để thực hiện các cuộc tấn công). Chỉ ghi nội dung thay đổi của phiên bản mới này, ghi đè hoặc ghi đè toàn bộ tệp bằng các thay đổi mới nhất này để công cụ đóng gói đọc chính xác.
 > 
 > 3. **Biên dịch & Đóng gói Thử nghiệm:**
 >    - Chạy kịch bản `.\package_project.ps1` trên PowerShell để tự động đồng bộ phiên bản vào `AssemblyInfo.cs` và đóng gói thử nghiệm nhằm phát hiện lỗi biên dịch.

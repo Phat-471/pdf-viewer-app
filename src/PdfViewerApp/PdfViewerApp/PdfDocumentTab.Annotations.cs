@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -590,6 +590,48 @@ public partial class PdfDocumentTab
 					canvas.Children.Add(element10);
 				}
 			}
+			else if (item is PdfHighlightAnnotation pdfHighlightAnnotation)
+			{
+				double numH = pdfHighlightAnnotation.Width * canvas.Width;
+				double numV = pdfHighlightAnnotation.Height * canvas.Height;
+				double numX = pdfHighlightAnnotation.X * canvas.Width;
+				double numY = pdfHighlightAnnotation.Y * canvas.Height;
+				Color color = Colors.Yellow;
+				try
+				{
+					color = (Color)ColorConverter.ConvertFromString(pdfHighlightAnnotation.ColorHex);
+				}
+				catch {}
+				
+				System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+				{
+					Width = numH,
+					Height = numV,
+					Fill = new SolidColorBrush(color),
+					Opacity = pdfHighlightAnnotation.Opacity * 0.4,
+					IsHitTestVisible = true,
+					Tag = pdfHighlightAnnotation
+				};
+				Canvas.SetLeft(rect, numX);
+				Canvas.SetTop(rect, numY);
+				canvas.Children.Add(rect);
+
+				if (item == SelectedAnnotation)
+				{
+					Border borderHighlight = new Border
+					{
+						Width = numH + 4.0,
+						Height = numV + 4.0,
+						BorderBrush = Brushes.DodgerBlue,
+						BorderThickness = new Thickness(1.5),
+						Background = Brushes.Transparent,
+						IsHitTestVisible = false
+					};
+					Canvas.SetLeft(borderHighlight, numX - 2.0);
+					Canvas.SetTop(borderHighlight, numY - 2.0);
+					canvas.Children.Add(borderHighlight);
+				}
+			}
 			else if (item is PdfMeasurementAnnotation pdfMeasurementAnnotation)
 			{
 				if (pdfMeasurementAnnotation.Points.Count >= 2)
@@ -820,6 +862,24 @@ public partial class PdfDocumentTab
 					Canvas.SetTop(stampBorder, canvasY);
 					canvas.Children.Add(stampBorder);
 				}
+				else if (pdfSignatureAnnotation.SignatureType == "Image" && !string.IsNullOrEmpty(pdfSignatureAnnotation.ImagePath))
+				{
+					try
+					{
+						System.Windows.Controls.Image img = new System.Windows.Controls.Image
+						{
+							Width = canvasW,
+							Height = canvasH,
+							Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(pdfSignatureAnnotation.ImagePath)),
+							Opacity = pdfSignatureAnnotation.Opacity,
+							Tag = pdfSignatureAnnotation
+						};
+						Canvas.SetLeft(img, canvasX);
+						Canvas.SetTop(img, canvasY);
+						canvas.Children.Add(img);
+					}
+					catch {}
+				}
 
 				if (item == SelectedAnnotation)
 				{
@@ -882,6 +942,13 @@ public partial class PdfDocumentTab
 		_tempSignatureColor = color;
 		ActiveTool = "PlaceSignature";
 		LogStatus("Nhấp chuột vào trang bất kỳ để dán chữ ký tay của bạn.");
+	}
+
+	public void StartPlaceImageSignature(string imagePath)
+	{
+		_tempSignatureImagePath = imagePath;
+		ActiveTool = "PlaceImageSignature";
+		LogStatus("Nhấp chuột vào trang bất kỳ để chèn chữ ký hình ảnh.");
 	}
 
 	public void StartPlaceStamp(string stampText)

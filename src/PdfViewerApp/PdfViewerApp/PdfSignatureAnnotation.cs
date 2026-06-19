@@ -11,6 +11,9 @@ public class PdfSignatureAnnotation : PdfAnnotation
 	// Text content for Stamps (e.g., "ĐÃ DUYỆT")
 	public string StampText { get; set; } = "";
 
+	// Path to the image file for Image Signatures
+	public string? ImagePath { get; set; }
+
 	// Handdrawn strokes (each stroke is a list of points relative to (X, Y) bounding box)
 	public List<List<Point>> Strokes { get; set; } = new List<List<Point>>();
 

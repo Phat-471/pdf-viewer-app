@@ -1,4 +1,2 @@
-- Nâng cấp WordPress Licensing Server: Thêm Dashboard thống kê trực quan và Panel quản lý thiết bị bị khóa (Blacklist/Whitelist).
-- Tối ưu hóa trải nghiệm Thu phóng (Zoom): Sử dụng LowQuality/NearestNeighbor rendering tạm thời trong quá trình hoạt họa thu phóng giúp tăng độ mượt mà.
-- Tối ưu hóa nạp trước trang (Prefetching): Tự động nới rộng khoảng cách tải trước trang (lên tới 4 trang) khi bộ nhớ đệm RAM khả dụng lớn (> 512MB).
-- Tích hợp Inno Setup: Tự động phát hiện và biên dịch gói cài đặt Setup.exe trong tiến trình đóng gói.
+- Nâng cấp server.
+- Tối ưu trải nghiệm.

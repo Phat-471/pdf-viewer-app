@@ -2000,6 +2000,27 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 	}
 
+	private void ImageSign_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null)
+		{
+			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			return;
+		}
+
+		var openFileDialog = new Microsoft.Win32.OpenFileDialog
+		{
+			Filter = "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg",
+			Title = "Chọn hình ảnh chữ ký"
+		};
+
+		if (openFileDialog.ShowDialog() == true)
+		{
+			activeTab.StartPlaceImageSignature(openFileDialog.FileName);
+		}
+	}
+
 	private void StampApprove_Click(object sender, RoutedEventArgs e)
 	{
 		PdfDocumentTab activeTab = GetActiveTab();
@@ -2752,6 +2773,28 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		LogStatus("Đã chuyển sang công cụ Hộp văn bản để thực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ để tạo.");
 	}
 
+	private void HighlightTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Highlight";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			string selectedText = activeTab.GetSelectedTextString();
+			if (!string.IsNullOrEmpty(selectedText))
+			{
+				activeTab.HighlightSelectedText("#FFFF00");
+				LogStatus("Đã tô màu (Highlight) vùng chữ được chọn.");
+				ActiveTool = "SelectText";
+				activeTab.ActiveTool = "SelectText";
+			}
+			else
+			{
+				activeTab.ActiveTool = "SelectText";
+				LogStatus("Hãy bôi đen văn bản để thực hiện tô màu (Highlight).");
+			}
+		}
+	}
+
 	private void CalloutTool_Click(object sender, RoutedEventArgs e)
 	{
 		ActiveTool = "Callout";
@@ -3214,6 +3257,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.OvalToolRequested += OvalTool_Click;
 		_mainRibbon.LineToolRequested += LineTool_Click;
 		_mainRibbon.TextBoxToolRequested += TextBoxTool_Click;
+		_mainRibbon.HighlightToolRequested += HighlightTool_Click;
 		_mainRibbon.CalloutToolRequested += CalloutTool_Click;
 		_mainRibbon.StickyNoteToolRequested += StickyNoteTool_Click;
 		_mainRibbon.SnapshotToolRequested += SnapshotTool_Click;
@@ -3232,6 +3276,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.MeasureGuideRequested += MeasureGuide_Click;
 		_mainRibbon.CalibrateScaleRequested += CalibrateScale_Click;
 		_mainRibbon.HandwriteSignRequested += HandwriteSign_Click;
+		_mainRibbon.ImageSignRequested += ImageSign_Click;
 		_mainRibbon.StampApproveRequested += StampApprove_Click;
 		_mainRibbon.PasteRequested += Paste_Click;
 		_mainRibbon.CutRequested += Cut_Click;

@@ -108,6 +108,13 @@
                                 <Border Background="#7F000000" VerticalAlignment="Top" HorizontalAlignment="Right" Padding="6,2" CornerRadius="0,0,0,4">
                                     <TextBlock Text="{Binding RotationAngle, StringFormat={}{0}°}" FontSize="10" Foreground="#F8FAFC" />
                                 </Border>
+                                <Border CornerRadius="4" Background="#CC0F172A" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="↺" Width="28" Height="22" Background="Transparent" Foreground="White" BorderThickness="0" Cursor="Hand" Click="QuickRotateLeft_Click" ToolTip="Xoay trái 90°" />
+                                        <Button Content="↻" Width="28" Height="22" Background="Transparent" Foreground="White" BorderThickness="0" Cursor="Hand" Click="QuickRotateRight_Click" ToolTip="Xoay phải 90°" />
+                                        <Button Content="🗑" Width="28" Height="22" Background="Transparent" Foreground="#EF4444" BorderThickness="0" Cursor="Hand" Click="QuickDelete_Click" ToolTip="Xóa trang" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
                         <TextBlock Text="{Binding PageLabel}" HorizontalAlignment="Center" Margin="0,8,0,0" Foreground="#F8FAFC" FontWeight="SemiBold" FontSize="12" />

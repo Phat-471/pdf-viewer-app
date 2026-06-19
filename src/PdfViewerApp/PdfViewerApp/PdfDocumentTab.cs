@@ -47,6 +47,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private double _tempSignatureHeight;
 	private Color _tempSignatureColor = Colors.Blue;
 	private string? _tempStampText;
+	private string? _tempSignatureImagePath;
 	private PdfMeasurementAnnotation? _pendingAreaAnnotation;
 	public double CurrentMeasurementScale { get; set; } = 100.0;
 
@@ -645,6 +646,41 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					ActiveTool = "Select";
 					_tempSignatureStrokes = null;
+				}
+				RedrawPageAnnotations(canvas, num);
+			}
+			e.Handled = true;
+		}
+		else if (ActiveTool == "PlaceImageSignature")
+		{
+			Point position = e.GetPosition(canvas);
+			if (!string.IsNullOrEmpty(_tempSignatureImagePath))
+			{
+				double imgWidth = 150.0;
+				double imgHeight = 100.0;
+				PdfSignatureAnnotation imgAnn = new PdfSignatureAnnotation
+				{
+					PageIndex = num - 1,
+					X = (position.X - imgWidth / 2.0) / canvas.Width,
+					Y = (position.Y - imgHeight / 2.0) / canvas.Height,
+					Width = imgWidth / canvas.Width,
+					Height = imgHeight / canvas.Height,
+					OriginalWidth = imgWidth,
+					OriginalHeight = imgHeight,
+					SignatureType = "Image",
+					ImagePath = _tempSignatureImagePath,
+					Thickness = 0.0
+				};
+				imgAnn.X = Math.Clamp(imgAnn.X, 0.0, 1.0 - imgAnn.Width);
+				imgAnn.Y = Math.Clamp(imgAnn.Y, 0.0, 1.0 - imgAnn.Height);
+
+				SaveUndoState();
+				Annotations.Add(imgAnn);
+				SelectedAnnotation = imgAnn;
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+					_tempSignatureImagePath = null;
 				}
 				RedrawPageAnnotations(canvas, num);
 			}
@@ -2504,7 +2540,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	private string GetSelectedTextString()
+	public string GetSelectedTextString()
 	{
 		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1)
 		{
@@ -4086,6 +4122,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		bool isOverwrite = string.IsNullOrEmpty(outputPath);
 		string targetPath = outputPath ?? CurrentPdfPath;
+		List<(int PageNumber, string ImagePath, double Left, double Bottom, double Width, double Height)> imageSigsData = new();
+		foreach (var ann in Annotations.OfType<PdfSignatureAnnotation>())
+		{
+			if (ann.SignatureType == "Image" && !string.IsNullOrEmpty(ann.ImagePath) && File.Exists(ann.ImagePath))
+			{
+				int pageNum = ann.PageIndex + 1;
+				Size pageSize = _pageDimensions[ann.PageIndex];
+				double left = ann.X * pageSize.Width;
+				double widthPoints = ann.Width * pageSize.Width;
+				double heightPoints = ann.Height * pageSize.Height;
+				double bottom = (1.0 - ann.Y - ann.Height) * pageSize.Height;
+				imageSigsData.Add((pageNum, ann.ImagePath, left, bottom, widthPoints, heightPoints));
+			}
+		}
+
 		bool isOrderChanged = false;
 		for (int i = 0; i < _pageOrder.Count; i++)
 		{
@@ -4097,7 +4148,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		List<KeyValuePair<int, int>> activeRotations = _pageRotations.Where((KeyValuePair<int, int> r) => r.Value != 0).ToList();
 		bool hasPendingTextEdits = _pendingTextEdits.Count > 0;
-		if (activeRotations.Count == 0 && !isOrderChanged && !hasPendingTextEdits)
+		if (activeRotations.Count == 0 && !isOrderChanged && !hasPendingTextEdits && imageSigsData.Count == 0)
 		{
 			if (isOverwrite)
 			{
@@ -4170,6 +4221,36 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						}
 						catch
 						{
+						}
+						workingFile = text;
+					}
+					tempFile = workingFile;
+				}
+
+				if (imageSigsData.Count > 0)
+				{
+					string workingFile = tempFile;
+					foreach (var sig in imageSigsData)
+					{
+						string text = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
+						bool flag = PdfInterop.PdfCore.overlay_pdf_image(workingFile, sig.PageNumber, sig.ImagePath, sig.Left, sig.Bottom, sig.Width, sig.Height, text);
+						try
+						{
+							File.Delete(workingFile);
+						}
+						catch
+						{
+						}
+						if (!flag)
+						{
+							try
+							{
+								File.Delete(text);
+							}
+							catch
+							{
+							}
+							return false;
 						}
 						workingFile = text;
 					}

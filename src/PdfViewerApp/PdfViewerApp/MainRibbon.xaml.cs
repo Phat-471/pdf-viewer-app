@@ -130,6 +130,8 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? StickyNoteToolRequested;
 
+	public event RoutedEventHandler? HighlightToolRequested;
+
 	public event RoutedEventHandler? SnapshotToolRequested;
 
 	public event RoutedEventHandler? AiSnapshotToolRequested;
@@ -163,6 +165,8 @@ public partial class MainRibbon : UserControl
 	public event RoutedEventHandler? MeasureGuideRequested;
 
 	public event RoutedEventHandler? HandwriteSignRequested;
+
+	public event RoutedEventHandler? ImageSignRequested;
 
 	public event RoutedEventHandler? StampApproveRequested;
 
@@ -403,6 +407,10 @@ public partial class MainRibbon : UserControl
 		if (StickyNoteToolBtn != null)
 		{
 			StickyNoteToolBtn.IsChecked = activeTool == "StickyNote";
+		}
+		if (HighlightToolBtn != null)
+		{
+			HighlightToolBtn.IsChecked = activeTool == "Highlight";
 		}
 		if (SnapshotToolBtn != null)
 		{
@@ -695,6 +703,8 @@ public partial class MainRibbon : UserControl
 
 	private void StickyNoteTool_Click(object sender, RoutedEventArgs e) => StickyNoteToolRequested?.Invoke(this, e);
 
+	private void HighlightTool_Click(object sender, RoutedEventArgs e) => HighlightToolRequested?.Invoke(this, e);
+
 	private void SnapshotTool_Click(object sender, RoutedEventArgs e) => SnapshotToolRequested?.Invoke(this, e);
 
 	private void AiSnapshotTool_Click(object sender, RoutedEventArgs e) => AiSnapshotToolRequested?.Invoke(this, e);
@@ -882,6 +892,8 @@ public partial class MainRibbon : UserControl
 	private void CalibrateScale_Click(object sender, RoutedEventArgs e) => CalibrateScaleRequested?.Invoke(this, e);
 
 	private void HandwriteSign_Click(object sender, RoutedEventArgs e) => HandwriteSignRequested?.Invoke(this, e);
+
+	private void ImageSign_Click(object sender, RoutedEventArgs e) => ImageSignRequested?.Invoke(this, e);
 
 	private void StampApprove_Click(object sender, RoutedEventArgs e) => StampApproveRequested?.Invoke(this, e);
 

@@ -72,6 +72,17 @@ if exist "libs\pdfium.dll" (
 if not exist "src\PdfViewerApp\Assets" mkdir "src\PdfViewerApp\Assets"
 copy /Y "C:\Users\IT\.gemini\antigravity-ide\brain\89e6a9ca-03d0-4e13-8e4f-7b1bc6b11b43\hphat_logo_1780279208636.png" "src\PdfViewerApp\Assets\hphat_logo_1780279208636.png"
 
+:: 3.6 Run unit tests
+echo.
+echo [Buoc 3.6] Dang chay kiem thu tu dong (Unit Tests)...
+call dotnet test src\PdfViewerApp.Tests\PdfViewerApp.Tests.csproj -c Debug
+if %ERRORLEVEL% neq 0 (
+    echo   [LOI] Kiem thu tu dong that bai! Ma loi: %ERRORLEVEL%
+    cd /d "%~dp0"
+    pause
+    exit /b %ERRORLEVEL%
+)
+
 :: 4. Build WPF application
 echo.
 echo [Buoc 4/4] Dang bien dich ung dung WPF (src\PdfViewerApp)...
