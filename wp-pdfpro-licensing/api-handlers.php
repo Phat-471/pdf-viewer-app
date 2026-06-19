@@ -258,7 +258,7 @@ function pdfpro_licensing_api_check(WP_REST_Request $request) {
     }
 
     $payload_data = array(
-        'license_key' => $license_key,
+        'license_key' => $license->license_key,
         'machine_id'  => $machine_id,
         'expires_at'  => $license->expires_at ? date('c', strtotime($license->expires_at)) : 'never',
         'status'      => $status,
