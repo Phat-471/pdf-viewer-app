@@ -169,6 +169,30 @@ public partial class MainWindow : Window, IComponentConnector
 			}
 		};
 		base.StateChanged += MainWindow_StateChanged;
+
+		// Tự động kiểm tra mạng và kích hoạt lại khi có mạng trở lại
+		try
+		{
+			System.Net.NetworkInformation.NetworkChange.NetworkAvailabilityChanged += async (s, ev) =>
+			{
+				if (ev.IsAvailable)
+				{
+					// Đợi 2 giây để kết nối mạng ổn định hoàn toàn (tránh DHCP chưa gán IP)
+					await Task.Delay(2000);
+					await ActivationLicense.TriggerNetworkCheckAsync();
+					if (ActivationLicense.IsInternetAvailable)
+					{
+						await ActivationLicense.CheckHeartbeatOnlineAsync(force: true);
+						await base.Dispatcher.InvokeAsync(delegate
+						{
+							ApplyAppActivationState();
+							LogStatus("Đã kết nối lại máy chủ bản quyền trực tuyến.");
+						});
+					}
+				}
+			};
+		}
+		catch {}
 	}
 
 	private async Task RunUpdateCheckAsync()

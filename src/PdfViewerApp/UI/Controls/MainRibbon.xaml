@@ -56,6 +56,7 @@
           <fluent:Button Header="Mở File PDF" Click="OpenPdf_Click" />
           <fluent:Button Header="Lưu" Click="SavePdf_Click" />
           <fluent:Button Header="Lưu Dưới Dạng..." Click="SavePdfAs_Click" />
+          <fluent:Button Header="Tối Ưu Dung Lượng" Click="CompressPdf_Click" />
           <fluent:Button Header="Thoát" Click="Exit_Click" />
         </fluent:BackstageTabControl>
       </fluent:Backstage>

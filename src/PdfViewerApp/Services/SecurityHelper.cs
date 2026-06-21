@@ -212,6 +212,9 @@ internal static class SecurityHelper
 
 	public static void CheckIntegrity()
 	{
+#if DEBUG
+		return;
+#endif
 		string violationReason = null;
 
 		if (IsDebuggerAttached())

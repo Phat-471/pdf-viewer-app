@@ -304,11 +304,11 @@
             </Button>
           </StackPanel>
         </Border>
-                <Border Name="TabEmptyState" Background="#0F172A" CornerRadius="14" BorderThickness="1" BorderBrush="#1E293B" Visibility="Visible" Margin="0,0,0,0">
+        <Border Name="TabEmptyState" Background="#0F172A" CornerRadius="14" BorderThickness="1" BorderBrush="#1E293B" Visibility="Visible" Margin="0,0,0,0" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
           <Border.Effect>
             <DropShadowEffect BlurRadius="22" ShadowDepth="4" Color="#000000" Opacity="0.30" />
           </Border.Effect>
-          <Grid Name="DashboardHostContainer" Margin="18" />
+          <Grid Name="DashboardHostContainer" Margin="18" UseLayoutRounding="True" SnapsToDevicePixels="True" />
         </Border>
       </Grid>
       <Grid Name="AiPanelHostContainer" Grid.Column="1" Margin="0,5,5,5" Visibility="Collapsed" />

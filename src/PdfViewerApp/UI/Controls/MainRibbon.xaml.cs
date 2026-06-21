@@ -439,6 +439,14 @@ public partial class MainRibbon : UserControl
 	{
 		double opacity = (isActivated ? 1.0 : 0.4);
 		string? toolTip = (isActivated ? null : "Tính năng PRO (Yêu cầu kích hoạt bản quyền)");
+		
+		#if DEBUG
+		System.Windows.MessageBox.Show($"SetActivationState: isActivated={isActivated}\n" +
+			$"MergeFilesBtn: {MergeFilesBtn != null}\n" +
+			$"CompressPdfBtn: {CompressPdfBtn != null}\n" +
+			$"BatchCompressBtn: {BatchCompressBtn != null}");
+		#endif
+
 		ApplyProButtonState(MergeFilesBtn, opacity, toolTip);
 		ApplyProButtonState(MergeFromExplorerBtn, opacity, toolTip);
 		ApplyProButtonState(MovePageUpBtn, opacity, toolTip);
@@ -450,6 +458,8 @@ public partial class MainRibbon : UserControl
 		ApplyProButtonState(SplitCurrentPageBtn, opacity, toolTip);
 		ApplyProButtonState(ExtractPagesBtn, opacity, toolTip);
 		ApplyProButtonState(AiSnapshotBtn, opacity, toolTip);
+		ApplyProButtonState(CompressPdfBtn, opacity, toolTip);
+		ApplyProButtonState(BatchCompressBtn, opacity, toolTip);
 	}
 
 	public (string FontFamily, double FontSize, bool Bold, bool Italic, bool Underline, bool Strikeout, bool Subscript, bool Superscript, System.Windows.TextAlignment Alignment, Color StrokeColor, Color BackgroundColor, double Opacity) ReadAnnotationSettings()

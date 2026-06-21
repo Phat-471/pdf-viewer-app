@@ -1,8 +1,11 @@
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;
+use std::io::Write;
 use lopdf::{xobject, Dictionary, Document, Object};
 use image::ImageEncoder;
+use flate2::read::ZlibDecoder;
+use std::io::Read;
 
 // Convert C string to Rust string slice safely
 fn to_str<'a>(s: *const c_char) -> Option<&'a str> {
@@ -20,6 +23,38 @@ fn get_integer(obj: &Object) -> Option<i64> {
         Object::Integer(i) => Some(*i),
         _ => None,
     }
+}
+
+fn resolve_object<'a>(doc: &'a Document, obj: &'a Object) -> &'a Object {
+    match obj {
+        Object::Reference(id) => {
+            if let Ok(resolved) = doc.get_object(*id) {
+                resolve_object(doc, resolved)
+            } else {
+                obj
+            }
+        }
+        _ => obj,
+    }
+}
+
+// Manually decompress FlateDecode (zlib) data
+// lopdf's decompressed_content() fails when Filter is an Array ([/FlateDecode])
+// This function handles both cases by attempting raw inflate
+fn manual_decompress_flate(compressed: &[u8]) -> Option<Vec<u8>> {
+    // Try standard zlib (with zlib header 0x78..)
+    let mut decoder = ZlibDecoder::new(compressed);
+    let mut out = Vec::new();
+    if decoder.read_to_end(&mut out).is_ok() && !out.is_empty() {
+        return Some(out);
+    }
+    // Try raw deflate (without zlib header, used by some PDFs)
+    let mut decoder2 = flate2::read::DeflateDecoder::new(compressed);
+    let mut out2 = Vec::new();
+    if decoder2.read_to_end(&mut out2).is_ok() && !out2.is_empty() {
+        return Some(out2);
+    }
+    None
 }
 
 #[no_mangle]
@@ -731,6 +766,30 @@ pub extern "C" fn compress_pdf(
     image_quality: u8,
     output_path: *const c_char,
 ) -> bool {
+    // Wrap in catch_unwind to prevent Rust panics from crossing FFI and crashing the app
+    let result = std::panic::catch_unwind(|| {
+        compress_pdf_inner(pdf_path, image_quality, output_path)
+    });
+    match result {
+        Ok(val) => val,
+        Err(_) => {
+            // Panic occurred - try to log it
+            let desktop = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Public".to_string());
+            let log_path = format!("{}\\Desktop\\compress_debug.log", desktop);
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).write(true).open(&log_path) {
+                let _ = writeln!(f, "[RUST] !!! PANIC/CRASH xay ra trong compress_pdf !!!");
+                let _ = writeln!(f, "[RUST] Co the do het RAM khi xu ly anh lon.");
+            }
+            false
+        }
+    }
+}
+
+fn compress_pdf_inner(
+    pdf_path: *const c_char,
+    image_quality: u8,
+    output_path: *const c_char,
+) -> bool {
     let pdf_str = match to_str(pdf_path) {
         Some(s) => s,
         None => return false,
@@ -740,87 +799,367 @@ pub extern "C" fn compress_pdf(
         None => return false,
     };
 
+    // Open log file on Desktop for debug output
+    let log_path = {
+        let desktop = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Public".to_string());
+        format!("{}\\Desktop\\compress_debug.log", desktop)
+    };
+    let mut log_file = std::fs::OpenOptions::new()
+        .create(true).append(false).write(true)
+        .open(&log_path)
+        .ok();
+
+    macro_rules! log {
+        ($($arg:tt)*) => {{
+            let msg = format!($($arg)*);
+            println!("{}", msg);
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "{}", msg);
+                let _ = f.flush();
+            }
+        }};
+    }
+
+    log!("[RUST] --- Bat dau compress_pdf ---");
+    log!("[RUST] File goc: {}", pdf_str);
+    log!("[RUST] File ra: {}", output_str);
+    log!("[RUST] Chat luong anh nen: {}", image_quality);
+    log!("[RUST] Log file: {}", log_path);
+
     let mut doc = match Document::load(pdf_str) {
-        Ok(d) => d,
-        Err(_) => return false,
+        Ok(d) => {
+            log!("[RUST] Load Document thanh cong.");
+            d
+        }
+        Err(e) => {
+            log!("[RUST] ERROR: Khong the load document. Loi: {:?}", e);
+            return false;
+        }
     };
 
     // Tìm tất cả các stream của Image XObject
     let mut image_ids = Vec::new();
     for (id, object) in doc.objects.iter() {
         if let Ok(stream) = object.as_stream() {
-            let is_image = stream.dict.get(b"Subtype").ok()
-                .and_then(|o| o.as_name().ok())
-                .map(|n| n == b"Image")
-                .unwrap_or(false);
-            if is_image {
+            let subtype = stream.dict.get(b"Subtype").ok()
+                .map(|o| resolve_object(&doc, o))
+                .and_then(|o| o.as_name().ok().map(|n| String::from_utf8_lossy(n).into_owned()));
+            let filter = stream.dict.get(b"Filter").ok()
+                .map(|o| resolve_object(&doc, o))
+                .map(|o| format!("{:?}", o));
+            let w = stream.dict.get(b"Width").ok()
+                .map(|o| resolve_object(&doc, o))
+                .and_then(|o| get_integer(o)).unwrap_or(0);
+            let h = stream.dict.get(b"Height").ok()
+                .map(|o| resolve_object(&doc, o))
+                .and_then(|o| get_integer(o)).unwrap_or(0);
+            log!("[RUST] Object {:?}: Subtype={:?} Filter={:?} W={} H={} raw_len={}",
+                 id, subtype, filter, w, h, stream.content.len());
+            if subtype.as_deref() == Some("Image") {
                 image_ids.push(*id);
             }
         }
     }
 
+    log!("[RUST] Tim thay {} doi tuong Image trong file PDF.", image_ids.len());
+
     if image_ids.is_empty() {
+        log!("[RUST] Khong co anh nao can nen. Luu lai file goc.");
         return doc.save(output_str).is_ok();
     }
 
-    for id in image_ids {
-        if let Ok(Object::Stream(ref mut stream)) = doc.get_object_mut(id) {
-            let width = stream.dict.get(b"Width").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
-            let height = stream.dict.get(b"Height").ok().and_then(|o| get_integer(o)).unwrap_or(0) as u32;
-            let bits = stream.dict.get(b"BitsPerComponent").ok().and_then(|o| get_integer(o)).unwrap_or(8) as u32;
+    let mut success_count = 0;
+    let mut skip_count = 0;
 
-            if width == 0 || height == 0 || bits != 8 {
-                continue;
+    for id in image_ids {
+        // --- Step 1: Collect metadata (immutable borrow) ---
+        let mut width: u32 = 0;
+        let mut height: u32 = 0;
+        let mut is_dct = false;
+        let mut is_cmyk = false;  // DeviceCMYK has 4 channels, different from RGBA
+        let mut raw_stream_bytes: Vec<u8> = Vec::new();
+        let mut has_stream = false;
+
+        if let Ok(Object::Stream(ref stream)) = doc.get_object(id) {
+            has_stream = true;
+            width = stream.dict.get(b"Width").ok()
+                .map(|o| resolve_object(&doc, o))
+                .and_then(|o| get_integer(o))
+                .unwrap_or(0) as u32;
+
+            height = stream.dict.get(b"Height").ok()
+                .map(|o| resolve_object(&doc, o))
+                .and_then(|o| get_integer(o))
+                .unwrap_or(0) as u32;
+
+            // Detect ColorSpace (CRITICAL for CMYK vs RGBA distinction)
+            if let Ok(cs_obj) = stream.dict.get(b"ColorSpace") {
+                let cs_resolved = resolve_object(&doc, cs_obj);
+                let cs_name = match cs_resolved {
+                    Object::Name(ref n) => String::from_utf8_lossy(n).to_string(),
+                    Object::Array(ref arr) => {
+                        // e.g. [/ICCBased 3 0 R] - check first element
+                        if let Some(Object::Name(ref n)) = arr.first() {
+                            String::from_utf8_lossy(n).to_string()
+                        } else { String::new() }
+                    }
+                    _ => String::new(),
+                };
+                if cs_name.contains("CMYK") || cs_name.contains("Cmyk") {
+                    is_cmyk = true;
+                }
+                log!("[RUST] -> ColorSpace: {} is_cmyk:{}", cs_name, is_cmyk);
             }
 
-            let color_space: &[u8] = stream.dict.get(b"ColorSpace").ok()
-                .and_then(|o| o.as_name().ok())
-                .unwrap_or(&[]);
-
-            if let Ok(decompressed) = stream.decompressed_content() {
-                let mut compressed_bytes = Vec::new();
-                let mut success = false;
-
-                if color_space == b"DeviceRGB" && decompressed.len() == (width * height * 3) as usize {
-                    let mut jpeg_data = Vec::new();
-                    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
-                    if encoder.write_image(&decompressed, width, height, image::ColorType::Rgb8).is_ok() {
-                        compressed_bytes = jpeg_data;
-                        success = true;
+            // Detect filter type
+            if let Ok(filter_obj) = stream.dict.get(b"Filter") {
+                let resolved = resolve_object(&doc, filter_obj);
+                let check_dct = |name: &[u8]| name == b"DCTDecode";
+                match resolved {
+                    Object::Name(ref n) => { if check_dct(n) { is_dct = true; } }
+                    Object::Array(ref arr) => {
+                        for item in arr {
+                            if let Object::Name(ref n) = resolve_object(&doc, item) {
+                                if check_dct(n) { is_dct = true; break; }
+                            }
+                        }
                     }
-                } else if color_space == b"DeviceGray" && decompressed.len() == (width * height) as usize {
-                    let mut jpeg_data = Vec::new();
-                    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
-                    if encoder.write_image(&decompressed, width, height, image::ColorType::L8).is_ok() {
-                        compressed_bytes = jpeg_data;
-                        success = true;
+                    _ => {}
+                }
+            }
+
+            // Store raw compressed content for DCT, otherwise try decompressing
+            if is_dct {
+                raw_stream_bytes = stream.content.clone();
+            } else {
+                // Try lopdf's built-in first
+                match stream.decompressed_content() {
+                    Ok(dec) if !dec.is_empty() => {
+                        raw_stream_bytes = dec;
                     }
-                } else {
-                    let filter: &[u8] = stream.dict.get(b"Filter").ok()
-                        .and_then(|o| o.as_name().ok())
-                        .unwrap_or(&[]);
-                    if filter == b"DCTDecode" {
-                        if let Ok(img) = image::load_from_memory_with_format(&decompressed, image::ImageFormat::Jpeg) {
-                            let mut jpeg_data = Vec::new();
-                            let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_data, image_quality);
-                            let rgb = img.to_rgb8();
-                            if encoder.write_image(&rgb, rgb.width(), rgb.height(), image::ColorType::Rgb8).is_ok() {
-                                compressed_bytes = jpeg_data;
-                                success = true;
+                    _ => {
+                        // lopdf fails for [/FlateDecode] array filter — decompress manually
+                        log!("[RUST] -> lopdf decode failed cho ID {:?}, thu manual zlib inflate...", id);
+                        match manual_decompress_flate(&stream.content) {
+                            Some(dec) => {
+                                log!("[RUST] -> Manual zlib OK: {} -> {} bytes", stream.content.len(), dec.len());
+                                raw_stream_bytes = dec;
+                            }
+                            None => {
+                                log!("[RUST] -> Manual zlib THAT BAI cho ID {:?}, dung raw bytes", id);
+                                raw_stream_bytes = stream.content.clone();
                             }
                         }
                     }
                 }
+            }
+        }
 
-                if success && !compressed_bytes.is_empty() {
-                    stream.set_content(compressed_bytes);
-                    stream.dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
+        log!("[RUST] === Image ID {:?} === W:{} H:{} is_dct:{} raw_bytes:{} has_stream:{}",
+                 id, width, height, is_dct, raw_stream_bytes.len(), has_stream);
+
+        if !has_stream || raw_stream_bytes.is_empty() {
+            log!("[RUST] -> SKIP: stream rong hoac khong co stream.");
+            skip_count += 1;
+            continue;
+        }
+
+        // --- Step 2: Decode to DynamicImage ---
+        let dynamic_img: Option<image::DynamicImage> = if is_dct {
+            // DCT stream.content IS the raw JPEG bytes
+            match image::load_from_memory_with_format(&raw_stream_bytes, image::ImageFormat::Jpeg) {
+                Ok(img) => {
+                    log!("[RUST] -> OK: Decode JPEG thanh cong. Kich thuoc thuc: {}x{}", img.width(), img.height());
+                    Some(img)
                 }
+                Err(e) => {
+                    log!("[RUST] -> WARN: load JPEG that bai ({:?}), thu voi load_from_memory...", e);
+                    // Sometimes DCT stream might have extra wrapper, try generic
+                    image::load_from_memory(&raw_stream_bytes).ok()
+                }
+            }
+        } else {
+            // Non-DCT: raw_stream_bytes is decompressed pixel data
+            // Try by expected size first (RGB, Gray, RGBA/CMYK)
+            let try_rgb   = width > 0 && height > 0 && raw_stream_bytes.len() == (width * height * 3) as usize;
+            let try_gray  = width > 0 && height > 0 && raw_stream_bytes.len() == (width * height) as usize;
+            let try_cmyk_or_rgba = width > 0 && height > 0 && raw_stream_bytes.len() == (width * height * 4) as usize;
+
+            log!("[RUST] -> Non-DCT decode attempt: len={} expected_rgb={} expected_gray={} expected_4ch={} is_cmyk:{}",
+                     raw_stream_bytes.len(), width * height * 3, width * height, width * height * 4, is_cmyk);
+
+            if try_rgb {
+                image::ImageBuffer::<image::Rgb<u8>, _>::from_raw(width, height, raw_stream_bytes.clone())
+                    .map(|b| { log!("[RUST] -> OK: Parsed as RGB8"); image::DynamicImage::ImageRgb8(b) })
+            } else if try_gray {
+                image::ImageBuffer::<image::Luma<u8>, _>::from_raw(width, height, raw_stream_bytes.clone())
+                    .map(|b| { log!("[RUST] -> OK: Parsed as Gray8"); image::DynamicImage::ImageLuma8(b) })
+            } else if try_cmyk_or_rgba {
+                if is_cmyk {
+                    // CMYK -> RGB8 manual conversion
+                    log!("[RUST] -> Converting CMYK -> RGB8...");
+                    let cmyk = &raw_stream_bytes;
+                    let mut rgb_data = Vec::with_capacity((cmyk.len() / 4) * 3);
+                    for chunk in cmyk.chunks(4) {
+                        if chunk.len() == 4 {
+                            let c = chunk[0] as f32 / 255.0;
+                            let m = chunk[1] as f32 / 255.0;
+                            let y = chunk[2] as f32 / 255.0;
+                            let k = chunk[3] as f32 / 255.0;
+                            let r = ((1.0 - c) * (1.0 - k) * 255.0) as u8;
+                            let g = ((1.0 - m) * (1.0 - k) * 255.0) as u8;
+                            let b = ((1.0 - y) * (1.0 - k) * 255.0) as u8;
+                            rgb_data.push(r); rgb_data.push(g); rgb_data.push(b);
+                        }
+                    }
+                    image::ImageBuffer::<image::Rgb<u8>, _>::from_raw(width, height, rgb_data)
+                        .map(|b| { log!("[RUST] -> OK: CMYK->RGB8 done"); image::DynamicImage::ImageRgb8(b) })
+                } else {
+                    // RGBA8
+                    image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, raw_stream_bytes.clone())
+                        .map(|b| { log!("[RUST] -> OK: Parsed as RGBA8"); image::DynamicImage::ImageRgba8(b) })
+                }
+            } else {
+                log!("[RUST] -> Thu load_from_memory (generic)...");
+                image::load_from_memory(&raw_stream_bytes).map(|img| {
+                    log!("[RUST] -> OK: Generic decode thanh cong. Size: {}x{}", img.width(), img.height());
+                    img
+                }).ok()
+            }
+        };
+
+        let dynamic_img = match dynamic_img {
+            Some(img) => img,
+            None => {
+                log!("[RUST] -> SKIP: Khong the decode anh cho ID {:?}", id);
+                skip_count += 1;
+                continue;
+            }
+        };
+
+        // --- Step 3: Convert to RGB8 ImageBuffer (manual, safe for all color types) ---
+        let (orig_w, orig_h) = (dynamic_img.width(), dynamic_img.height());
+        let raw_bytes_len = raw_stream_bytes.len();
+        let uncompressed_mb = raw_bytes_len as f64 / (1024.0 * 1024.0);
+
+        // Safety guard: skip images that are extremely large (> 150MB uncompressed) to prevent OOM
+        if uncompressed_mb > 150.0 {
+            log!("[RUST] -> SKIP: Anh qua lon ({:.1}MB unpacked), bo qua de tranh OOM cho ID {:?}", uncompressed_mb, id);
+            drop(raw_stream_bytes);
+            drop(dynamic_img);
+            skip_count += 1;
+            continue;
+        }
+        drop(raw_stream_bytes);
+
+        log!("[RUST] -> [3a] Converting to RGB8 {}x{}...", orig_w, orig_h);
+        // Manual conversion: avoids DynamicImage::to_rgb8() which can panic on Gray8/RGBA8
+        let rgb8_buf: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> = match &dynamic_img {
+            image::DynamicImage::ImageLuma8(luma) => {
+                // Gray8 -> RGB8: replicate each gray byte 3 times
+                let gray = luma.as_raw();
+                let mut rgb = Vec::with_capacity(gray.len() * 3);
+                for &g in gray.iter() {
+                    rgb.push(g); rgb.push(g); rgb.push(g);
+                }
+                image::ImageBuffer::from_raw(orig_w, orig_h, rgb)
+                    .unwrap_or_else(|| image::ImageBuffer::new(orig_w, orig_h))
+            }
+            image::DynamicImage::ImageRgba8(rgba) => {
+                // RGBA8 -> RGB8: drop alpha channel
+                let raw = rgba.as_raw();
+                let mut rgb = Vec::with_capacity((raw.len() / 4) * 3);
+                for chunk in raw.chunks(4) {
+                    rgb.push(chunk[0]); rgb.push(chunk[1]); rgb.push(chunk[2]);
+                }
+                image::ImageBuffer::from_raw(orig_w, orig_h, rgb)
+                    .unwrap_or_else(|| image::ImageBuffer::new(orig_w, orig_h))
+            }
+            image::DynamicImage::ImageRgb8(rgb) => {
+                rgb.clone()
+            }
+            _ => {
+                // Fallback for other types
+                dynamic_img.to_rgb8()
+            }
+        };
+        drop(dynamic_img);
+        log!("[RUST] -> [3b] RGB8 conversion done.");
+
+        // --- Step 3b: Downsample if needed using imageops::resize directly ---
+        let max_dimension: u32 = if image_quality >= 80 {
+            3000
+        } else if image_quality >= 60 {
+            2000
+        } else {
+            1200
+        };
+        let (final_buf, final_w, final_h) = if orig_w > max_dimension || orig_h > max_dimension {
+            let scale = max_dimension as f32 / orig_w.max(orig_h) as f32;
+            let new_w = ((orig_w as f32 * scale) as u32).max(1);
+            let new_h = ((orig_h as f32 * scale) as u32).max(1);
+            log!("[RUST] -> [3c] Resize {}x{} -> {}x{} ({:.1}MB)...", orig_w, orig_h, new_w, new_h, uncompressed_mb);
+            // Use high-quality CatmullRom (Bicubic) filter instead of Nearest to prevent pixelation/jagged lines
+            let resized = image::imageops::resize(&rgb8_buf, new_w, new_h, image::imageops::FilterType::CatmullRom);
+            drop(rgb8_buf);
+            log!("[RUST] -> [3d] Resize done.");
+            (resized, new_w, new_h)
+        } else {
+            (rgb8_buf, orig_w, orig_h)
+        };
+
+        // --- Step 4: JPEG encode directly from raw RGB bytes ---
+        log!("[RUST] -> [4] JPEG encode {}x{} quality={}...", final_w, final_h, image_quality);
+        let mut jpeg_bytes = Vec::new();
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, image_quality);
+        match encoder.write_image(final_buf.as_raw(), final_w, final_h, image::ColorType::Rgb8) {
+            Ok(_) => {
+                let old_size = raw_bytes_len;
+                let new_size = jpeg_bytes.len();
+                let reduction = if old_size > 0 {
+                    ((old_size as f64 - new_size as f64) / old_size as f64 * 100.0) as i64
+                } else { 0 };
+                log!("[RUST] -> JPEG encode OK: {} bytes -> {} bytes (giam {}%)", old_size, new_size, reduction);
+
+                // --- Step 5: Write back (mutable borrow) ---
+                if let Ok(Object::Stream(ref mut stream)) = doc.get_object_mut(id) {
+                    stream.set_content(jpeg_bytes);
+                    stream.dict.set("Filter", Object::Name(b"DCTDecode".to_vec()));
+                    stream.dict.set("Width", Object::Integer(final_w as i64));
+                    stream.dict.set("Height", Object::Integer(final_h as i64));
+                    stream.dict.set("ColorSpace", Object::Name(b"DeviceRGB".to_vec()));
+                    stream.dict.set("BitsPerComponent", Object::Integer(8));
+                    stream.dict.remove(b"DecodeParms");
+                    success_count += 1;
+                    log!("[RUST] -> Ghi lai stream thanh cong.");
+                } else {
+                    log!("[RUST] -> WARN: Khong the get_object_mut de ghi lai.");
+                    skip_count += 1;
+                }
+            }
+            Err(e) => {
+                log!("[RUST] -> SKIP: JPEG encode THAT BAI cho ID {:?}: {:?}", id, e);
+                skip_count += 1;
             }
         }
     }
 
-    doc.save(output_str).is_ok()
+    log!("[RUST] ========================================");
+    log!("[RUST] Ket qua nen: {} thanh cong, {} bo qua.", success_count, skip_count);
+    log!("[RUST] ========================================");
+
+    // Prune unused/orphaned objects for additional space savings
+    log!("[RUST] Pruning unused objects...");
+    doc.prune_objects();
+
+    log!("[RUST] Saving to: {}", output_str);
+    let save_res = doc.save(output_str);
+    let save_ok = save_res.is_ok();
+    if let Err(ref e) = save_res {
+        log!("[RUST] Save Error: {:?}", e);
+    }
+    log!("[RUST] Save Status: {}", save_ok);
+    save_ok
 }
 
 #[no_mangle]

@@ -9,3 +9,4 @@ crate-type = ["cdylib"]
 [dependencies]
 lopdf = { version = "0.31.0", features = ["embed_image"] }
 image = { version = "0.24.7", default-features = false, features = ["jpeg", "png"] }
+flate2 = "1.0"

@@ -156,20 +156,12 @@
       </Style.Triggers>
     </Style>
   </UserControl.Resources>
-  <Grid Margin="0" Opacity="0">
-    <Grid.RenderTransform>
-      <TranslateTransform X="0" Y="20"/>
-    </Grid.RenderTransform>
+  <Grid Margin="0" Opacity="0" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
     <Grid.Triggers>
       <EventTrigger RoutedEvent="FrameworkElement.Loaded">
         <BeginStoryboard>
           <Storyboard>
             <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.0" To="1.0" Duration="0:0:0.4">
-              <DoubleAnimation.EasingFunction>
-                <CubicEase EasingMode="EaseOut"/>
-              </DoubleAnimation.EasingFunction>
-            </DoubleAnimation>
-            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="20" To="0" Duration="0:0:0.4">
               <DoubleAnimation.EasingFunction>
                 <CubicEase EasingMode="EaseOut"/>
               </DoubleAnimation.EasingFunction>
@@ -182,7 +174,7 @@
       <ColumnDefinition Width="*" />
       <ColumnDefinition Width="360" />
     </Grid.ColumnDefinitions>
-    <Border Name="MainPanelBorder" Background="#0F172A" CornerRadius="14" BorderThickness="1" BorderBrush="#1E293B" Padding="32" Margin="0,0,16,0">
+    <Border Name="MainPanelBorder" Background="#0F172A" CornerRadius="14" BorderThickness="1" BorderBrush="#1E293B" Padding="32" Margin="0,0,16,0" UseLayoutRounding="True" SnapsToDevicePixels="True">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
