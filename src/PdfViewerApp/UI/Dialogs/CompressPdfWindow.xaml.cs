@@ -44,6 +44,7 @@ namespace PdfViewerApp
             CancelBtn.IsEnabled = false;
             StatusTextBlock.Text = "Đang nén hình ảnh...";
 
+            bool isLossless = RadioLossless.IsChecked == true;
             byte quality = 80;
             if (RadioMedium.IsChecked == true) quality = 60;
             else if (RadioHigh.IsChecked == true) quality = 35;
@@ -56,7 +57,14 @@ namespace PdfViewerApp
             {
                 try
                 {
-                    return PdfInterop.PdfCore.compress_pdf(_sourcePdfPath, quality, tempOutFile);
+                    if (isLossless)
+                    {
+                        return PdfInterop.PdfCore.optimize_pdf_lossless(_sourcePdfPath, true, tempOutFile);
+                    }
+                    else
+                    {
+                        return PdfInterop.PdfCore.compress_pdf(_sourcePdfPath, quality, tempOutFile);
+                    }
                 }
                 catch
                 {

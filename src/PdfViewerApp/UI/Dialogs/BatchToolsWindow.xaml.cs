@@ -24,7 +24,7 @@ namespace PdfViewerApp
 		private bool _isProcessing = false;
 		private string _selectedFolder = string.Empty;
 
-		public BatchToolsWindow()
+		public BatchToolsWindow(int initialTabIndex = 0)
 		{
 			InitializeComponent();
 			FileListView.ItemsSource = Files;
@@ -35,11 +35,17 @@ namespace PdfViewerApp
 			_selectedFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 			RotateOutputDirTextBox.Text = _selectedFolder;
 			CompressOutputDirTextBox.Text = _selectedFolder;
+			OptOutputDirTextBox.Text = _selectedFolder;
 			ExtractOutputDirTextBox.Text = _selectedFolder;
 			MergeOutputDirTextBox.Text = _selectedFolder;
 			WatermarkOutputDirTextBox.Text = _selectedFolder;
 			SecurityOutputDirTextBox.Text = _selectedFolder;
 			ConvertOutputDirTextBox.Text = _selectedFolder;
+
+			if (initialTabIndex >= 0 && initialTabIndex < BatchTabControl.Items.Count)
+			{
+				BatchTabControl.SelectedIndex = initialTabIndex;
+			}
 		}
 
 		private void UpdatePlaceholderVisibility()
@@ -381,6 +387,7 @@ namespace PdfViewerApp
 				_selectedFolder = dialog.FolderName;
 				RotateOutputDirTextBox.Text = _selectedFolder;
 				CompressOutputDirTextBox.Text = _selectedFolder;
+				OptOutputDirTextBox.Text = _selectedFolder;
 				ExtractOutputDirTextBox.Text = _selectedFolder;
 				MergeOutputDirTextBox.Text = _selectedFolder;
 				WatermarkOutputDirTextBox.Text = _selectedFolder;
@@ -430,6 +437,10 @@ namespace PdfViewerApp
 				else if (selectedTab.Header.ToString() == "Nén PDF")
 				{
 					await StartCompressFlowAsync(token);
+				}
+				else if (selectedTab.Header.ToString() == "Nén Tối Ưu")
+				{
+					await StartLosslessCompressFlowAsync(token);
 				}
 				else if (selectedTab.Header.ToString() == "Trích Xuất Trang")
 				{
@@ -771,6 +782,41 @@ namespace PdfViewerApp
 			MessageBox.Show(this, "Hoàn tất tiến trình nén dung lượng hàng loạt!", "Nén PDF", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
+		private async Task StartLosslessCompressFlowAsync(CancellationToken token)
+		{
+			bool removeMetadata = OptRemoveMetadataCheckBox.IsChecked == true;
+
+			for (int i = 0; i < Files.Count; i++)
+			{
+				token.ThrowIfCancellationRequested();
+				var fileItem = Files[i];
+				fileItem.Status = "Đang tối ưu...";
+				OverallStatusText.Text = $"Đang tối ưu tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
+
+				string outPath = Path.Combine(_selectedFolder, $"optimized_{fileItem.FileName}");
+				bool success = false;
+
+				await Task.Run(() =>
+				{
+					try
+					{
+						success = PdfInterop.PdfCore.optimize_pdf_lossless(fileItem.FilePath, removeMetadata, outPath);
+					}
+					catch (OperationCanceledException)
+					{
+						throw;
+					}
+					catch { }
+				});
+
+				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
+				OverallProgressBar.Value = i + 1;
+			}
+
+			OverallStatusText.Text = "Đã hoàn thành tối ưu tất cả tệp!";
+			MessageBox.Show(this, "Hoàn tất tiến trình tối ưu nén tệp hàng loạt!", "Nén Tối Ưu", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
 		private async Task StartExtractFlowAsync(CancellationToken token)
 		{
 			string pagesStr = ExtractPageRangeTextBox.Text.Trim().Replace(",", ";");
@@ -892,6 +938,11 @@ namespace PdfViewerApp
 
 			CompressQualitySlider.IsEnabled = enabled;
 			CompressBrowseBtn.IsEnabled = enabled;
+
+			OptCompressStreamsCheckBox.IsEnabled = enabled;
+			OptPruneObjectsCheckBox.IsEnabled = enabled;
+			OptRemoveMetadataCheckBox.IsEnabled = enabled;
+			OptBrowseBtn.IsEnabled = enabled;
 
 			ExtractPageRangeTextBox.IsEnabled = enabled;
 			ExtractBrowseBtn.IsEnabled = enabled;

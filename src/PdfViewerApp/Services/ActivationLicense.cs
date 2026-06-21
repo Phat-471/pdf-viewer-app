@@ -24,6 +24,7 @@ internal static class ActivationLicense
 	private const string DefaultApiDomain = "https://hongmien.vn";
 
 	private static bool _isOfflineDetected = false;
+	private static bool _isInternetAvailable = true;
 
 	public static string ApiDomain => GetApiDomain();
 
@@ -162,7 +163,8 @@ internal static class ActivationLicense
 				if (isActivated)
 				{
 					// Kiểm tra trạng thái offline
-					bool currentlyOffline = _isOfflineDetected || !System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();
+					bool noNetwork = !_isInternetAvailable || !System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();
+					bool currentlyOffline = _isOfflineDetected || noNetwork;
 					double daysSinceCheck = (DateTimeOffset.Now - activationRecord.LastOnlineCheckTime).TotalDays;
 
 					if (currentlyOffline)
@@ -176,7 +178,14 @@ internal static class ActivationLicense
 						{
 							needsOnlineVerification = true;
 							int remainingDays = (int)Math.Max(0, Math.Ceiling(15.0 - daysSinceCheck));
-							offlineWarningMessage = $"Máy tính của bạn hiện không có kết nối Internet. Ứng dụng đang chạy ở chế độ Ngoại tuyến (Hạn dùng offline còn lại: {remainingDays} ngày).";
+							if (noNetwork)
+							{
+								offlineWarningMessage = $"Máy tính của bạn hiện không có kết nối Internet. Ứng dụng đang chạy ở chế độ Ngoại tuyến (Hạn dùng offline còn lại: {remainingDays} ngày).";
+							}
+							else
+							{
+								offlineWarningMessage = $"Không thể kết nối đến máy chủ bản quyền. Ứng dụng đang chạy ở chế độ Ngoại tuyến (Hạn dùng offline còn lại: {remainingDays} ngày).";
+							}
 						}
 					}
 				}
@@ -271,9 +280,10 @@ internal static class ActivationLicense
 		}
 		catch (Exception ex)
 		{
+			_isOfflineDetected = true;
+			_isInternetAvailable = await CheckInternetConnectionAsync();
 			if (ex is HttpRequestException || ex is System.Net.Sockets.SocketException || ex.Message.Contains(ApiDomain) || ex.Message.Contains("No such host") || ex.Message.Contains("connection") || ex.Message.Contains("connect"))
 			{
-				_isOfflineDetected = true;
 				return (Success: false, Message: "Không thể kết nối đến máy chủ bản quyền. Vui lòng kiểm tra lại kết nối Internet.");
 			}
 			return (Success: false, Message: "Lỗi kết nối máy chủ kích hoạt: " + ex.Message);
@@ -574,11 +584,38 @@ internal static class ActivationLicense
 			{
 				// Phản hồi lỗi HTTP từ server, xem như offline
 				_isOfflineDetected = true;
+				_isInternetAvailable = await CheckInternetConnectionAsync();
 			}
 		}
 		catch
 		{
 			_isOfflineDetected = true;
+			_isInternetAvailable = await CheckInternetConnectionAsync();
+		}
+	}
+
+	private static async Task<bool> CheckInternetConnectionAsync()
+	{
+		try
+		{
+			using (var client = new HttpClient())
+			{
+				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2.0));
+				HttpResponseMessage response = await client.GetAsync("https://www.google.com", cts.Token);
+				return response.IsSuccessStatusCode;
+			}
+		}
+		catch
+		{
+			try
+			{
+				var addresses = await System.Net.Dns.GetHostAddressesAsync("www.google.com");
+				return addresses.Length > 0;
+			}
+			catch
+			{
+				return false;
+			}
 		}
 	}
 }

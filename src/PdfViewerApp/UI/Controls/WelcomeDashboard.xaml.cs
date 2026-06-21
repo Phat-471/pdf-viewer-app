@@ -19,6 +19,8 @@ public partial class WelcomeDashboard : UserControl, IComponentConnector
 
 	public event EventHandler? PrintRequested;
 
+	public event EventHandler? CompressRequested;
+
 	public event EventHandler? AiSnapshotRequested;
 
 	public event EventHandler? SettingsRequested;
@@ -67,6 +69,11 @@ public partial class WelcomeDashboard : UserControl, IComponentConnector
 	private void PrintFile_Click(object sender, RoutedEventArgs e)
 	{
 		PrintRequested?.Invoke(this, EventArgs.Empty);
+	}
+
+	private void CompressFile_Click(object sender, RoutedEventArgs e)
+	{
+		CompressRequested?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void AiSnapshot_Click(object sender, RoutedEventArgs e)

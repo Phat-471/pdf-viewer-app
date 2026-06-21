@@ -824,6 +824,54 @@ pub extern "C" fn compress_pdf(
 }
 
 #[no_mangle]
+pub extern "C" fn optimize_pdf_lossless(
+    pdf_path: *const c_char,
+    remove_metadata: bool,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut doc = match Document::load(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // 1. Clean up unused objects
+    doc.prune_objects();
+
+    // 2. Remove metadata if requested
+    if remove_metadata {
+        if let Ok(root_ref) = doc.trailer.get(b"Root").and_then(|o| o.as_reference()) {
+            if let Ok(Object::Dictionary(ref mut catalog_dict)) = doc.get_object_mut(root_ref) {
+                catalog_dict.remove(b"Metadata");
+                catalog_dict.remove(b"PieceInfo");
+            }
+        }
+        doc.trailer.remove(b"Info");
+    }
+
+    // 3. Compress uncompressed streams using FlateDecode
+    for (_id, object) in doc.objects.iter_mut() {
+        if let Object::Stream(ref mut stream) = *object {
+            let has_filter = stream.dict.get(b"Filter").is_ok();
+            if !has_filter {
+                let _ = stream.compress();
+            }
+        }
+    }
+
+    doc.save(output_str).is_ok()
+}
+
+
+#[no_mangle]
 pub extern "C" fn add_pdf_watermark(
     pdf_path: *const c_char,
     text: *const c_char,

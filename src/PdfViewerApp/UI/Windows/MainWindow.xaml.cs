@@ -1445,6 +1445,16 @@ exit 0
 		}
 	}
 
+	private void BatchCompress_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			BatchToolsWindow batchToolsWindow = new BatchToolsWindow(3); // 3 is Nén Tối Ưu tab
+			batchToolsWindow.Owner = this;
+			batchToolsWindow.ShowDialog();
+		}
+	}
+
 	private void ToggleSidebar_Click(object sender, RoutedEventArgs e)
 	{
 		GetActiveTab()?.ToggleSidebar();
@@ -3221,6 +3231,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_welcomeDashboard.AiSnapshotRequested += WelcomeDashboard_AiSnapshotRequested;
 		_welcomeDashboard.SettingsRequested += WelcomeDashboard_SettingsRequested;
 		_welcomeDashboard.OpenRecentRequested += WelcomeDashboard_OpenRecentRequested;
+		_welcomeDashboard.CompressRequested += WelcomeDashboard_CompressRequested;
 	}
 
 	private void HookMainRibbonEvents()
@@ -3235,6 +3246,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
 		_mainRibbon.ComparePdfsRequested += ComparePdfs_Click;
 		_mainRibbon.CompressPdfRequested += CompressPdf_Click;
+		_mainRibbon.BatchCompressRequested += BatchCompress_Click;
 		_mainRibbon.WatermarkRequested += Watermark_Click;
 		_mainRibbon.PageNumberingRequested += PageNumbering_Click;
 		_mainRibbon.ExtractImagesRequested += ExtractImages_Click;
@@ -3426,6 +3438,11 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	private void WelcomeDashboard_AiSnapshotRequested(object? sender, EventArgs e)
 	{
 		AiSnapshotTool_Click(this, new RoutedEventArgs());
+	}
+
+	private void WelcomeDashboard_CompressRequested(object? sender, EventArgs e)
+	{
+		BatchCompress_Click(this, new RoutedEventArgs());
 	}
 
 	private void WelcomeDashboard_SettingsRequested(object? sender, EventArgs e)

@@ -250,7 +250,7 @@ if ($isccPath -ne "") {
     Write-Host "    Found Inno Setup Compiler: $isccPath" -ForegroundColor DarkGray
     Write-Host "    Running Inno Setup compiler..." -ForegroundColor Yellow
     $absoluteIssPath = Join-Path $scriptDir "installer.iss"
-    & $isccPath $absoluteIssPath
+    & $isccPath "/dMyAppVersion=$version" $absoluteIssPath
     if ($LASTEXITCODE -eq 0) {
         Write-Host "    Inno Setup package created successfully!" -ForegroundColor Green
     } else {

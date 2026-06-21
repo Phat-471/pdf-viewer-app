@@ -1,7 +1,7 @@
 <Window x:Class="PdfViewerApp.CompressPdfWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Tối Ưu &amp; Nén Dung Lượng PDF" Height="380" Width="450"
+        Title="Tối Ưu &amp; Nén Dung Lượng PDF" Height="440" Width="450"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#0F172A"
@@ -68,10 +68,17 @@
                 <!-- Compress levels -->
                 <TextBlock Text="Chọn mức độ nén:" Foreground="#F8FAFC" FontWeight="Bold" Margin="0,0,0,4"/>
                 
-                <RadioButton Name="RadioLow" Style="{StaticResource ModernRadioButton}" IsChecked="True">
+                <RadioButton Name="RadioLossless" Style="{StaticResource ModernRadioButton}" IsChecked="True">
                     <StackPanel Orientation="Vertical">
-                        <TextBlock Text="Nén Thấp (Chất lượng ảnh tốt nhất)" FontWeight="Bold"/>
-                        <TextBlock Text="Giảm nhẹ dung lượng, giữ nguyên độ nét tối đa (JPEG 80%)" Foreground="#94A3B8" FontSize="11"/>
+                        <TextBlock Text="Nén Tối Ưu (Không giảm nét hình ảnh)" FontWeight="Bold" Foreground="#38BDF8"/>
+                        <TextBlock Text="Tối ưu cấu trúc PDF, giữ nguyên 100% độ sắc nét ban đầu" Foreground="#94A3B8" FontSize="11"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton Name="RadioLow" Style="{StaticResource ModernRadioButton}">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="Nén Thấp (Chất lượng ảnh tốt)" FontWeight="Bold"/>
+                        <TextBlock Text="Giảm nhẹ dung lượng ảnh (JPEG 80%)" Foreground="#94A3B8" FontSize="11"/>
                     </StackPanel>
                 </RadioButton>
 

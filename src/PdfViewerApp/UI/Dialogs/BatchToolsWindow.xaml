@@ -488,6 +488,36 @@
             </ScrollViewer>
           </TabItem>
 
+          <!-- TAB 3B: OPTIMIZE (LOSSLESS COMPRESS) -->
+          <TabItem Header="Nén Tối Ưu">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Cấu Hình Nén Tối Ưu Không Giảm Chất Lượng" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Lossless Options -->
+                <CheckBox Name="OptCompressStreamsCheckBox" Content="Nén các dòng dữ liệu (FlateDecode)" IsChecked="True" Margin="0,0,0,10" />
+                <CheckBox Name="OptPruneObjectsCheckBox" Content="Dọn dẹp tài nguyên thừa (Prune)" IsChecked="True" Margin="0,0,0,10" />
+                <CheckBox Name="OptRemoveMetadataCheckBox" Content="Loại bỏ Metadata / XML dư thừa" IsChecked="True" Margin="0,0,0,10" />
+
+                <TextBlock Text="* Tính năng này giúp giảm dung lượng file tối đa bằng cách tối ưu hóa cấu trúc bên trong PDF, hoàn toàn KHÔNG làm giảm độ phân giải hay độ nét của hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="OptOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="OptBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+
           <!-- TAB 4: EXTRACT -->
           <TabItem Header="Trích Xuất Trang">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">

@@ -178,6 +178,14 @@ public static class PdfInterop
             [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
         );
 
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool optimize_pdf_lossless(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
+            bool removeMetadata,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath
+        );
+
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void MergeProgressCallback(uint current, uint total);
 

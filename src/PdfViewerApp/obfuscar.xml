@@ -23,5 +23,6 @@
     <SkipType name="PdfViewerApp.Ai.AiSettings" />
     <SkipType name="PdfViewerApp.UpdateRollbackState" />
     <SkipType name="PdfViewerApp.SilentUpdateReadyState" />
+    <SkipType name="PdfViewerApp.SecurityHelper" />
   </Module>
 </Obfuscator>

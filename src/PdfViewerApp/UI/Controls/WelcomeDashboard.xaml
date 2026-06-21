@@ -199,6 +199,7 @@
           <Button Content="Mở File" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="OpenFile_Click" />
           <Button Content="Ghép File" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="MergeFile_Click" />
           <Button Content="In ấn" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="PrintFile_Click" />
+          <Button Content="Nén File" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="CompressFile_Click" />
           <Button Content="AI Snapshot" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="AiSnapshot_Click" />
           <Button Content="Cài đặt" Style="{StaticResource DashboardActionButton}" Margin="0,0,8,8" Padding="12,6" Click="Settings_Click" />
         </WrapPanel>
