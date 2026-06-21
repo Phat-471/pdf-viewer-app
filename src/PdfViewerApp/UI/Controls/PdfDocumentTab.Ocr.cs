@@ -352,6 +352,99 @@ namespace PdfViewerApp
 		}
 
 		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
+		private async Task<List<OcrTextRegion>?> RunTesseractOcrAsync(string imagePath, Size pageSize, double targetWidth, double targetHeight)
+		{
+			string tessdataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdata");
+			if (!Directory.Exists(tessdataPath))
+			{
+				return null;
+			}
+
+			return await Task.Run(() =>
+			{
+				try
+				{
+					AppPreferences preferences = AppPreferences.Load();
+					string lang = "eng";
+					if (!string.IsNullOrEmpty(preferences.OcrLanguage))
+					{
+						string pref = preferences.OcrLanguage.ToLowerInvariant();
+						if (pref.StartsWith("vi")) lang = "vie";
+						else if (pref.StartsWith("en")) lang = "eng";
+						else lang = "vie+eng";
+					}
+					else
+					{
+						lang = "vie+eng";
+					}
+
+					string[] langs = lang.Split('+');
+					List<string> availableLangs = new List<string>();
+					foreach (var l in langs)
+					{
+						if (File.Exists(Path.Combine(tessdataPath, $"{l}.traineddata")))
+						{
+							availableLangs.Add(l);
+						}
+					}
+
+					if (availableLangs.Count == 0)
+					{
+						var files = Directory.GetFiles(tessdataPath, "*.traineddata");
+						if (files.Length > 0)
+						{
+							availableLangs.Add(Path.GetFileNameWithoutExtension(files[0]));
+						}
+						else
+						{
+							return null;
+						}
+					}
+
+					string finalLang = string.Join("+", availableLangs);
+
+					using (var engine = new Tesseract.TesseractEngine(tessdataPath, finalLang, Tesseract.EngineMode.Default))
+					using (var img = Tesseract.Pix.LoadFromFile(imagePath))
+					using (var page = engine.Process(img))
+					{
+						List<OcrTextRegion> regions = new List<OcrTextRegion>();
+						double scaleX = pageSize.Width / Math.Max(1.0, targetWidth);
+						double scaleY = pageSize.Height / Math.Max(1.0, targetHeight);
+
+						using (var iter = page.GetIterator())
+						{
+							iter.Begin();
+							do
+							{
+								if (iter.TryGetBoundingBox(Tesseract.PageIteratorLevel.TextLine, out Tesseract.Rect rect))
+								{
+									string text = iter.GetText(Tesseract.PageIteratorLevel.TextLine)?.Trim() ?? "";
+									if (string.IsNullOrWhiteSpace(text))
+									{
+										continue;
+									}
+
+									double left = rect.X1 * scaleX;
+									double right = rect.X2 * scaleX;
+									double top = pageSize.Height - rect.Y1 * scaleY;
+									double bottom = pageSize.Height - rect.Y2 * scaleY;
+
+									regions.Add(new OcrTextRegion(text, left, bottom, right - left, top - bottom));
+								}
+							} while (iter.Next(Tesseract.PageIteratorLevel.TextLine));
+						}
+						return regions;
+					}
+				}
+				catch (Exception ex)
+				{
+					PdfPerfLogger.Log("Tesseract OCR failed: " + ex.Message);
+					return null;
+				}
+			});
+		}
+
+		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
 		private async Task<List<OcrTextRegion>?> RecognizeOcrRegionsAsync(int pageNumber)
 		{
 			if (_documentHandle == IntPtr.Zero || !TryGetPageSize(pageNumber, out Size pageSize))
@@ -374,6 +467,13 @@ namespace PdfViewerApp
 				{
 					encoder.Save(fileStream);
 				}
+
+				var tesseractRegions = await RunTesseractOcrAsync(imagePath, pageSize, targetWidth, targetHeight);
+				if (tesseractRegions != null && tesseractRegions.Count > 0)
+				{
+					return tesseractRegions;
+				}
+
 				AppPreferences preferences = AppPreferences.Load();
 				OcrEngine? engine = null;
 				if (!string.IsNullOrEmpty(preferences.OcrLanguage))

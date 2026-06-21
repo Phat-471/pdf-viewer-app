@@ -148,6 +148,22 @@ namespace PdfViewerApp.Services.Cache
 			}
 		}
 
+		public BitmapSource? FindAnyCachedBitmapForPage(int pageNumber, bool isThumbnail)
+		{
+			string prefix = isThumbnail ? $"thumb:{pageNumber}:" : $"page:{pageNumber}:";
+			lock (_bitmapCache)
+			{
+				foreach (var kvp in _bitmapCache)
+				{
+					if (kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+					{
+						return kvp.Value;
+					}
+				}
+			}
+			return null;
+		}
+
 		private void TrimBitmapCache()
 		{
 			while (_bitmapCacheBytes > _maxBitmapCacheBytes && _bitmapCacheOrder.Last != null)

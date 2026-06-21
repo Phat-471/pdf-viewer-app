@@ -349,6 +349,10 @@ public partial class PdfDocumentTab
 					Height = num2,
 					HorizontalAlignment = HorizontalAlignment.Center
 				};
+				if (_cacheManager.FindAnyCachedBitmapForPage(pageNumber, isThumbnail: false) is BitmapSource placeholder)
+				{
+					image.Source = placeholder;
+				}
 				RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
 				Canvas canvas = new Canvas
 				{
@@ -712,6 +716,7 @@ public partial class PdfDocumentTab
 			UpdateThumbnailSelectionVisuals();
 			RecordRecentPage(SelectedPageNumber);
 			RefreshBookmarksPanel();
+			StartProgressivePagePrefetchAsync(_renderGeneration, SelectedPageNumber);
 		}
 		QueuePageRender(SelectedPageNumber, 0, _renderGeneration);
 		bool highCostRender = IsHighCostRenderZoom();

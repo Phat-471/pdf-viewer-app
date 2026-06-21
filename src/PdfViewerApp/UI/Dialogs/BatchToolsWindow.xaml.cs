@@ -37,6 +37,9 @@ namespace PdfViewerApp
 			CompressOutputDirTextBox.Text = _selectedFolder;
 			ExtractOutputDirTextBox.Text = _selectedFolder;
 			MergeOutputDirTextBox.Text = _selectedFolder;
+			WatermarkOutputDirTextBox.Text = _selectedFolder;
+			SecurityOutputDirTextBox.Text = _selectedFolder;
+			ConvertOutputDirTextBox.Text = _selectedFolder;
 		}
 
 		private void UpdatePlaceholderVisibility()
@@ -142,19 +145,31 @@ namespace PdfViewerApp
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-				if (files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
+				if (files.Any(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
+				                   f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+				                   f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+				                   f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+				                   Directory.Exists(f)))
 				{
+					FileListBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(20, 184, 166)); // Emerald green highlight
 					e.Effects = DragDropEffects.Copy;
 					e.Handled = true;
 					return;
 				}
 			}
+			FileListBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // Red for invalid files
 			e.Effects = DragDropEffects.None;
 			e.Handled = true;
 		}
 
+		private void Window_DragLeave(object sender, DragEventArgs e)
+		{
+			FileListBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)); // Reset to slate
+		}
+
 		private async void Window_Drop(object sender, DragEventArgs e)
 		{
+			FileListBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)); // Reset
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -166,8 +181,8 @@ namespace PdfViewerApp
 		{
 			OpenFileDialog openFileDialog = new OpenFileDialog
 			{
-				Filter = "PDF documents (*.pdf)|*.pdf",
-				Title = "Chọn các file PDF",
+				Filter = "All supported files (*.pdf;*.jpg;*.jpeg;*.png)|*.pdf;*.jpg;*.jpeg;*.png|PDF documents (*.pdf)|*.pdf|Image files (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png",
+				Title = "Chọn các file PDF hoặc Hình ảnh",
 				Multiselect = true
 			};
 			if (openFileDialog.ShowDialog() == true)
@@ -178,11 +193,41 @@ namespace PdfViewerApp
 
 		private async Task AddPdfFilesAsync(string[] paths)
 		{
-			var pdfFiles = paths.Where(p => p.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && File.Exists(p)).ToList();
-			if (pdfFiles.Count == 0) return;
+			var validFiles = new List<string>();
+			await Task.Run(() =>
+			{
+				foreach (var path in paths)
+				{
+					if (File.Exists(path))
+					{
+						if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
+						    path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+						    path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+						    path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+						{
+							validFiles.Add(path);
+						}
+					}
+					else if (Directory.Exists(path))
+					{
+						try
+						{
+							var filesInDir = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
+								.Where(f => f.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ||
+								            f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+								            f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+								            f.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
+							validFiles.AddRange(filesInDir);
+						}
+						catch { }
+					}
+				}
+			});
+
+			if (validFiles.Count == 0) return;
 
 			OverallStatusText.Text = $"Đang đọc thông tin tệp...";
-			foreach (var path in pdfFiles)
+			foreach (var path in validFiles)
 			{
 				if (Files.Any(f => string.Equals(f.FilePath, path, StringComparison.OrdinalIgnoreCase)))
 					continue;
@@ -194,12 +239,18 @@ namespace PdfViewerApp
 				}
 				catch { }
 
+				bool isImage = !path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
 				var newItem = new BatchToolFileItem
 				{
 					FilePath = path,
 					SizeBytes = sizeBytes,
-					Status = "Đang tải số trang..."
+					Status = isImage ? "Sẵn sàng" : "Đang tải số trang..."
 				};
+				if (isImage)
+				{
+					newItem.PageCount = 1;
+				}
 				Files.Add(newItem);
 			}
 
@@ -213,6 +264,7 @@ namespace PdfViewerApp
 				foreach (var item in Files.ToList())
 				{
 					if (item.PageCount > 0) continue;
+					if (!item.FilePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) continue;
 
 					int pages = 0;
 					bool success = false;
@@ -245,7 +297,7 @@ namespace PdfViewerApp
 				}
 			});
 
-			OverallStatusText.Text = $"Đã nạp thêm {pdfFiles.Count} tệp.";
+			OverallStatusText.Text = $"Đã nạp thêm {validFiles.Count} tệp.";
 		}
 
 		private void RemoveFile_Click(object sender, RoutedEventArgs e)
@@ -331,6 +383,9 @@ namespace PdfViewerApp
 				CompressOutputDirTextBox.Text = _selectedFolder;
 				ExtractOutputDirTextBox.Text = _selectedFolder;
 				MergeOutputDirTextBox.Text = _selectedFolder;
+				WatermarkOutputDirTextBox.Text = _selectedFolder;
+				SecurityOutputDirTextBox.Text = _selectedFolder;
+				ConvertOutputDirTextBox.Text = _selectedFolder;
 			}
 		}
 
@@ -383,6 +438,18 @@ namespace PdfViewerApp
 				else if (selectedTab.Header.ToString() == "Gộp File")
 				{
 					await StartMergeFlowAsync(token);
+				}
+				else if (selectedTab.Header.ToString() == "Đóng Dấu")
+				{
+					await StartWatermarkFlowAsync(token);
+				}
+				else if (selectedTab.Header.ToString() == "Bảo Mật")
+				{
+					await StartSecurityFlowAsync(token);
+				}
+				else if (selectedTab.Header.ToString() == "Chuyển Đổi")
+				{
+					await StartConvertFlowAsync(token);
 				}
 			}
 			catch (OperationCanceledException)
@@ -831,6 +898,264 @@ namespace PdfViewerApp
 
 			MergeFileNameTextBox.IsEnabled = enabled;
 			MergeBrowseBtn.IsEnabled = enabled;
+
+			WatermarkTextTextBox.IsEnabled = enabled;
+			WatermarkFontSizeTextBox.IsEnabled = enabled;
+			WatermarkOpacitySlider.IsEnabled = enabled;
+			WatermarkAngleComboBox.IsEnabled = enabled;
+			WatermarkColorComboBox.IsEnabled = enabled;
+			WatermarkBrowseBtn.IsEnabled = enabled;
+
+			SecurityActionComboBox.IsEnabled = enabled;
+			SecurityUserPasswordTextBox.IsEnabled = enabled;
+			bool isEncrypt = SecurityActionComboBox == null || SecurityActionComboBox.SelectedIndex == 0;
+			SecurityOwnerPasswordTextBox.IsEnabled = enabled && isEncrypt;
+			SecurityAllowPrintCheckBox.IsEnabled = enabled && isEncrypt;
+			SecurityAllowCopyCheckBox.IsEnabled = enabled && isEncrypt;
+			SecurityBrowseBtn.IsEnabled = enabled;
+
+			ConvertDirectionComboBox.IsEnabled = enabled;
+			ConvertBrowseBtn.IsEnabled = enabled;
+		}
+
+		private async Task StartWatermarkFlowAsync(CancellationToken token)
+		{
+			string text = WatermarkTextTextBox.Text;
+			if (string.IsNullOrEmpty(text))
+			{
+				MessageBox.Show(this, "Vui lòng nhập nội dung đóng dấu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+				return;
+			}
+			if (!double.TryParse(WatermarkFontSizeTextBox.Text, out double fontSize) || fontSize <= 0)
+			{
+				fontSize = 48;
+			}
+			double opacity = WatermarkOpacitySlider.Value;
+			double angle = double.Parse((WatermarkAngleComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "45");
+			string colorTag = (WatermarkColorComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "128,128,128";
+			var rgbParts = colorTag.Split(',');
+			double r = double.Parse(rgbParts[0]) / 255.0;
+			double g = double.Parse(rgbParts[1]) / 255.0;
+			double b = double.Parse(rgbParts[2]) / 255.0;
+
+			for (int i = 0; i < Files.Count; i++)
+			{
+				token.ThrowIfCancellationRequested();
+				var fileItem = Files[i];
+				fileItem.Status = "Đang đóng dấu...";
+				OverallStatusText.Text = $"Đang xử lý tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
+
+				string outPath = Path.Combine(_selectedFolder, $"watermarked_{fileItem.FileName}");
+				bool success = false;
+
+				await Task.Run(() =>
+				{
+					try
+					{
+						success = PdfInterop.PdfCore.add_pdf_watermark(fileItem.FilePath, text, angle, opacity, fontSize, r, g, b, outPath);
+					}
+					catch (OperationCanceledException)
+					{
+						throw;
+					}
+					catch { }
+				});
+
+				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
+				OverallProgressBar.Value = i + 1;
+			}
+
+			OverallStatusText.Text = "Đã hoàn thành đóng dấu tất cả tệp!";
+			MessageBox.Show(this, "Hoàn tất đóng dấu hàng loạt!", "Đóng dấu PDF", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		private async Task StartSecurityFlowAsync(CancellationToken token)
+		{
+			string action = (SecurityActionComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Encrypt";
+			string userPwd = SecurityUserPasswordTextBox.Text;
+			string ownerPwd = SecurityOwnerPasswordTextBox.Text;
+			bool allowPrint = SecurityAllowPrintCheckBox.IsChecked == true;
+			bool allowCopy = SecurityAllowCopyCheckBox.IsChecked == true;
+
+			if (action == "Encrypt" && string.IsNullOrEmpty(userPwd) && string.IsNullOrEmpty(ownerPwd))
+			{
+				MessageBox.Show(this, "Vui lòng điền mật khẩu mở hoặc quản trị.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+				return;
+			}
+
+			for (int i = 0; i < Files.Count; i++)
+			{
+				token.ThrowIfCancellationRequested();
+				var fileItem = Files[i];
+				fileItem.Status = action == "Encrypt" ? "Đang mã hóa..." : "Đang gỡ bảo mật...";
+				OverallStatusText.Text = $"Đang xử lý tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
+
+				string prefix = action == "Encrypt" ? "secured_" : "unsecured_";
+				string outPath = Path.Combine(_selectedFolder, $"{prefix}{fileItem.FileName}");
+				bool success = false;
+
+				await Task.Run(() =>
+				{
+					try
+					{
+						if (action == "Encrypt")
+						{
+							using (var document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify))
+							{
+								var securitySettings = document.SecuritySettings;
+								if (!string.IsNullOrEmpty(userPwd))
+									securitySettings.UserPassword = userPwd;
+								if (!string.IsNullOrEmpty(ownerPwd))
+									securitySettings.OwnerPassword = ownerPwd;
+
+								securitySettings.PermitPrint = allowPrint;
+								securitySettings.PermitExtractContent = allowCopy;
+								
+								document.Save(outPath);
+								success = true;
+							}
+						}
+						else
+						{
+							PdfSharp.Pdf.PdfDocument document = null;
+							try
+							{
+								document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, userPwd, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+							}
+							catch
+							{
+								if (!string.IsNullOrEmpty(ownerPwd))
+								{
+									document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, ownerPwd, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+								}
+								else
+								{
+									throw;
+								}
+							}
+
+							using (document)
+							{
+								using (var outDoc = new PdfSharp.Pdf.PdfDocument())
+								{
+									foreach (var page in document.Pages)
+									{
+										outDoc.AddPage(page);
+									}
+									outDoc.Save(outPath);
+									success = true;
+								}
+							}
+						}
+					}
+					catch (OperationCanceledException)
+					{
+						throw;
+					}
+					catch { }
+				});
+
+				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
+				OverallProgressBar.Value = i + 1;
+			}
+
+			OverallStatusText.Text = action == "Encrypt" ? "Đã hoàn thành bảo mật tất cả tệp!" : "Đã hoàn thành gỡ bảo mật tất cả tệp!";
+			MessageBox.Show(this, action == "Encrypt" ? "Hoàn tất bảo mật hàng loạt!" : "Hoàn tất gỡ bỏ bảo mật hàng loạt!", "Bảo mật PDF", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+
+		private async Task StartConvertFlowAsync(CancellationToken token)
+		{
+			string direction = (ConvertDirectionComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "PdfToImage";
+
+			if (direction == "PdfToImage")
+			{
+				for (int i = 0; i < Files.Count; i++)
+				{
+					token.ThrowIfCancellationRequested();
+					var fileItem = Files[i];
+					fileItem.Status = "Đang trích xuất ảnh...";
+					OverallStatusText.Text = $"Đang trích xuất tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
+
+					string subFolder = Path.Combine(_selectedFolder, Path.GetFileNameWithoutExtension(fileItem.FileName) + "_images");
+					try
+					{
+						if (!Directory.Exists(subFolder))
+							Directory.CreateDirectory(subFolder);
+					}
+					catch { }
+
+					int count = -1;
+					await Task.Run(() =>
+					{
+						try
+						{
+							count = PdfInterop.PdfCore.extract_pdf_images(fileItem.FilePath, subFolder);
+						}
+						catch (OperationCanceledException)
+						{
+							throw;
+						}
+						catch { }
+					});
+
+					fileItem.Status = count >= 0 ? $"Thành công ({count} ảnh)" : "Lỗi trích xuất";
+					OverallProgressBar.Value = i + 1;
+				}
+				OverallStatusText.Text = "Đã hoàn thành trích xuất ảnh!";
+				MessageBox.Show(this, "Hoàn tất trích xuất ảnh hàng loạt!", "Chuyển đổi", MessageBoxButton.OK, MessageBoxImage.Information);
+			}
+			else
+			{
+				// Convert Image to PDF
+				for (int i = 0; i < Files.Count; i++)
+				{
+					token.ThrowIfCancellationRequested();
+					var fileItem = Files[i];
+					if (fileItem.FilePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+					{
+						continue;
+					}
+
+					fileItem.Status = "Đang chuyển đổi...";
+					OverallStatusText.Text = $"Đang chuyển đổi {i + 1}/{Files.Count}: {fileItem.FileName}...";
+
+					string outPath = Path.Combine(_selectedFolder, Path.GetFileNameWithoutExtension(fileItem.FileName) + ".pdf");
+					bool success = false;
+
+					await Task.Run(() =>
+					{
+						try
+						{
+							using (var doc = new PdfSharp.Pdf.PdfDocument())
+							{
+								var page = doc.AddPage();
+								using (var xImage = PdfSharp.Drawing.XImage.FromFile(fileItem.FilePath))
+								{
+									page.Width = PdfSharp.Drawing.XUnit.FromPoint(xImage.PointWidth);
+									page.Height = PdfSharp.Drawing.XUnit.FromPoint(xImage.PointHeight);
+
+									using (var gfx = PdfSharp.Drawing.XGraphics.FromPdfPage(page))
+									{
+										gfx.DrawImage(xImage, 0, 0, page.Width.Point, page.Height.Point);
+									}
+								}
+								doc.Save(outPath);
+								success = true;
+							}
+						}
+						catch (OperationCanceledException)
+						{
+							throw;
+						}
+						catch { }
+					});
+
+					fileItem.Status = success ? "Thành công" : "Lỗi chuyển đổi";
+					OverallProgressBar.Value = i + 1;
+				}
+				OverallStatusText.Text = "Đã hoàn thành chuyển đổi ảnh sang PDF!";
+				MessageBox.Show(this, "Hoàn tất chuyển đổi ảnh sang PDF!", "Chuyển đổi", MessageBoxButton.OK, MessageBoxImage.Information);
+			}
 		}
 
 		private bool TryParsePageRange(string text, int pageCount, out int start, out int end)
@@ -866,6 +1191,27 @@ namespace PdfViewerApp
 			}
 
 			return false;
+		}
+
+		private void SecurityActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (SecurityActionComboBox == null || SecurityOwnerPasswordTextBox == null || SecurityAllowPrintCheckBox == null || SecurityAllowCopyCheckBox == null)
+				return;
+
+			string action = (SecurityActionComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Encrypt";
+			if (action == "Decrypt")
+			{
+				SecurityOwnerPasswordTextBox.Text = string.Empty;
+				SecurityOwnerPasswordTextBox.IsEnabled = false;
+				SecurityAllowPrintCheckBox.IsEnabled = false;
+				SecurityAllowCopyCheckBox.IsEnabled = false;
+			}
+			else
+			{
+				SecurityOwnerPasswordTextBox.IsEnabled = true;
+				SecurityAllowPrintCheckBox.IsEnabled = true;
+				SecurityAllowCopyCheckBox.IsEnabled = true;
+			}
 		}
 	}
 

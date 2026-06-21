@@ -32,12 +32,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="PdfSharp" Version="6.1.1" />
-    <PackageReference Include="Obfuscar" Version="2.2.38" GeneratePathProperty="true">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
+     <PackageReference Include="PdfSharp" Version="6.1.1" />
+     <PackageReference Include="Obfuscar" Version="2.2.38" GeneratePathProperty="true">
+       <PrivateAssets>all</PrivateAssets>
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+     </PackageReference>
+     <PackageReference Include="Tesseract" Version="5.2.0" />
+   </ItemGroup>
   <Target Name="Obfuscate" AfterTargets="AfterBuild" Condition=" '$(Configuration)' == 'Release' ">
     <PropertyGroup>
       <ObfuscarExe>$(PkgObfuscar)\tools\Obfuscar.Console.exe</ObfuscarExe>

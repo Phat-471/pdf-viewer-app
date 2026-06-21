@@ -10,7 +10,8 @@
         FontFamily="Segoe UI, Tahoma, Helvetica"
         AllowDrop="True"
         Drop="Window_Drop"
-        DragOver="Window_DragOver">
+        DragOver="Window_DragOver"
+        DragLeave="Window_DragLeave">
   <Window.Resources>
     <ResourceDictionary>
       <!-- Premium Button Style -->
@@ -275,7 +276,7 @@
         </Grid.RowDefinitions>
 
         <!-- Drop area / ListView container -->
-        <Border BorderBrush="#334155" BorderThickness="1.5" CornerRadius="8" Background="#1E293B">
+        <Border Name="FileListBorder" BorderBrush="#334155" BorderThickness="1.5" CornerRadius="8" Background="#1E293B">
           <Grid>
             <!-- Drop files hint -->
             <StackPanel Name="DropPlaceholder" VerticalAlignment="Center" HorizontalAlignment="Center" Panel.ZIndex="1" IsHitTestVisible="False">
@@ -538,6 +539,140 @@
                   </Grid.ColumnDefinitions>
                   <TextBox Name="MergeOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
                   <Button Name="MergeBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 6: WATERMARK -->
+          <TabItem Header="Đóng Dấu">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Đóng Dấu Bản Quyền Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Watermark Text -->
+                <TextBlock Text="Nội dung đóng dấu (Watermark Text)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="WatermarkTextTextBox" Text="CONFIDENTIAL" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
+
+                <!-- Font Size -->
+                <TextBlock Text="Cỡ chữ (Font Size)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="WatermarkFontSizeTextBox" Text="48" Style="{StaticResource ModernTextBox}" Height="32" Width="100" HorizontalAlignment="Left" Margin="0,0,0,16" KeyDown="NumberValidation_KeyDown" TextAlignment="Center" />
+
+                <!-- Opacity -->
+                <TextBlock Text="Độ mờ (Opacity: 0.1 - 1.0)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <Slider Name="WatermarkOpacitySlider" Minimum="0.1" Maximum="1.0" Value="0.3" SmallChange="0.05" LargeChange="0.1" Grid.Column="0" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding ElementName=WatermarkOpacitySlider, Path=Value, StringFormat={}{0:0.00}}" Foreground="#38BDF8" FontWeight="Bold" FontSize="14" Width="50" TextAlignment="Right" Grid.Column="1" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Angle -->
+                <TextBlock Text="Góc xoay (độ)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="WatermarkAngleComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="1">
+                  <ComboBoxItem Content="Ngang (0°)" Tag="0" />
+                  <ComboBoxItem Content="Chéo (45°)" Tag="45" />
+                  <ComboBoxItem Content="Dọc (90°)" Tag="90" />
+                  <ComboBoxItem Content="Chéo ngược (135°)" Tag="135" />
+                </ComboBox>
+
+                <!-- Color -->
+                <TextBlock Text="Màu sắc" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="WatermarkColorComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
+                  <ComboBoxItem Content="Màu Xám (Mặc định)" Tag="128,128,128" />
+                  <ComboBoxItem Content="Màu Đỏ" Tag="239,68,68" />
+                  <ComboBoxItem Content="Màu Xanh Dương" Tag="59,130,246" />
+                  <ComboBoxItem Content="Màu Đen" Tag="0,0,0" />
+                </ComboBox>
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="WatermarkOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="WatermarkBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 7: SECURITY -->
+          <TabItem Header="Bảo Mật">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Bảo Mật &amp; Mã Hóa Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Action selection -->
+                <TextBlock Text="Hành động" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="SecurityActionComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0" SelectionChanged="SecurityActionComboBox_SelectionChanged">
+                  <ComboBoxItem Content="Mã hóa &amp; Đặt mật khẩu" Tag="Encrypt" />
+                  <ComboBoxItem Content="Gỡ bỏ mật khẩu &amp; Bảo mật" Tag="Decrypt" />
+                </ComboBox>
+
+                <!-- User Password -->
+                <TextBlock Text="Mật khẩu mở file (Đọc giả)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="SecurityUserPasswordTextBox" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
+
+                <!-- Owner Password -->
+                <TextBlock Text="Mật khẩu quản trị (Owner Password)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <TextBox Name="SecurityOwnerPasswordTextBox" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Permissions -->
+                <TextBlock Text="Thiết lập quyền truy cập (khi có mật khẩu quản trị)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <CheckBox Name="SecurityAllowPrintCheckBox" Content="Cho phép In tài liệu" IsChecked="True" Margin="0,0,0,8" />
+                <CheckBox Name="SecurityAllowCopyCheckBox" Content="Cho phép Sao chép nội dung &amp; Trích xuất" IsChecked="True" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="SecurityOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="SecurityBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
+                </Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- TAB 8: CONVERT -->
+          <TabItem Header="Chuyển Đổi">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+              <StackPanel>
+                <TextBlock Text="Chuyển Đổi Định Dạng Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+
+                <!-- Convert Direction -->
+                <TextBlock Text="Hướng chuyển đổi" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <ComboBox Name="ConvertDirectionComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
+                  <ComboBoxItem Content="Trích xuất tất cả ảnh từ PDF (PDF sang Ảnh)" Tag="PdfToImage" />
+                  <ComboBoxItem Content="Ghép các tệp ảnh thành PDF (Ảnh sang PDF)" Tag="ImageToPdf" />
+                </ComboBox>
+
+                <TextBlock Text="* Định dạng ảnh được hỗ trợ: JPG, PNG." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
+
+                <Separator Background="#334155" Margin="0,8,0,16" />
+
+                <!-- Output Folder -->
+                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                <Grid Margin="0,0,0,16">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Name="ConvertOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
+                  <Button Name="ConvertBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
                 </Grid>
               </StackPanel>
             </ScrollViewer>
