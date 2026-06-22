@@ -173,22 +173,18 @@ Write-Host "    Hiep hoi tep tin va Menu chuot phai hoan tat!" -ForegroundColor 
 # 7. Register Virtual PDF Printer
 Write-Host "`n[7/7] Dang ky may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
 $printerName = "PDF Pro - HPhat Edition"
-$portName    = "PDFPro_HPhat_Port:"
+$portName    = "PORTPROMPT:"
 $driverName  = "Microsoft Print To PDF"
 
 try {
     if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
         Remove-Printer -Name $printerName -ErrorAction SilentlyContinue
     }
-    if (Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue) {
-        Remove-PrinterPort -Name $portName -ErrorAction SilentlyContinue
-    }
 
     $driver = Get-PrinterDriver -Name $driverName -ErrorAction SilentlyContinue
     if ($driver -eq $null) {
         Write-Host "    Khong tim thay driver '$driverName'. Bo qua may in ao." -ForegroundColor DarkYellow
     } else {
-        Add-PrinterPort -Name $portName -ErrorAction SilentlyContinue
         Add-Printer -Name $printerName -DriverName $driverName -PortName $portName -ErrorAction Stop
         Write-Host "    Da cai dat may in ao: $printerName" -ForegroundColor Green
 

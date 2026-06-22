@@ -1829,15 +1829,11 @@ exit 0
 				// 2. Prepare the PowerShell commands to register printer port & printer (requires elevation)
 				string script = @"
 $printerName = 'PDF Pro - HPhat Edition'
-$portName = 'PDFPro_HPhat_Port:'
+$portName = 'PORTPROMPT:'
 $driverName = 'Microsoft Print To PDF'
 if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
     Remove-Printer -Name $printerName
 }
-if (Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue) {
-    Remove-PrinterPort -Name $portName
-}
-Add-PrinterPort -Name $portName
 Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 ";
 				string base64Script = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));

@@ -54,7 +54,7 @@ internal static class NativePdfPrinter
 
 	private const int WHITENESS = 16711778;
 
-	public static void Print(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken))
+	public static void Print(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken), double printDpi = 600.0)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		PdfPerfLogger.Log("Native PDFium print start with Parallel Rendering");
@@ -153,7 +153,7 @@ internal static class NativePdfPrinter
 							PreRenderedPage rendered;
 							if (forceRasterize)
 							{
-								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags);
+								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi);
 							}
 							else
 							{
@@ -337,7 +337,7 @@ internal static class NativePdfPrinter
 		}
 	}
 
-	public static void PrintOptimized(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken))
+	public static void PrintOptimized(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken), double printDpi = 600.0)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		PdfPerfLogger.Log("Native PDFium print (Optimized) start with Parallel Rendering");
@@ -436,7 +436,7 @@ internal static class NativePdfPrinter
 							PreRenderedPage rendered;
 							if (forceRasterize)
 							{
-								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags);
+								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi);
 							}
 							else
 							{
@@ -638,7 +638,7 @@ internal static class NativePdfPrinter
 		}
 	}
 
-	private static PreRenderedPage PreRenderPageToBitmap(nint document, int pageIndex, int copy, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags)
+	private static PreRenderedPage PreRenderPageToBitmap(nint document, int pageIndex, int copy, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, double printDpi = 600.0)
 	{
 		nint num = IntPtr.Zero;
 		lock (PdfiumEngine.SyncRoot)
@@ -660,11 +660,15 @@ internal static class NativePdfPrinter
 				num3 = PdfiumEngine.FPDF_GetPageHeight(num);
 			}
 			
-			double targetDpiX = dpiX;
-			double targetDpiY = dpiY;
+			double targetDpiX = Math.Min(dpiX, printDpi);
+			double targetDpiY = Math.Min(dpiY, printDpi);
 			
-			// Adaptive DPI: Giới hạn độ phân giải tối đa cho các trang in có kích thước điểm ảnh quá lớn để tránh spool file khổng lồ
-			double maxPrintPixels = 16000000.0; // Giới hạn ở 16 Megapixels (đủ nét cho A3 ở ~300 DPI hoặc A4 ở ~400 DPI)
+			// Adaptive DPI: Giới hạn độ phân giải tối đa dựa trên chất lượng được chọn để tránh mất nét trên bản vẽ lớn (CAD/Revit)
+			double maxPrintPixels = 16000000.0; // Mặc định 16MP cho 300 DPI
+			if (printDpi >= 1200.0) maxPrintPixels = 400000000.0;      // 400MP cho Siêu nét (1200 DPI)
+			else if (printDpi >= 600.0) maxPrintPixels = 100000000.0;  // 100MP cho Rất nét (600 DPI)
+			else if (printDpi >= 400.0) maxPrintPixels = 36000000.0;   // 36MP cho Nét (400 DPI)
+
 			double currentPrintPixels = (num2 / 72.0 * targetDpiX) * (num3 / 72.0 * targetDpiY);
 			if (currentPrintPixels > maxPrintPixels)
 			{

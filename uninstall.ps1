@@ -47,15 +47,15 @@ Write-Host "    Da xoa cac khoa registry cau hinh." -ForegroundColor Green
 # 5. Clean up Virtual Printer
 Write-Host "`n[4/4] Dang go bo may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
 $printerName = "PDF Pro - HPhat Edition"
-$portName    = "PDFPro_HPhat_Port:"
+$oldPortName = "PDFPro_HPhat_Port:"
 try {
     if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
         Remove-Printer -Name $printerName -ErrorAction Stop
         Write-Host "    Da go bo may in ao." -ForegroundColor Green
     }
-    if (Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue) {
-        Remove-PrinterPort -Name $portName -ErrorAction Stop
-        Write-Host "    Da xoa cong may in." -ForegroundColor Green
+    if (Get-PrinterPort -Name $oldPortName -ErrorAction SilentlyContinue) {
+        Remove-PrinterPort -Name $oldPortName -ErrorAction Stop
+        Write-Host "    Da xoa cong may in cu." -ForegroundColor Green
     }
 } catch {
     Write-Host "    Loi khi go bo may in ao: $($_.Exception.Message)" -ForegroundColor DarkYellow

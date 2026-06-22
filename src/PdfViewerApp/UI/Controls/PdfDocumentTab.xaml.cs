@@ -2214,10 +2214,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
 				bool reversePageOrder = optionsDialog.ReversePageOrder;
 				bool forceRasterize = optionsDialog.OptimizeCadDrawings;
+				double printDpi = optionsDialog.PrintDpi;
 				Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 				await Task.Run(delegate
 				{
-					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken);
+					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
 				});
 				nativeSubmitSw.Stop();
 				PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
@@ -2251,10 +2252,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
 				bool reversePageOrder = optionsDialog.ReversePageOrder;
 				bool forceRasterize = optionsDialog.OptimizeCadDrawings;
+				double printDpi = optionsDialog.PrintDpi;
 				Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 				await Task.Run(delegate
 				{
-					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken);
+					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
 				});
 				nativeSubmitSw.Stop();
 				PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
