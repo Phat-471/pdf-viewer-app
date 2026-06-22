@@ -198,6 +198,11 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
             return new WP_Error('limit_exceeded', 'Mã bản quyền này đã vượt quá số lượng máy cho phép kích hoạt.', array('status' => 403));
         }
 
+        // Giải phóng kích hoạt cũ của máy này trên tất cả các key khác trước khi liên kết key mới
+        $wpdb->delete($table_activations, array(
+            'machine_id' => $machine_id
+        ));
+
         // Lưu thông tin kích hoạt mới
         $wpdb->insert($table_activations, array(
             'license_id'   => $license->id,
@@ -205,7 +210,7 @@ function pdfpro_licensing_api_activate(WP_REST_Request $request) {
             'machine_name' => $machine_name,
             'activated_at' => current_time('mysql')
         ));
-        $log_entry .= "Inserted new activation record for machine_id: " . $machine_id . "\n";
+        $log_entry .= "Cleared old activations and inserted new activation record for machine_id: " . $machine_id . "\n";
     } else {
         $log_entry .= "Machine already activated\n";
     }
