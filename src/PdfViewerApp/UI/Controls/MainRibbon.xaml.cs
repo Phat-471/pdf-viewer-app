@@ -149,6 +149,8 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? RestorePreviousVersionRequested;
 
+	public event RoutedEventHandler? ShowPdfDiagnosticsRequested;
+
 	public event RoutedEventHandler? AboutRequested;
 
 	public event RoutedEventHandler? UserGuideRequested;
@@ -825,6 +827,8 @@ public partial class MainRibbon : UserControl
 	private void ShowPerformanceTrace_Click(object sender, RoutedEventArgs e) => ShowPerformanceTraceRequested?.Invoke(this, e);
 
 	private void RestorePreviousVersion_Click(object sender, RoutedEventArgs e) => RestorePreviousVersionRequested?.Invoke(this, e);
+
+	private void ShowPdfDiagnostics_Click(object sender, RoutedEventArgs e) => ShowPdfDiagnosticsRequested?.Invoke(this, e);
 
 	private void About_Click(object sender, RoutedEventArgs e) => AboutRequested?.Invoke(this, e);
 

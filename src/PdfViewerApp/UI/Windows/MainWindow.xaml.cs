@@ -132,8 +132,6 @@ public partial class MainWindow : Window, IComponentConnector
 
 			HandleStartupPdfArguments();
 			UpdateTabEmptyState();
-			EnsureDiagnosticsButtons();
-			EnsureRollbackButtonGroup();
 			LocalAiInstaller.StartInitializeBackground();
 			RefreshRecentFilesDashboard();
 			base.Dispatcher.InvokeAsync((Func<Task>)async delegate
@@ -382,116 +380,7 @@ public partial class MainWindow : Window, IComponentConnector
 		LogStatus("Sẵn sàng");
 	}
 
-	private void EnsureDiagnosticsButtons()
-	{
-		Fluent.RibbonGroupBox? diagnosticsGroup = FindRibbonGroupBoxByHeader("Trợ Giúp & Hệ Thống");
-		if (diagnosticsGroup == null)
-		{
-			return;
-		}
 
-		bool hasDiagnostics = false;
-		foreach (object item in diagnosticsGroup.Items)
-		{
-			if (item is Fluent.Button existing && string.Equals(existing.Header?.ToString(), "Chẩn đoán PDF", StringComparison.Ordinal))
-			{
-				hasDiagnostics = true;
-				break;
-			}
-		}
-
-		if (!hasDiagnostics)
-		{
-			Fluent.Button diagnosticsButton = new Fluent.Button
-			{
-				Header = "Chẩn đoán PDF",
-				Margin = new Thickness(8, 0, 8, 0)
-			};
-			diagnosticsButton.Click += ShowPdfDiagnostics_Click;
-			diagnosticsButton.LargeIcon = new TextBlock
-			{
-				FontFamily = new FontFamily("Segoe MDL2 Assets"),
-				Text = "\ue9d9", // Speedometer
-				FontSize = 32,
-				Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#38BDF8")),
-				HorizontalAlignment = HorizontalAlignment.Center
-			};
-			diagnosticsGroup.Items.Insert(0, diagnosticsButton);
-		}
-
-		bool hasRestore = false;
-		foreach (object item in diagnosticsGroup.Items)
-		{
-			if (item is Fluent.Button existing && string.Equals(existing.Header?.ToString(), "Khôi phục bản trước", StringComparison.Ordinal))
-			{
-				hasRestore = true;
-				break;
-			}
-		}
-
-		if (!hasRestore)
-		{
-			Fluent.Button restoreButton = new Fluent.Button
-			{
-				Header = "Khôi phục bản trước",
-				Margin = new Thickness(8, 0, 8, 0)
-			};
-			restoreButton.Click += RestorePreviousVersion_Click;
-			restoreButton.LargeIcon = new TextBlock
-			{
-				FontFamily = new FontFamily("Segoe MDL2 Assets"),
-				Text = "\ue72e",
-				FontSize = 32,
-				Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
-				HorizontalAlignment = HorizontalAlignment.Center
-			};
-
-			int insertIndex = Math.Min(1, diagnosticsGroup.Items.Count);
-			diagnosticsGroup.Items.Insert(insertIndex, restoreButton);
-		}
-	}
-
-	private void EnsureRollbackButtonGroup()
-	{
-		Fluent.RibbonTabItem? diagnosticsTab = FindVisualChildren<Fluent.RibbonTabItem>(this).LastOrDefault();
-		if (diagnosticsTab == null)
-		{
-			return;
-		}
-
-		if (diagnosticsTab.Groups.OfType<Fluent.RibbonGroupBox>().Any(group => group.Items.OfType<Fluent.Button>().Any(button => string.Equals(button.Header?.ToString(), "Khôi phục bản trước", StringComparison.Ordinal))))
-		{
-			return;
-		}
-
-		if (diagnosticsTab.Groups.OfType<Fluent.RibbonGroupBox>().Any(group => string.Equals(group.Header?.ToString(), "Khôi Phục", StringComparison.Ordinal)))
-		{
-			return;
-		}
-
-		Fluent.RibbonGroupBox rollbackGroup = new Fluent.RibbonGroupBox
-		{
-			Header = "Khôi Phục"
-		};
-
-		Fluent.Button restoreButton = new Fluent.Button
-		{
-			Header = "Khôi phục bản trước",
-			Margin = new Thickness(8, 0, 8, 0)
-		};
-		restoreButton.Click += RestorePreviousVersion_Click;
-		restoreButton.LargeIcon = new TextBlock
-		{
-			FontFamily = new FontFamily("Segoe MDL2 Assets"),
-			Text = "\ue72e",
-			FontSize = 32,
-			Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DC2626")),
-			HorizontalAlignment = HorizontalAlignment.Center
-		};
-
-		rollbackGroup.Items.Add(restoreButton);
-		diagnosticsTab.Groups.Add(rollbackGroup);
-	}
 
 	private Fluent.RibbonGroupBox? FindRibbonGroupBoxByHeader(string header)
 	{
@@ -3318,6 +3207,8 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.CheckLibrariesRequested += CheckLibraries_Click;
 		_mainRibbon.ActivationRequested += Activation_Click;
 		_mainRibbon.ShowPerformanceTraceRequested += ShowPerformanceTrace_Click;
+		_mainRibbon.ShowPdfDiagnosticsRequested += ShowPdfDiagnostics_Click;
+		_mainRibbon.RestorePreviousVersionRequested += RestorePreviousVersion_Click;
 		_mainRibbon.AboutRequested += About_Click;
 		_mainRibbon.UserGuideRequested += UserGuide_Click;
 		_mainRibbon.FeedbackRequested += Feedback_Click;

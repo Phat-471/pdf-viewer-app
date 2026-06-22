@@ -477,6 +477,16 @@
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
+        <fluent:Button Header="Chẩn đoán PDF" Margin="8,0,8,0" Click="ShowPdfDiagnostics_Click" ToolTip="Xem chẩn đoán chi tiết và phân tích hiệu năng của tài liệu PDF">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D9;" FontSize="32" Foreground="#38BDF8" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Khôi phục bản trước" Margin="8,0,8,0" Click="RestorePreviousVersion_Click" ToolTip="Khôi phục về phiên bản trước đó nếu gặp lỗi sau khi cập nhật">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72E;" FontSize="32" Foreground="#DC2626" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
         <fluent:Button Header="Kích Hoạt" Margin="8,0,8,0" Click="Activation_Click" ToolTip="Nhập mã bản quyền để kích hoạt toàn bộ tính năng cao cấp của phần mềm">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#D13438" HorizontalAlignment="Center" />
