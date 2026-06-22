@@ -4,29 +4,49 @@
   <DrawingImage x:Key="AppLogoImage">
     <DrawingImage.Drawing>
       <DrawingGroup>
-        <GeometryDrawing Brush="#0F172A">
+        <!-- Premium rounded gradient background plate -->
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#0B0F19" Offset="0.0"/>
+              <GradientStop Color="#1E293B" Offset="1.0"/>
+            </LinearGradientBrush>
+          </GeometryDrawing.Brush>
           <GeometryDrawing.Geometry>
             <RectangleGeometry Rect="0,0,64,64" RadiusX="18" RadiusY="18" />
           </GeometryDrawing.Geometry>
         </GeometryDrawing>
-        <GeometryDrawing Brush="#14B8A6">
+
+        <!-- Glowing outer document border -->
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#00F2FE" Offset="0.0"/>
+              <GradientStop Color="#4FACFE" Offset="1.0"/>
+            </LinearGradientBrush>
+          </GeometryDrawing.Brush>
           <GeometryDrawing.Geometry>
-            <PathGeometry Figures="M 18,12 H 45 L 52,19 V 52 H 18 Z" />
+            <PathGeometry Figures="M 18,12 C 18,12 36,12 42,12 C 45,12 48,15 48,18 V 46 C 48,49 45,52 42,52 H 18 C 15,52 12,49 12,46 V 18 C 12,15 15,12 18,12 Z M 19,15 C 17,15 15,17 15,19 V 45 C 15,47 17,49 19,49 H 41 C 43,49 45,47 45,45 V 19 C 45,17 43,15 41,15 Z" />
           </GeometryDrawing.Geometry>
         </GeometryDrawing>
-        <GeometryDrawing Brush="#E2E8F0">
+
+        <!-- Stylized luxurious letter P with gradient fill -->
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0.8,1">
+              <GradientStop Color="#2AF598" Offset="0.0"/>
+              <GradientStop Color="#009EFD" Offset="1.0"/>
+            </LinearGradientBrush>
+          </GeometryDrawing.Brush>
           <GeometryDrawing.Geometry>
-            <PathGeometry Figures="M 22,17 H 42 L 47,22 V 47 H 22 Z" />
+            <PathGeometry Figures="M 22,20 H 34 C 39,20 42,23 42,27.5 C 42,32 39,35 34,35 H 27 V 44 C 27,45 26.5,46 25.5,46 H 23.5 C 22.5,46 22,45 22,44 Z M 27,25 V 30 H 33 C 35,30 36.5,29 36.5,27.5 C 36.5,26 35,25 33,25 Z" />
           </GeometryDrawing.Geometry>
         </GeometryDrawing>
-        <GeometryDrawing Brush="#0F766E">
+
+        <!-- Diagonal gloss/light reflection -->
+        <GeometryDrawing Brush="#18FFFFFF">
           <GeometryDrawing.Geometry>
-            <PathGeometry Figures="M 26,25 C 26,20 30,17 35,17 C 41,17 45,21 45,27 C 45,32 41,36 35,36 H 31 V 45 H 26 Z" />
-          </GeometryDrawing.Geometry>
-        </GeometryDrawing>
-        <GeometryDrawing Brush="#38BDF8">
-          <GeometryDrawing.Geometry>
-            <PathGeometry Figures="M 38,40 C 44,40 49,37 52,32 C 50,39 44,46 36,49 C 31,51 27,51 23,50 C 29,46 33,42 38,40 Z" />
+            <PathGeometry Figures="M 12,18 L 48,34 V 39 L 12,23 Z" />
           </GeometryDrawing.Geometry>
         </GeometryDrawing>
       </DrawingGroup>

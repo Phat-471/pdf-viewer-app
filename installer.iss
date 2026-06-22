@@ -52,3 +52,20 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.M
 ; Default PDF Association
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "PDF Pro - {#MyAppPublisher}"; Flags: uninsdeletekey
+
+; Define ProgID for PDF files
+Root: HKCU; Subkey: "Software\Classes\PDFPro.PDF"; ValueType: string; ValueName: ""; ValueData: "PDF Document"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\PDFPro.PDF\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\PDFPro.PDF\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+
+; Associate PDF extension with our ProgID under OpenWithProgids
+Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.PDF"; Flags: uninsdeletevalue
+
+; Modern Windows Default App Capabilities Registration
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "PDF Pro"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Bộ công cụ xem và xử lý PDF chuyên nghiệp"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".pdf"; ValueData: "PDFPro.PDF"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "PDF Pro"; ValueData: "Software\PDFPro\Capabilities"; Flags: uninsdeletevalue
+
+; Open With list support
+Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
