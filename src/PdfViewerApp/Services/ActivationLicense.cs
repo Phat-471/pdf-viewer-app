@@ -264,6 +264,7 @@ internal static class ActivationLicense
 				LastOnlineCheckTime = DateTimeOffset.Now
 			};
 
+			DeactivateOldLicenseIfDifferent(normalizedKey);
 			SaveRecord(record);
 			_isOfflineDetected = false;
 			return (Success: true, Message: "Đã kích hoạt bản quyền ngoại tuyến thành công!");
@@ -316,6 +317,7 @@ internal static class ActivationLicense
 					LastOnlineCheckTime = DateTimeOffset.Now
 				};
 
+				DeactivateOldLicenseIfDifferent(key);
 				SaveRecord(record);
 				_isOfflineDetected = false;
 				return (Success: true, Message: "Đã kích hoạt bản quyền thành công!");
@@ -369,6 +371,43 @@ internal static class ActivationLicense
 		{
 			File.Delete(LicensePath);
 		}
+	}
+
+	private static void DeactivateOldLicenseIfDifferent(string newKey)
+	{
+		try
+		{
+			if (File.Exists(LicensePath))
+			{
+				ActivationRecord oldRecord = LoadRecord();
+				if (oldRecord != null && !string.IsNullOrEmpty(oldRecord.ActivationKey))
+				{
+					string normOld = NormalizeKey(oldRecord.ActivationKey);
+					string normNew = NormalizeKey(newKey);
+					if (normOld != normNew)
+					{
+						string oldKey = oldRecord.ActivationKey;
+						_ = Task.Run(async delegate
+						{
+							try
+							{
+								var client = HttpHelper.Client;
+								using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
+								var payload = new Dictionary<string, string>
+								{
+									{ "license_key", oldKey },
+									{ "machine_id", MachineId }
+								};
+								StringContent content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+								await client.PostAsync(ApiDeactivateUrl, content, cts.Token);
+							}
+							catch {}
+						});
+					}
+				}
+			}
+		}
+		catch {}
 	}
 
 	public static string GenerateActivationKeyForMachine(string machineId)
