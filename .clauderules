@@ -24,3 +24,14 @@ Whenever you finish modifying the codebase (adding features, fixing bugs, or upd
      git push origin "v[New Version]"
      ```
      *(Pushing the tag is critical because it triggers the GitHub Actions CI/CD to build and publish the release to the update server).*
+
+## Context & Token Optimization Rules
+
+To prevent bloating the context window and wasting prompt tokens, you MUST adhere to the following rules:
+1. **Never read entire large files**: When viewing files over 200 lines (e.g., `MainWindow.xaml.cs` or `PdfDocumentTab.xaml.cs`), always use line-bounded reads (e.g., `view_file` with specific `StartLine` and `EndLine` parameters) to only fetch the exact range you need.
+2. **Use search tools instead of directory scans**: Do not recursively read full directories. Use `grep_search` to find exact patterns, files, or method references.
+3. **Strictly ignore build and package artifacts**: Never index or read files inside:
+   - `bin/`, `obj/`, `target/`
+   - `releases/`, `publish/`
+   - `backups/`, `publish_settings.json`
+4. **Be extremely concise**: Keep your explanations brief and direct. Do not write essay-like summaries, and do not duplicate code snippets inside your chat responses if they are already in the file system. Refer to them using file links.
