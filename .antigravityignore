@@ -1,0 +1,16 @@
+# Antigravity Ignore Rules
+# Ignore build, binaries, package folders, and temporary files to optimize context tokens.
+
+bin/
+obj/
+target/
+releases/
+publish/
+backups/
+libs/
+*.zip
+*.log
+*.exe
+*.lnk
+*update-manifest.json
+*update-package-summary.md
