@@ -2103,204 +2103,213 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}, DispatcherPriority.Background);
 		try
 		{
-			PrintDialog printDialog = new PrintDialog();
-			if (optionsDialog.SelectedPrintQueue != null)
+			var selectedQueue = optionsDialog.SelectedPrintQueue;
+			if (selectedQueue == null)
 			{
-				printDialog.PrintQueue = optionsDialog.SelectedPrintQueue;
+				throw new InvalidOperationException("Vui lòng chọn máy in hợp lệ.");
 			}
-			printDialog.PrintTicket = optionsDialog.SelectedPrintTicket ?? printDialog.PrintQueue.UserPrintTicket ?? printDialog.PrintQueue.DefaultPrintTicket ?? new PrintTicket();
-			printDialog.PrintTicket.CopyCount = optionsDialog.Copies;
+
+			// Capture options from UI thread
+			var baseTicket = optionsDialog.SelectedPrintTicket ?? selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket ?? new PrintTicket();
+			int copies = optionsDialog.Copies;
 			PageMediaSize pageMediaSize = optionsDialog.CreatePageMediaSize();
-			if (pageMediaSize != null)
-			{
-				printDialog.PrintTicket.PageMediaSize = pageMediaSize;
-			}
 			PageOrientation? pageOrientation = optionsDialog.CreatePageOrientation();
-			if (pageOrientation.HasValue)
-			{
-				printDialog.PrintTicket.PageOrientation = pageOrientation;
-			}
-			ApplyRequestedPageResolution(printDialog.PrintTicket, optionsDialog.PrintDpi);
-			PrintCapabilities printCapabilities = printDialog.PrintQueue.GetPrintCapabilities(printDialog.PrintTicket);
-			PrinterPrintProfile printerProfile = PrinterPrintProfile.Resolve(printDialog.PrintQueue);
-			PdfPerfLogger.Log("Profile: " + printerProfile.Name);
+			double printDpi = optionsDialog.PrintDpi;
+			string printEngineMode = optionsDialog.PrintEngineMode;
 			string printOffsetMode = optionsDialog.PrintOffsetMode;
-			bool flag = printOffsetMode == "WpfOffset" || (!(printOffsetMode == "Physical") && printerProfile.DriverAlreadyOffsetsPrintableArea);
-			bool driverAlreadyOffsetsPrintableArea = flag;
-			PdfPerfLogger.Log("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
-			PdfPerfLogger.Log("Tệp đang in: " + CurrentPdfPath);
-			PdfPerfLogger.Log("Máy in mục tiêu: " + printDialog.PrintQueue.FullName);
-			PdfPerfLogger.Log($"Số bản in (Copies): {optionsDialog.Copies}");
-			PdfPerfLogger.Log($"Trang bắt đầu: {optionsDialog.StartPageIndex + 1}, Trang kết thúc: {optionsDialog.EndPageIndex + 1}");
-			PdfPerfLogger.Log($"Tự động căn giữa (AutoCenter): {optionsDialog.AutoCenter}, Khớp khổ giấy (FitToPrintableArea): {optionsDialog.FitToPrintableArea}");
-			PdfPerfLogger.Log($"Hướng xoay giấy: {pageOrientation}");
-			PdfPerfLogger.Log($"Khổ giấy đã chọn: {pageMediaSize?.PageMediaSizeName} (Rộng: {pageMediaSize?.Width} x Cao: {pageMediaSize?.Height})");
-			PdfPerfLogger.Log($"DPI in đã chọn: {optionsDialog.PrintDpi}; PrintTicket.PageResolution={printDialog.PrintTicket.PageResolution?.X}x{printDialog.PrintTicket.PageResolution?.Y}");
-			PdfPerfLogger.Log("Chế độ in đã chọn: " + optionsDialog.PrintEngineMode);
-			PdfPerfLogger.Log($"Native separate page jobs: {optionsDialog.NativeSeparatePageJobs}");
-			PdfPerfLogger.Log($"Reverse page order: {optionsDialog.ReversePageOrder}");
-			PdfDocumentPaginator paginator = new PdfDocumentPaginator(CurrentPdfPath);
-			paginator.Annotations.AddRange(Annotations);
-			paginator.StartPage = optionsDialog.StartPageIndex;
-			paginator.EndPage = optionsDialog.EndPageIndex;
-			paginator.AutoCenter = optionsDialog.AutoCenter;
-			paginator.FitToPrintableArea = optionsDialog.FitToPrintableArea;
-			paginator.PrintDpi = optionsDialog.PrintDpi;
-			paginator.ReversePageOrder = optionsDialog.ReversePageOrder;
-			paginator.PrintProgress = printProgress;
-			paginator.BottomSafetyPadding = printerProfile.BottomSafetyPadding;
-			paginator.RightSafetyPadding = printerProfile.RightSafetyPadding;
-			paginator.DriverAlreadyOffsetsPrintableArea = driverAlreadyOffsetsPrintableArea;
-			paginator.PrintTestFrame = optionsDialog.PrintTestFrame;
-			if (optionsDialog.PrintTestFrame)
+			bool printTestFrame = optionsDialog.PrintTestFrame;
+			int startPageIndex = optionsDialog.StartPageIndex;
+			int endPageIndex = optionsDialog.EndPageIndex;
+			bool fitToPrintableArea = optionsDialog.FitToPrintableArea;
+			bool autoCenter = optionsDialog.AutoCenter;
+			bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
+			bool reversePageOrder = optionsDialog.ReversePageOrder;
+			bool forceRasterize = optionsDialog.OptimizeCadDrawings;
+			var annotationsList = Annotations.ToList();
+
+			await Task.Run(async delegate
 			{
-				paginator.StartPage = 0;
-				paginator.EndPage = 0;
-				PdfPerfLogger.Log("Print test frame enabled: forcing a single diagnostic page.");
-			}
-			double num = printCapabilities.OrientedPageMediaWidth ?? pageMediaSize?.Width ?? printDialog.PrintableAreaWidth;
-			double num2 = printCapabilities.OrientedPageMediaHeight ?? pageMediaSize?.Height ?? printDialog.PrintableAreaHeight;
-			if (pageOrientation == PageOrientation.Landscape)
-			{
-				double num3 = Math.Max(num, num2);
-				double num4 = Math.Min(num, num2);
-				num = num3;
-				num2 = num4;
-			}
-			else if (pageOrientation == PageOrientation.Portrait)
-			{
-				double num5 = Math.Min(num, num2);
-				double num6 = Math.Max(num, num2);
-				num = num5;
-				num2 = num6;
-			}
-			paginator.PageSize = new Size(Math.Max(1.0, num), Math.Max(1.0, num2));
-			PdfPerfLogger.Log($"Kích thước trang đích (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
-			if (printCapabilities.PageImageableArea != null)
-			{
-				double originWidth = printCapabilities.PageImageableArea.OriginWidth;
-				double originHeight = printCapabilities.PageImageableArea.OriginHeight;
-				double value = Math.Max(0.0, num - originWidth - printCapabilities.PageImageableArea.ExtentWidth);
-				double value2 = Math.Max(0.0, num2 - originHeight - printCapabilities.PageImageableArea.ExtentHeight);
-				paginator.ImageableArea = new Rect(originWidth, originHeight, printCapabilities.PageImageableArea.ExtentWidth, printCapabilities.PageImageableArea.ExtentHeight);
-				PdfPerfLogger.Log($"Vùng in được của máy in (Raw PageImageableArea): Gốc=({originWidth}, {originHeight}) Kích thước=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
-				PdfPerfLogger.Log($"Khoảng lề biên kéo giấy tính toán: Phải={value}, Dưới={value2}");
-				PdfPerfLogger.Log($"Tọa độ vùng in truyền cho Paginator (ImageableArea): Gốc=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kích thước=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
-			}
-			if (optionsDialog.PrintEngineMode == "NativePdfium" && !optionsDialog.PrintTestFrame)
-			{
-				if (Annotations.Count > 0)
+				// 1. Cấu hình PrintTicket trên thread nền
+				printProgress.Report(new PrintProgressInfo("Đang cấu hình máy in...", 0, 0, IsIndeterminate: true));
+				PrintTicket printTicket = baseTicket.Clone();
+				printTicket.CopyCount = copies;
+				if (pageMediaSize != null)
 				{
-					PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+					printTicket.PageMediaSize = pageMediaSize;
 				}
-				PrintTicket printTicket = printDialog.PrintTicket.Clone();
-				printTicket.CopyCount = 1;
-				string queueName = printDialog.PrintQueue.FullName;
-				byte[] devModeBytes = null;
-				try
+				if (pageOrientation.HasValue)
 				{
-					using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printDialog.PrintQueue.FullName, printDialog.PrintQueue.ClientPrintSchemaVersion);
-					devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(printTicket, BaseDevModeType.UserDefault);
+					printTicket.PageOrientation = pageOrientation;
 				}
-				catch (Exception ex)
+				ApplyRequestedPageResolution(printTicket, printDpi);
+
+				// 2. Truy vấn PrintCapabilities (Get Capabilities) trên thread nền để tránh treo UI
+				printProgress.Report(new PrintProgressInfo("Đang truy vấn cấu hình máy in...", 0, 0, IsIndeterminate: true));
+				PrintCapabilities printCapabilities = selectedQueue.GetPrintCapabilities(printTicket);
+				PrinterPrintProfile printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
+				PdfPerfLogger.Log("Profile: " + printerProfile.Name);
+
+				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" || 
+					(!(printOffsetMode == "Physical") && printerProfile.DriverAlreadyOffsetsPrintableArea);
+
+				PdfPerfLogger.Log("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
+				PdfPerfLogger.Log("Tệp đang in: " + CurrentPdfPath);
+				PdfPerfLogger.Log("Máy in mục tiêu: " + selectedQueue.FullName);
+				PdfPerfLogger.Log($"Số bản in (Copies): {copies}");
+				PdfPerfLogger.Log($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
+				PdfPerfLogger.Log($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
+				PdfPerfLogger.Log($"Hướng xoay giấy: {pageOrientation}");
+				PdfPerfLogger.Log($"Khổ giấy đã chọn: {pageMediaSize?.PageMediaSizeName} (Rộng: {pageMediaSize?.Width} x Cao: {pageMediaSize?.Height})");
+				PdfPerfLogger.Log($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={printTicket.PageResolution?.X}x{printTicket.PageResolution?.Y}");
+				PdfPerfLogger.Log("Chế độ in đã chọn: " + printEngineMode);
+				PdfPerfLogger.Log($"Native separate page jobs: {separatePageJobs}");
+				PdfPerfLogger.Log($"Reverse page order: {reversePageOrder}");
+
+				double orientedWidth = printCapabilities.OrientedPageMediaWidth ?? pageMediaSize?.Width ?? 8.5 * 96.0;
+				double orientedHeight = printCapabilities.OrientedPageMediaHeight ?? pageMediaSize?.Height ?? 11.0 * 96.0;
+				if (pageOrientation == PageOrientation.Landscape)
 				{
-					PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
+					double num3 = Math.Max(orientedWidth, orientedHeight);
+					double num4 = Math.Min(orientedWidth, orientedHeight);
+					orientedWidth = num3;
+					orientedHeight = num4;
 				}
-				int startPageIndex = optionsDialog.StartPageIndex;
-				int endPageIndex = optionsDialog.EndPageIndex;
-				int copies = optionsDialog.Copies;
-				bool fitToPrintableArea = optionsDialog.FitToPrintableArea;
-				bool autoCenter = optionsDialog.AutoCenter;
-				bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
-				bool reversePageOrder = optionsDialog.ReversePageOrder;
-				bool forceRasterize = optionsDialog.OptimizeCadDrawings;
-				double printDpi = optionsDialog.PrintDpi;
-				Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-				await Task.Run(delegate
+				else if (pageOrientation == PageOrientation.Portrait)
 				{
+					double num5 = Math.Min(orientedWidth, orientedHeight);
+					double num6 = Math.Max(orientedWidth, orientedHeight);
+					orientedWidth = num5;
+					orientedHeight = num6;
+				}
+
+				if (printEngineMode == "NativePdfium" && !printTestFrame)
+				{
+					if (annotationsList.Count > 0)
+					{
+						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+					}
+					PrintTicket singleTicket = printTicket.Clone();
+					singleTicket.CopyCount = 1;
+					string queueName = selectedQueue.FullName;
+					byte[] devModeBytes = null;
+					try
+					{
+						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(selectedQueue.FullName, selectedQueue.ClientPrintSchemaVersion);
+						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
+					}
+					catch (Exception ex)
+					{
+						PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
+					}
+
+					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
-				});
-				nativeSubmitSw.Stop();
-				PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
-				progressDialog.MarkCompleted("Da gui lenh in vao may in.");
-				LogStatus("Print job sent");
-			}
-			else if (optionsDialog.PrintEngineMode == "NativePdfium_Optimized" && !optionsDialog.PrintTestFrame)
-			{
-				if (Annotations.Count > 0)
-				{
-					PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+					nativeSubmitSw.Stop();
+					PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
+					progressDialog.MarkCompleted("Da gui lenh in vao may in.");
+					LogStatus("Print job sent");
 				}
-				PrintTicket printTicket = printDialog.PrintTicket.Clone();
-				printTicket.CopyCount = 1;
-				string queueName = printDialog.PrintQueue.FullName;
-				byte[] devModeBytes = null;
-				try
+				else if (printEngineMode == "NativePdfium_Optimized" && !printTestFrame)
 				{
-					using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printDialog.PrintQueue.FullName, printDialog.PrintQueue.ClientPrintSchemaVersion);
-					devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(printTicket, BaseDevModeType.UserDefault);
-				}
-				catch (Exception ex)
-				{
-					PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
-				}
-				int startPageIndex = optionsDialog.StartPageIndex;
-				int endPageIndex = optionsDialog.EndPageIndex;
-				int copies = optionsDialog.Copies;
-				bool fitToPrintableArea = optionsDialog.FitToPrintableArea;
-				bool autoCenter = optionsDialog.AutoCenter;
-				bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
-				bool reversePageOrder = optionsDialog.ReversePageOrder;
-				bool forceRasterize = optionsDialog.OptimizeCadDrawings;
-				double printDpi = optionsDialog.PrintDpi;
-				Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-				await Task.Run(delegate
-				{
+					if (annotationsList.Count > 0)
+					{
+						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+					}
+					PrintTicket singleTicket = printTicket.Clone();
+					singleTicket.CopyCount = 1;
+					string queueName = selectedQueue.FullName;
+					byte[] devModeBytes = null;
+					try
+					{
+						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(selectedQueue.FullName, selectedQueue.ClientPrintSchemaVersion);
+						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
+					}
+					catch (Exception ex)
+					{
+						PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
+					}
+
+					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
-				});
-				nativeSubmitSw.Stop();
-				PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
-				progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
-				LogStatus("Print job sent");
-			}
-			else if (optionsDialog.PrintEngineMode == "PdfDirect")
-			{
-				string queueName = printDialog.PrintQueue.FullName;
-				string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
-				progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
-				await Task.Run(delegate
+					nativeSubmitSw.Stop();
+					PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
+					progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
+					LogStatus("Print job sent");
+				}
+				else if (printEngineMode == "PdfDirect")
 				{
+					string queueName = selectedQueue.FullName;
+					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
+					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
 					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
-				});
-				progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
-				LogStatus("Print job sent");
-			}
-			else if (optionsDialog.PrintEngineMode == "PdfDirect_Optimized")
-			{
-				string queueName = printDialog.PrintQueue.FullName;
-				string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
-				progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
-				await Task.Run(delegate
+					progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
+					LogStatus("Print job sent");
+				}
+				else if (printEngineMode == "PdfDirect_Optimized")
 				{
+					string queueName = selectedQueue.FullName;
+					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
+					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
 					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
-				});
-				progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
-				LogStatus("Print job sent");
-			}
-			else
-			{
-				PdfPerfLogger.Log("Using WPF Bitmap print pipeline.");
-				Stopwatch printSubmitSw = Stopwatch.StartNew();
-				printProgress.Report(new PrintProgressInfo("Dang gui lenh in WPF Bitmap...", 0, Math.Max(1, paginator.PageCount), IsIndeterminate: true));
-				await base.Dispatcher.InvokeAsync(delegate
+					progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
+					LogStatus("Print job sent");
+				}
+				else
 				{
-				}, DispatcherPriority.Background);
-				printDialog.PrintDocument(paginator, System.IO.Path.GetFileName(CurrentPdfPath));
-				printSubmitSw.Stop();
-				PdfPerfLogger.Log($"PrintDocument submit total: {printSubmitSw.ElapsedMilliseconds} ms");
-				progressDialog.MarkCompleted("Da gui lenh in vao may in.");
-				LogStatus("Print job sent");
-			}
+					// WPF Paginator requires UI thread for Visuals creation
+					await base.Dispatcher.InvokeAsync(delegate
+					{
+						PdfDocumentPaginator paginator = new PdfDocumentPaginator(CurrentPdfPath);
+						paginator.Annotations.AddRange(annotationsList);
+						paginator.StartPage = startPageIndex;
+						paginator.EndPage = endPageIndex;
+						paginator.AutoCenter = autoCenter;
+						paginator.FitToPrintableArea = fitToPrintableArea;
+						paginator.PrintDpi = printDpi;
+						paginator.ReversePageOrder = reversePageOrder;
+						paginator.PrintProgress = printProgress;
+						paginator.BottomSafetyPadding = printerProfile.BottomSafetyPadding;
+						paginator.RightSafetyPadding = printerProfile.RightSafetyPadding;
+						paginator.DriverAlreadyOffsetsPrintableArea = driverAlreadyOffsetsPrintableArea;
+						paginator.PrintTestFrame = printTestFrame;
+
+						if (printTestFrame)
+						{
+							paginator.StartPage = 0;
+							paginator.EndPage = 0;
+							PdfPerfLogger.Log("Print test frame enabled: forcing a single diagnostic page.");
+						}
+
+						paginator.PageSize = new Size(Math.Max(1.0, orientedWidth), Math.Max(1.0, orientedHeight));
+						PdfPerfLogger.Log($"Kích thước trang đích (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
+
+						if (printCapabilities.PageImageableArea != null)
+						{
+							double originWidth = printCapabilities.PageImageableArea.OriginWidth;
+							double originHeight = printCapabilities.PageImageableArea.OriginHeight;
+							double value = Math.Max(0.0, orientedWidth - originWidth - printCapabilities.PageImageableArea.ExtentWidth);
+							double value2 = Math.Max(0.0, orientedHeight - originHeight - printCapabilities.PageImageableArea.ExtentHeight);
+							paginator.ImageableArea = new Rect(originWidth, originHeight, printCapabilities.PageImageableArea.ExtentWidth, printCapabilities.PageImageableArea.ExtentHeight);
+							PdfPerfLogger.Log($"Vùng in được của máy in (Raw PageImageableArea): Gốc=({originWidth}, {originHeight}) Kích thước=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
+							PdfPerfLogger.Log($"Khoảng lề biên kéo giấy tính toán: Phải={value}, Dưới={value2}");
+							PdfPerfLogger.Log($"Tọa độ vùng in truyền cho Paginator (ImageableArea): Gốc=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kích thước=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
+						}
+
+						PdfPerfLogger.Log("Using WPF Bitmap print pipeline.");
+						Stopwatch printSubmitSw = Stopwatch.StartNew();
+						printProgress.Report(new PrintProgressInfo("Dang gui lenh in WPF Bitmap...", 0, Math.Max(1, paginator.PageCount), IsIndeterminate: true));
+						
+						PrintDialog printDialog = new PrintDialog();
+						printDialog.PrintQueue = selectedQueue;
+						printDialog.PrintTicket = printTicket;
+						printDialog.PrintDocument(paginator, System.IO.Path.GetFileName(CurrentPdfPath));
+						printSubmitSw.Stop();
+						PdfPerfLogger.Log($"PrintDocument submit total: {printSubmitSw.ElapsedMilliseconds} ms");
+						progressDialog.MarkCompleted("Da gui lenh in vao may in.");
+						LogStatus("Print job sent");
+					});
+				}
+			});
 		}
 		catch (OperationCanceledException)
 		{

@@ -1,6 +1,7 @@
 v1.6.0:
 - Sửa lỗi máy in ảo PDF ("PDF Pro - HPhat Edition") không xuất được file bằng cách chuyển sang cổng mặc định PORTPROMPT: và bảo vệ các cổng hệ thống khi gỡ cài đặt.
 - Nâng cấp đáng kể độ nét khi in: Tự động điều chỉnh giới hạn độ phân giải động lên tới 1200 DPI (400 Megapixels) cho các bản in chất lượng cao, giữ nguyên vẹn độ sắc nét của bản vẽ CAD/Vector lớn (A0, A1, A2) không bị răng cưa hay vỡ nét.
+- Tối ưu hóa cơ chế in: Gửi lệnh in bất đồng bộ, truy vấn thông tin Driver và chuyển đổi PrintTicket off-thread để tránh đơ treo giao diện khi bấm nút In.
 - Tách file partial PdfDocumentTab.Zoom.cs và PdfDocumentTab.Sidebar.cs để tối ưu hóa cấu trúc code.
 - Tối ưu cơ chế Obfuscar tự động xác định SDK cho mọi môi trường phát triển.
 - Sửa các cảnh báo tương thích nền tảng CA1416.
