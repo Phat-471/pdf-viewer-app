@@ -2112,6 +2112,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				throw new InvalidOperationException("Vui lòng chọn máy in hợp lệ.");
 			}
 
+			// Capture print settings/objects on UI thread to avoid thread affinity exceptions on background thread
+			var printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
+			string printerName = selectedQueue.FullName;
+			int clientSchemaVersion = selectedQueue.ClientPrintSchemaVersion;
+			var cancellationToken = progressDialog.CancellationToken;
+
 			// Capture options from UI thread
 			var baseTicket = optionsDialog.SelectedPrintTicket ?? selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket ?? new PrintTicket();
 			int copies = optionsDialog.Copies;
@@ -2148,8 +2154,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 				// 2. Truy vấn PrintCapabilities (Get Capabilities) trên thread nền để tránh treo UI
 				printProgress.Report(new PrintProgressInfo("Đang truy vấn cấu hình máy in...", 0, 0, IsIndeterminate: true));
-				PrintCapabilities printCapabilities = selectedQueue.GetPrintCapabilities(printTicket);
-				PrinterPrintProfile printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
+				PrintCapabilities printCapabilities;
+				using (var server = new LocalPrintServer())
+				using (var bgQueue = server.GetPrintQueue(printerName))
+				{
+					printCapabilities = bgQueue.GetPrintCapabilities(printTicket);
+				}
 				PdfPerfLogger.Log("Profile: " + printerProfile.Name);
 
 				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" || 
@@ -2157,7 +2167,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 				PdfPerfLogger.Log("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
 				PdfPerfLogger.Log("Tệp đang in: " + CurrentPdfPath);
-				PdfPerfLogger.Log("Máy in mục tiêu: " + selectedQueue.FullName);
+				PdfPerfLogger.Log("Máy in mục tiêu: " + printerName);
 				PdfPerfLogger.Log($"Số bản in (Copies): {copies}");
 				PdfPerfLogger.Log($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
 				PdfPerfLogger.Log($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
@@ -2193,11 +2203,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 					PrintTicket singleTicket = printTicket.Clone();
 					singleTicket.CopyCount = 1;
-					string queueName = selectedQueue.FullName;
+					string queueName = printerName;
 					byte[] devModeBytes = null;
 					try
 					{
-						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(selectedQueue.FullName, selectedQueue.ClientPrintSchemaVersion);
+						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
 						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
 					}
 					catch (Exception ex)
@@ -2206,7 +2216,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
+					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
 					PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in vao may in.");
@@ -2220,11 +2230,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 					PrintTicket singleTicket = printTicket.Clone();
 					singleTicket.CopyCount = 1;
-					string queueName = selectedQueue.FullName;
+					string queueName = printerName;
 					byte[] devModeBytes = null;
 					try
 					{
-						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(selectedQueue.FullName, selectedQueue.ClientPrintSchemaVersion);
+						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
 						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
 					}
 					catch (Exception ex)
@@ -2233,7 +2243,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, progressDialog.CancellationToken, printDpi);
+					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
 					PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
@@ -2241,19 +2251,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else if (printEngineMode == "PdfDirect")
 				{
-					string queueName = selectedQueue.FullName;
+					string queueName = printerName;
 					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
 					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
+					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, cancellationToken);
 					progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
 					LogStatus("Print job sent");
 				}
 				else if (printEngineMode == "PdfDirect_Optimized")
 				{
-					string queueName = selectedQueue.FullName;
+					string queueName = printerName;
 					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
 					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, queueName, docName, progressDialog.CancellationToken);
+					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, queueName, docName, cancellationToken);
 					progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
 					LogStatus("Print job sent");
 				}

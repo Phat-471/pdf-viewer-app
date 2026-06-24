@@ -1,3 +1,6 @@
+v1.6.5:
+- Vá lỗi nghiêm trọng (Thread Affinity Exception) khi thực hiện lệnh in trên một số dòng máy in (như Canon iX6700).
+
 v1.6.4:
 - Gộp thành công sẽ tự động mở trong cửa sổ mới, hỗ trợ lưu thủ công sau (Save As).
 - Mặc định mở file thường dưới dạng tab trên cùng một ứng dụng.
