@@ -1,3 +1,3 @@
-v1.6.1:
-- Sửa lỗi gộp file PDF bị trống hoặc lỗi cấu trúc trang.
-- Bổ sung tùy chọn làm đậm nét vẽ CAD/bản vẽ kỹ thuật trong cài đặt hệ thống.
+v1.6.2:
+- Sửa triệt để lỗi gộp PDF từ menu chuột phải.
+- Nâng cấp bộ cài tự động dọn dẹp sạch sẽ menu chuột phải cũ và ứng dụng cũ trước khi cài đặt.

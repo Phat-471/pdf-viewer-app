@@ -1,7 +1,7 @@
 ; installer.iss
 #define MyAppName "PDF Pro"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.9"
+  #define MyAppVersion "1.6.2"
 #endif
 #define MyAppPublisher "HPhat Edition"
 #define MyAppExeName "PdfViewerApp.exe"
@@ -74,3 +74,26 @@ Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueN
 
 ; Open With list support
 Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+
+[Code]
+function InitializeSetup(): Boolean;
+begin
+  // Delete all old Explorer context menu registry keys and application associations
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\Applications\PdfViewerApp.exe');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\PdfViewerApp.Document');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\PDFPro.PDF');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\.pdf\OpenWithList\PdfViewerApp.exe');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe');
+  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\PDFPro');
+
+  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids', 'PdfViewerApp.Document');
+  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids', 'PDFPro.PDF');
+  RegDeleteValue(HKCU, 'Software\Classes\.pdf\OpenWithProgids', 'PDFPro.PDF');
+  RegDeleteValue(HKCU, 'Software\RegisteredApplications', 'PDF Pro');
+
+  // Delete previous installation directory for a clean re-install
+  DelTree(ExpandConstant('{localappdata}\PDF Pro'), True, True, True);
+
+  Result := True;
+end;

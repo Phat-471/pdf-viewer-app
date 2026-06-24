@@ -35,12 +35,24 @@ Write-Host "`n[3/4] Dang xoa cau hinh Registry va Menu chuot phai..." -Foregroun
 Remove-Item -Path "HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge" -Recurse -ErrorAction SilentlyContinue
 Remove-Item -Path "HKCU:\Software\Classes\Applications\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
 Remove-Item -Path "HKCU:\Software\Classes\PdfViewerApp.Document" -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path "HKCU:\Software\Classes\PDFPro.PDF" -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path "HKCU:\Software\Classes\.pdf\OpenWithList\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
+Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
 Remove-Item -Path "HKCU:\Software\PDFPro" -Recurse -ErrorAction SilentlyContinue
 
-# Clean OpenWithProgids
+# Clean OpenWithProgids & RegisteredApplications
 $openWithProgIdsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids"
 if (Test-Path $openWithProgIdsKey) {
     Remove-ItemProperty -Path $openWithProgIdsKey -Name "PdfViewerApp.Document" -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path $openWithProgIdsKey -Name "PDFPro.PDF" -ErrorAction SilentlyContinue
+}
+$classesPdfOpenWithProgids = "HKCU:\Software\Classes\.pdf\OpenWithProgids"
+if (Test-Path $classesPdfOpenWithProgids) {
+    Remove-ItemProperty -Path $classesPdfOpenWithProgids -Name "PDFPro.PDF" -ErrorAction SilentlyContinue
+}
+$registeredAppsKey = "HKCU:\Software\RegisteredApplications"
+if (Test-Path $registeredAppsKey) {
+    Remove-ItemProperty -Path $registeredAppsKey -Name "PDF Pro" -ErrorAction SilentlyContinue
 }
 Write-Host "    Da xoa cac khoa registry cau hinh." -ForegroundColor Green
 

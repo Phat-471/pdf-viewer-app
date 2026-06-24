@@ -103,10 +103,7 @@ pub extern "C" fn merge_pdfs_with_progress(
     let mut target_objects = BTreeMap::new();
 
     for (i, mut doc) in documents.into_iter().enumerate() {
-        doc.renumber_objects_with(max_id);
-        max_id = doc.max_id + 1;
-
-        // Resolve Catalog and Pages root IDs using trailer first
+        // Resolve Catalog and Pages root IDs using trailer first (before renumbering)
         let mut catalog_id = doc.trailer.get(b"Root").and_then(|obj| obj.as_reference()).ok();
         let mut pages_id = None;
         if let Some(cat_id) = catalog_id {
@@ -129,18 +126,39 @@ pub extern "C" fn merge_pdfs_with_progress(
             }
         }
 
-        // Collect all leaf Page objects using get_pages()
+        // Collect all leaf Page objects using get_pages() BEFORE renumbering
         let pages = doc.get_pages();
+
+        // Get sorted keys of doc.objects before renumbering
+        let keys: Vec<lopdf::ObjectId> = doc.objects.keys().cloned().collect();
+
+        // Renumber objects
+        doc.renumber_objects_with(max_id);
+
+        // Map original page IDs to new renumbered page IDs
         for (_page_num, page_id) in pages {
-            pages_kids.push(Object::Reference(page_id));
+            if let Ok(idx) = keys.binary_search(&page_id) {
+                let new_page_id = (max_id + idx as u32, 0);
+                pages_kids.push(Object::Reference(new_page_id));
+            }
         }
+
+        // Map catalog and pages root to their new renumbered IDs
+        let new_catalog_id = catalog_id.and_then(|orig_id| {
+            keys.binary_search(&orig_id).ok().map(|idx| (max_id + idx as u32, 0))
+        });
+        let new_pages_id = pages_id.and_then(|orig_id| {
+            keys.binary_search(&orig_id).ok().map(|idx| (max_id + idx as u32, 0))
+        });
 
         // Add all objects to the target dictionary, except catalog and root pages
         for (id, object) in doc.objects {
-            if Some(id) != catalog_id && Some(id) != pages_id {
+            if Some(id) != new_catalog_id && Some(id) != new_pages_id {
                 target_objects.insert(id, object);
             }
         }
+
+        max_id = doc.max_id + 1;
 
         if let Some(cb) = progress_callback {
             cb((i + 1) as u32, total_files);
@@ -1612,4 +1630,75 @@ pub extern "C" fn repair_pdf(
     // 4. Save to output path - this regenerates the xref table and trailer
     doc.save(output_str).is_ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lopdf::{Document, Dictionary, Object};
+
+    fn generate_fake_document() -> Document {
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        
+        let mut font_dict = Dictionary::new();
+        font_dict.set("Type", "Font");
+        font_dict.set("Subtype", "Type1");
+        font_dict.set("BaseFont", "Courier");
+        let font_id = doc.add_object(Object::Dictionary(font_dict));
+
+        let mut font_list = Dictionary::new();
+        font_list.set("F1", font_id);
+        let mut res_dict = Dictionary::new();
+        res_dict.set("Font", Object::Dictionary(font_list));
+        let resources_id = doc.add_object(Object::Dictionary(res_dict));
+
+        let mut page_dict = Dictionary::new();
+        page_dict.set("Type", "Page");
+        page_dict.set("Parent", pages_id);
+        page_dict.set("Resources", resources_id);
+        page_dict.set("MediaBox", vec![0.into(), 0.into(), 595.into(), 842.into()]);
+        let page_id = doc.add_object(Object::Dictionary(page_dict));
+
+        let mut pages_dict = Dictionary::new();
+        pages_dict.set("Type", "Pages");
+        pages_dict.set("Kids", vec![Object::Reference(page_id)]);
+        pages_dict.set("Count", 1);
+        doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+
+        let mut catalog_dict = Dictionary::new();
+        catalog_dict.set("Type", "Catalog");
+        catalog_dict.set("Pages", Object::Reference(pages_id));
+        let catalog_id = doc.add_object(Object::Dictionary(catalog_dict));
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+
+        doc
+    }
+
+    #[test]
+    fn test_merge() {
+        let mut doc1 = generate_fake_document();
+        let mut doc2 = generate_fake_document();
+        
+        doc1.save("doc1.pdf").unwrap();
+        doc2.save("doc2.pdf").unwrap();
+
+        let paths = std::ffi::CString::new("doc1.pdf;doc2.pdf").unwrap();
+        let out = std::ffi::CString::new("merged.pdf").unwrap();
+        let success = merge_pdfs(paths.as_ptr(), out.as_ptr());
+        assert!(success);
+
+        let merged = Document::load("merged.pdf").unwrap();
+        println!("Merged objects count: {}", merged.objects.len());
+        let pages = merged.get_pages();
+        println!("Merged pages count: {}", pages.len());
+        
+        // Clean up
+        let _ = std::fs::remove_file("doc1.pdf");
+        let _ = std::fs::remove_file("doc2.pdf");
+        let _ = std::fs::remove_file("merged.pdf");
+
+        assert_eq!(pages.len(), 2);
+    }
+}
+
 
