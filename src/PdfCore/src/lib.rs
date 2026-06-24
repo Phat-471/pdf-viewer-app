@@ -106,31 +106,33 @@ pub extern "C" fn merge_pdfs_with_progress(
         doc.renumber_objects_with(max_id);
         max_id = doc.max_id + 1;
 
-        // Extract catalog and pages
-        let mut catalog_id = None;
+        // Resolve Catalog and Pages root IDs using trailer first
+        let mut catalog_id = doc.trailer.get(b"Root").and_then(|obj| obj.as_reference()).ok();
         let mut pages_id = None;
+        if let Some(cat_id) = catalog_id {
+            if let Ok(cat_dict) = doc.get_object(cat_id).and_then(|obj| obj.as_dict()) {
+                pages_id = cat_dict.get(b"Pages").and_then(|obj| obj.as_reference()).ok();
+            }
+        }
 
-        for (id, object) in doc.objects.iter() {
-            if let Ok(dict) = object.as_dict() {
-                let type_name = dict.type_name().unwrap_or("");
-                if type_name == "Catalog" {
-                    catalog_id = Some(*id);
-                } else if type_name == "Pages" {
-                    pages_id = Some(*id);
+        // Fallback search if trailer is missing Root or Pages
+        if catalog_id.is_none() || pages_id.is_none() {
+            for (id, object) in doc.objects.iter() {
+                if let Ok(dict) = object.as_dict() {
+                    let type_name = dict.type_name().unwrap_or("");
+                    if type_name == "Catalog" && catalog_id.is_none() {
+                        catalog_id = Some(*id);
+                    } else if type_name == "Pages" && pages_id.is_none() {
+                        pages_id = Some(*id);
+                    }
                 }
             }
         }
 
-        if let Some(pages_id) = pages_id {
-            if let Ok(kids_val) = doc.get_object(pages_id).and_then(|obj| obj.as_dict()).and_then(|dict| dict.get(b"Kids")) {
-                if let Ok(kids_arr) = kids_val.as_array() {
-                    for kid in kids_arr {
-                        if let Ok(ref_id) = kid.as_reference() {
-                            pages_kids.push(Object::Reference(ref_id));
-                        }
-                    }
-                }
-            }
+        // Collect all leaf Page objects using get_pages()
+        let pages = doc.get_pages();
+        for (_page_num, page_id) in pages {
+            pages_kids.push(Object::Reference(page_id));
         }
 
         // Add all objects to the target dictionary, except catalog and root pages
@@ -177,6 +179,7 @@ pub extern "C" fn merge_pdfs_with_progress(
 
     target_doc.save(output_str).is_ok()
 }
+
 
 #[no_mangle]
 pub extern "C" fn rotate_pdf_page(

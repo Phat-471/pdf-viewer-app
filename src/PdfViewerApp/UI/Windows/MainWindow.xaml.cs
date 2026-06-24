@@ -3100,13 +3100,31 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	}
 
 	/// <summary>Cập nhật cấu hình và áp dụng ngay lập tức trong thời gian thực.</summary>
-	public void UpdatePreferences(string themeName, bool allowMultipleInstances, string ocrLanguage)
+	public void UpdatePreferences(string themeName, bool allowMultipleInstances, string ocrLanguage, bool enhanceThinLines)
 	{
 		_appPreferences.ThemeName = themeName;
 		_appPreferences.AllowMultipleInstances = allowMultipleInstances;
 		_appPreferences.OcrLanguage = ocrLanguage;
+		_appPreferences.EnhanceThinLines = enhanceThinLines;
 		_appPreferences.Save();
 		SetTheme(themeName);
+
+		PdfiumEngine.EnhanceThinLines = enhanceThinLines;
+		RefreshAllTabs();
+	}
+
+	public void RefreshAllTabs()
+	{
+		if (PdfTabControl != null)
+		{
+			foreach (object item in PdfTabControl.Items)
+			{
+				if (item is TabItem tabItem && tabItem.Content is PdfDocumentTab docTab)
+				{
+					docTab.ClearCacheAndRender();
+				}
+			}
+		}
 	}
 
 	/// <summary>Preview theme ngay lập tức khi người dùng chọn trong Settings (chưa lưu).</summary>

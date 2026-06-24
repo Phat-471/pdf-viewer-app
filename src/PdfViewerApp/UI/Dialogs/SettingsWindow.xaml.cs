@@ -37,6 +37,7 @@ public partial class SettingsWindow : Window, IComponentConnector
 		SelectThemeRadio(_selectedThemeName);
 
 		AllowMultipleInstancesCheckBox.IsChecked = _preferences.AllowMultipleInstances;
+		EnhanceThinLinesCheckBox.IsChecked = _preferences.EnhanceThinLines;
 
 		OcrLanguageComboBox.Items.Clear();
 		ComboBoxItem defaultItem = new ComboBoxItem { Content = "Mặc định hệ thống", Tag = "" };
@@ -167,10 +168,12 @@ public partial class SettingsWindow : Window, IComponentConnector
 		_aiSettings.GeminiModel = string.IsNullOrWhiteSpace(geminiModel) ? "gemini-3.5-flash" : geminiModel.Trim();
 		_aiSettings.Save();
 
+		bool enhanceThinLines = EnhanceThinLinesCheckBox.IsChecked == true;
+
 		var mainWindow = System.Windows.Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
 		if (mainWindow != null)
 		{
-			mainWindow.UpdatePreferences(_selectedThemeName, allowInstances, ocrLang);
+			mainWindow.UpdatePreferences(_selectedThemeName, allowInstances, ocrLang, enhanceThinLines);
 			mainWindow.ReloadAiSettings();
 			mainWindow.RefreshRecentFilesDashboard();
 		}

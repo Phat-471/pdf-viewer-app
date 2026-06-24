@@ -4145,4 +4145,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public int BitmapCacheCount => _cacheManager?.Count ?? 0;
 	public long BitmapCacheBytes => _cacheManager?.Bytes ?? 0;
 	public Services.Cache.PdfCacheManager CacheManager => _cacheManager;
+
+	public void ClearCacheAndRender()
+	{
+		ClearBitmapCache();
+		RenderPdfPages();
+	}
 }

@@ -399,6 +399,7 @@
                 </RadioButton>
               </WrapPanel>
               <CheckBox Name="AllowMultipleInstancesCheckBox" Content="Mở nhiều cửa sổ ứng dụng độc lập (Multi-instance)" Foreground="#F8FAFC" Margin="0,6,0,0" />
+              <CheckBox Name="EnhanceThinLinesCheckBox" Content="Làm đậm nét vẽ CAD/Bản vẽ (Enhance thin lines)" Foreground="#F8FAFC" Margin="0,6,0,0" />
               <StackPanel Margin="0,10,0,0">
                 <TextBlock Text="NGÔN NGỮ OCR MONG MUỐN" Foreground="#94A3B8" FontSize="10" FontWeight="Bold" Margin="0,0,0,4" />
                 <ComboBox Name="OcrLanguageComboBox" Style="{StaticResource ModernComboBox}" Height="30" />

@@ -24,6 +24,30 @@ public static class PdfiumEngine
 
 	public static object SyncRoot => RenderLock;
 
+	private static bool? _enhanceThinLinesCached = null;
+	public static bool EnhanceThinLines
+	{
+		get
+		{
+			if (!_enhanceThinLinesCached.HasValue)
+			{
+				try
+				{
+					_enhanceThinLinesCached = AppPreferences.Load().EnhanceThinLines;
+				}
+				catch
+				{
+					_enhanceThinLinesCached = true;
+				}
+			}
+			return _enhanceThinLinesCached.Value;
+		}
+		set
+		{
+			_enhanceThinLinesCached = value;
+		}
+	}
+
 	private static class Native
 	{
 		public static void FPDF_InitLibrary() => PdfInterop.Pdfium.FPDF_InitLibrary();
@@ -436,7 +460,12 @@ public static class PdfiumEngine
 					if (num5 != IntPtr.Zero)
 					{
 						Native.FPDFBitmap_FillRect(num5, 0, 0, targetWidth, targetHeight, uint.MaxValue);
-						Native.FPDF_RenderPageBitmap(num5, num3, 0, 0, targetWidth, targetHeight, 0, 3);
+						int renderFlags = 3;
+						if (EnhanceThinLines)
+						{
+							renderFlags |= 0x4000; // FPDF_RENDER_NO_SMOOTHPATH
+						}
+						Native.FPDF_RenderPageBitmap(num5, num3, 0, 0, targetWidth, targetHeight, 0, renderFlags);
 						Native.FPDFBitmap_Destroy(num5);
 					}
 				}
@@ -521,7 +550,12 @@ public static class PdfiumEngine
 					if (num3 != IntPtr.Zero)
 					{
 						Native.FPDFBitmap_FillRect(num3, 0, 0, tileWidth, tileHeight, uint.MaxValue);
-						Native.FPDF_RenderPageBitmap(num3, num, -tileX, -tileY, fullWidth, fullHeight, 0, 3);
+						int renderFlags = 3;
+						if (EnhanceThinLines)
+						{
+							renderFlags |= 0x4000; // FPDF_RENDER_NO_SMOOTHPATH
+						}
+						Native.FPDF_RenderPageBitmap(num3, num, -tileX, -tileY, fullWidth, fullHeight, 0, renderFlags);
 						Native.FPDFBitmap_Destroy(num3);
 					}
 				}

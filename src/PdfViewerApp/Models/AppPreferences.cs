@@ -37,6 +37,9 @@ internal sealed class AppPreferences
 
 	public string OcrLanguage { get; set; } = "";
 
+	public bool EnhanceThinLines { get; set; } = true;
+
+
 	public static string PreferencesPath
 	{
 		get
