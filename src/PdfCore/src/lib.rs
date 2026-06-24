@@ -57,6 +57,47 @@ fn manual_decompress_flate(compressed: &[u8]) -> Option<Vec<u8>> {
     None
 }
 
+fn collect_pages_from_tree(
+    doc: &Document,
+    pages_id: lopdf::ObjectId,
+    pages: &mut Vec<lopdf::ObjectId>,
+    visited: &mut std::collections::HashSet<lopdf::ObjectId>,
+) {
+    if visited.contains(&pages_id) {
+        return;
+    }
+    visited.insert(pages_id);
+
+    if let Ok(dict) = doc.get_object(pages_id).and_then(|obj| obj.as_dict()) {
+        let type_name = dict.type_name().unwrap_or("");
+        if type_name == "Page" {
+            pages.push(pages_id);
+        } else if type_name == "Pages" {
+            if let Ok(kids_val) = dict.get(b"Kids") {
+                if let Ok(kids_arr) = kids_val.as_array() {
+                    for kid in kids_arr {
+                        if let Ok(kid_ref) = kid.as_reference() {
+                            collect_pages_from_tree(doc, kid_ref, pages, visited);
+                        }
+                    }
+                }
+            }
+        } else if dict.get(b"Kids").is_ok() {
+            if let Ok(kids_val) = dict.get(b"Kids") {
+                if let Ok(kids_arr) = kids_val.as_array() {
+                    for kid in kids_arr {
+                        if let Ok(kid_ref) = kid.as_reference() {
+                            collect_pages_from_tree(doc, kid_ref, pages, visited);
+                        }
+                    }
+                }
+            }
+        } else if dict.get(b"Parent").is_ok() {
+            pages.push(pages_id);
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn merge_pdfs(paths_semicolon: *const c_char, output_path: *const c_char) -> bool {
     merge_pdfs_with_progress(paths_semicolon, output_path, None)
@@ -126,8 +167,28 @@ pub extern "C" fn merge_pdfs_with_progress(
             }
         }
 
-        // Collect all leaf Page objects using get_pages() BEFORE renumbering
-        let pages = doc.get_pages();
+        // Collect all leaf Page objects BEFORE renumbering using multiple robust strategies
+        let mut pages = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        if let Some(p_id) = pages_id {
+            collect_pages_from_tree(&doc, p_id, &mut pages, &mut visited);
+        }
+
+        if pages.is_empty() {
+            for (_num, id) in doc.get_pages() {
+                pages.push(id);
+            }
+        }
+
+        if pages.is_empty() {
+            for (id, object) in doc.objects.iter() {
+                if let Ok(dict) = object.as_dict() {
+                    if dict.type_name().unwrap_or("") == "Page" {
+                        pages.push(*id);
+                    }
+                }
+            }
+        }
 
         // Get sorted keys of doc.objects before renumbering
         let keys: Vec<lopdf::ObjectId> = doc.objects.keys().cloned().collect();
@@ -136,7 +197,7 @@ pub extern "C" fn merge_pdfs_with_progress(
         doc.renumber_objects_with(max_id);
 
         // Map original page IDs to new renumbered page IDs
-        for (_page_num, page_id) in pages {
+        for page_id in pages {
             if let Ok(idx) = keys.binary_search(&page_id) {
                 let new_page_id = (max_id + idx as u32, 0);
                 pages_kids.push(Object::Reference(new_page_id));
@@ -1698,6 +1759,25 @@ mod tests {
         let _ = std::fs::remove_file("merged.pdf");
 
         assert_eq!(pages.len(), 2);
+    }
+
+    #[test]
+    fn test_merge_real_files() {
+        let doc1 = Document::load("../../_smoke/one_page.pdf").unwrap();
+        let doc2 = Document::load("../../_smoke/page_2.pdf").unwrap();
+        println!("doc1 pages: {}", doc1.get_pages().len());
+        println!("doc2 pages: {}", doc2.get_pages().len());
+
+        let paths = std::ffi::CString::new("../../_smoke/one_page.pdf;../../_smoke/page_2.pdf").unwrap();
+        let out = std::ffi::CString::new("merged_real.pdf").unwrap();
+        let success = merge_pdfs(paths.as_ptr(), out.as_ptr());
+        assert!(success);
+
+        let merged = Document::load("merged_real.pdf").unwrap();
+        println!("Merged real objects count: {}", merged.objects.len());
+        let pages = merged.get_pages();
+        println!("Merged real pages count: {}", pages.len());
+        let _ = std::fs::remove_file("merged_real.pdf");
     }
 }
 
