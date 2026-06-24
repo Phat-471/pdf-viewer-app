@@ -17,6 +17,13 @@ fn to_str<'a>(s: *const c_char) -> Option<&'a str> {
     }
 }
 
+pub fn load_pdf_document<P: AsRef<std::path::Path>>(path: P) -> lopdf::Result<Document> {
+    let mut bytes = std::fs::read(path).map_err(|e| lopdf::Error::IO(e))?;
+    fix_pdf_offsets(&mut bytes);
+    Document::load_mem(&bytes)
+}
+
+
 // Helper to get integer value from Object enum safely without method version dependency
 fn get_integer(obj: &Object) -> Option<i64> {
     match obj {
@@ -158,7 +165,7 @@ pub extern "C" fn merge_pdfs_with_progress(
     // Load documents
     for (idx, path) in paths.iter().enumerate() {
         log_debug(Some(output_str), &format!("Loading file {}: {}", idx + 1, path));
-        match Document::load(path) {
+        match load_pdf_document(path) {
             Ok(doc) => {
                 log_debug(Some(output_str), &format!("Loaded file {} successfully. Version: {}, Object count: {}", idx + 1, doc.version, doc.objects.len()));
                 documents.push(doc);
@@ -349,7 +356,7 @@ pub extern "C" fn rotate_pdf_page(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -404,7 +411,7 @@ pub extern "C" fn replace_pdf_text(
         return false;
     }
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -447,7 +454,7 @@ pub extern "C" fn overlay_pdf_image(
         return false;
     }
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -488,7 +495,7 @@ pub extern "C" fn delete_pdf_page(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -519,7 +526,7 @@ pub extern "C" fn insert_blank_page(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -603,7 +610,7 @@ pub extern "C" fn reorder_pdf_pages(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -671,7 +678,7 @@ pub extern "C" fn extract_pdf_pages(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -753,7 +760,7 @@ pub extern "C" fn make_pdf_searchable(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -981,7 +988,7 @@ fn compress_pdf_inner(
     log!("[RUST] Chat luong anh nen: {}", image_quality);
     log!("[RUST] Log file: {}", log_path);
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => {
             log!("[RUST] Load Document thanh cong.");
             d
@@ -1332,7 +1339,7 @@ pub extern "C" fn optimize_pdf_lossless(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -1390,7 +1397,7 @@ pub extern "C" fn add_pdf_watermark(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -1536,7 +1543,7 @@ pub extern "C" fn add_pdf_page_numbers(
         None => return false,
     };
 
-    let mut doc = match Document::load(pdf_str) {
+    let mut doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return false,
     };
@@ -1666,7 +1673,7 @@ pub extern "C" fn extract_pdf_images(
         None => return -1,
     };
 
-    let doc = match Document::load(pdf_str) {
+    let doc = match load_pdf_document(pdf_str) {
         Ok(d) => d,
         Err(_) => return -2,
     };
@@ -1852,6 +1859,189 @@ mod tests {
         println!("Merged real pages count: {}", pages.len());
         let _ = std::fs::remove_file("merged_real.pdf");
     }
+
+    struct SimpleLogger;
+    impl log::Log for SimpleLogger {
+        fn enabled(&self, _metadata: &log::Metadata) -> bool { true }
+        fn log(&self, record: &log::Record) {
+            println!("[LOG] {}: {}", record.level(), record.args());
+        }
+        fn flush(&self) {}
+    }
+    static LOGGER: SimpleLogger = SimpleLogger;
+
+    #[test]
+    fn test_inspect_user_pdf() {
+        let _ = log::set_logger(&LOGGER);
+        log::set_max_level(log::LevelFilter::Debug);
+
+        let path = "C:\\Users\\IT\\Desktop\\SB5943-24-06-26\\1.pdf";
+        println!("Inspecting user PDF: {}", path);
+        
+        let mut data = std::fs::read(path).unwrap();
+        
+        // Print original bytes around some offsets first
+        println!("Original bytes at 55140: {:?}", &data[55140..55150]);
+        
+        super::fix_pdf_offsets(&mut data);
+        
+        println!("Fixed bytes at 55140: {:?}", &data[55140..55150]);
+
+        match Document::load_mem(&data) {
+            Ok(doc) => {
+                println!("Load success!");
+                println!("Version: {}", doc.version);
+                println!("Object count: {}", doc.objects.len());
+                println!("Trailer keys: {:?}", doc.trailer.iter().map(|(k, _)| String::from_utf8_lossy(k)).collect::<Vec<_>>());
+                println!("Reference table entries: {}", doc.reference_table.entries.len());
+            }
+            Err(e) => {
+                println!("Load failed: {:?}", e);
+            }
+        }
+    }
 }
+
+fn find_last_startxref(data: &[u8]) -> Option<usize> {
+    let pattern = b"startxref";
+    if data.len() < pattern.len() {
+        return None;
+    }
+    let start = data.len() - pattern.len();
+    for i in (0..=start).rev() {
+        if &data[i..i + pattern.len()] == pattern {
+            let rest = &data[i + pattern.len()..];
+            let mut num_start = 0;
+            while num_start < rest.len() && rest[num_start].is_ascii_whitespace() {
+                num_start += 1;
+            }
+            let mut num_end = num_start;
+            while num_end < rest.len() && rest[num_end].is_ascii_digit() {
+                num_end += 1;
+            }
+            if num_end > num_start {
+                if let Ok(num_str) = std::str::from_utf8(&rest[num_start..num_end]) {
+                    if let Ok(offset) = num_str.parse::<usize>() {
+                        return Some(offset);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn parse_prev_from_trailer(trailer_data: &[u8]) -> Option<usize> {
+    let pattern = b"/Prev";
+    for i in 0..trailer_data.len() {
+        if i + pattern.len() <= trailer_data.len() && &trailer_data[i..i+pattern.len()] == pattern {
+            let rest = &trailer_data[i + pattern.len()..];
+            let mut num_start = 0;
+            while num_start < rest.len() && rest[num_start].is_ascii_whitespace() {
+                num_start += 1;
+            }
+            let mut num_end = num_start;
+            while num_end < rest.len() && rest[num_end].is_ascii_digit() {
+                num_end += 1;
+            }
+            if num_end > num_start {
+                if let Ok(num_str) = std::str::from_utf8(&rest[num_start..num_end]) {
+                    if let Ok(prev_offset) = num_str.parse::<usize>() {
+                        return Some(prev_offset);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn fix_xref_section_at(data: &mut [u8], xref_offset: usize) -> Option<usize> {
+    let mut idx = xref_offset;
+    if idx + 4 <= data.len() && &data[idx..idx+4] == b"xref" {
+        idx += 4;
+    }
+    loop {
+        while idx < data.len() && data[idx].is_ascii_whitespace() {
+            idx += 1;
+        }
+        if idx >= data.len() {
+            break;
+        }
+        if idx + 7 <= data.len() && &data[idx..idx+7] == b"trailer" {
+            idx += 7;
+            return parse_prev_from_trailer(&data[idx..]);
+        }
+        
+        let start_num = idx;
+        while idx < data.len() && data[idx].is_ascii_digit() {
+            idx += 1;
+        }
+        if idx == start_num {
+            break;
+        }
+        
+        while idx < data.len() && data[idx] == b' ' {
+            idx += 1;
+        }
+        
+        let count_start = idx;
+        while idx < data.len() && data[idx].is_ascii_digit() {
+            idx += 1;
+        }
+        if idx == count_start {
+            break;
+        }
+        
+        let count_str = std::str::from_utf8(&data[count_start..idx]).ok()?;
+        let count = count_str.parse::<usize>().ok()?;
+        
+        while idx < data.len() && (data[idx] == b'\r' || data[idx] == b'\n') {
+            idx += 1;
+        }
+        
+        for _ in 0..count {
+            if idx + 20 > data.len() {
+                break;
+            }
+            if data[idx + 17] == b'n' {
+                if let Ok(offset_str) = std::str::from_utf8(&data[idx..idx+10]) {
+                    if let Ok(orig_offset) = offset_str.parse::<usize>() {
+                        let data_len = data.len();
+                        if orig_offset < data_len {
+                            let mut new_offset = orig_offset;
+                            while new_offset < data_len && data[new_offset].is_ascii_whitespace() {
+                                new_offset += 1;
+                            }
+                            if new_offset > orig_offset && new_offset < data_len {
+                                if data[new_offset].is_ascii_digit() {
+                                    let new_offset_str = format!("{:010}", new_offset);
+                                    data[idx..idx+10].copy_from_slice(new_offset_str.as_bytes());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            idx += 20;
+        }
+    }
+    None
+}
+
+pub fn fix_pdf_offsets(data: &mut [u8]) {
+    let mut next_xref_offset = find_last_startxref(data);
+    let mut visited = std::collections::HashSet::new();
+    while let Some(offset) = next_xref_offset {
+        if visited.contains(&offset) || offset >= data.len() {
+            break;
+        }
+        visited.insert(offset);
+        let prev = fix_xref_section_at(data, offset);
+        next_xref_offset = prev;
+    }
+}
+
+
 
 

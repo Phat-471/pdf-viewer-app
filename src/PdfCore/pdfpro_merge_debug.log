@@ -1,0 +1,62 @@
+=== MERGE START ===--- Processing document 1 ---
+
+Output path: merged_real.pdf
+Catalog ID (from trailer): Some((5, 0))
+Input paths raw string: ../../_smoke/one_page.pdf;../../_smoke/page_2.pdf
+Pages ID (from trailer Catalog): Some((1, 0))
+Parsed 2 input files
+Running collect_pages_from_tree...
+Loading file 1: ../../_smoke/one_page.pdf
+collect_pages_from_tree found 1 pages
+Collected pages final list: [(4, 0)]
+Renumbered objects starting from 1. Document max_id is now 6.
+Mapped 1 page IDs successfully. Total kids so far: 1
+Loaded file 1 successfully. Version: 1.4, Object count: 5
+New Catalog ID: Some((5, 0))
+Loading file 2: ../../_smoke/page_2.pdf
+New Pages ID: Some((1, 0))
+Copied 4 objects to target
+--- Processing document 2 ---
+Catalog ID (from trailer): Some((5, 0))
+Pages ID (from trailer Catalog): Some((1, 0))
+Running collect_pages_from_tree...
+collect_pages_from_tree found 1 pages
+Collected pages final list: [(4, 0)]
+Renumbered objects starting from 7. Document max_id is now 12.
+Mapped 1 page IDs successfully. Total kids so far: 2
+New Catalog ID: Some((11, 0))
+New Pages ID: Some((7, 0))
+Copied 4 objects to target
+--- Finalizing merged document ---
+Total pages collected in kids: 2
+Adjusted parent reference for 2/2 page objects
+Saving merged PDF to merged.pdf...
+Loaded file 2 successfully. Version: 1.4, Object count: 6
+--- Processing document 1 ---
+Merge finished. Save status: true
+Catalog ID (from trailer): Some((1, 0))
+Pages ID (from trailer Catalog): Some((2, 0))
+Running collect_pages_from_tree...
+collect_pages_from_tree found 1 pages
+Collected pages final list: [(3, 0)]
+Renumbered objects starting from 1. Document max_id is now 5.
+Mapped 1 page IDs successfully. Total kids so far: 1
+New Catalog ID: Some((1, 0))
+New Pages ID: Some((2, 0))
+Copied 3 objects to target
+--- Processing document 2 ---
+Catalog ID (from trailer): Some((1, 0))
+Pages ID (from trailer Catalog): Some((2, 0))
+Running collect_pages_from_tree...
+collect_pages_from_tree found 2 pages
+Collected pages final list: [(3, 0), (6, 0)]
+Renumbered objects starting from 6. Document max_id is now 11.
+Mapped 2 page IDs successfully. Total kids so far: 3
+New Catalog ID: Some((6, 0))
+New Pages ID: Some((7, 0))
+Copied 4 objects to target
+--- Finalizing merged document ---
+Total pages collected in kids: 3
+Adjusted parent reference for 3/3 page objects
+Saving merged PDF to merged_real.pdf...
+Merge finished. Save status: true
