@@ -98,6 +98,22 @@ fn collect_pages_from_tree(
     }
 }
 
+fn log_debug(output_path: Option<&str>, message: &str) {
+    let temp_log = std::env::temp_dir().join("pdfpro_merge_debug.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).write(true).append(true).open(&temp_log) {
+        let _ = writeln!(file, "{}", message);
+    }
+    if let Some(out_p) = output_path {
+        let path = std::path::Path::new(out_p);
+        if let Some(parent) = path.parent() {
+            let log_path = parent.join("pdfpro_merge_debug.log");
+            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).write(true).append(true).open(&log_path) {
+                let _ = writeln!(file, "{}", message);
+            }
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn merge_pdfs(paths_semicolon: *const c_char, output_path: *const c_char) -> bool {
     merge_pdfs_with_progress(paths_semicolon, output_path, None)
@@ -118,8 +134,21 @@ pub extern "C" fn merge_pdfs_with_progress(
         None => return false,
     };
 
+    // Clear old log files
+    let temp_log = std::env::temp_dir().join("pdfpro_merge_debug.log");
+    let _ = std::fs::remove_file(&temp_log);
+    if let Some(parent) = std::path::Path::new(output_str).parent() {
+        let _ = std::fs::remove_file(parent.join("pdfpro_merge_debug.log"));
+    }
+
+    log_debug(Some(output_str), "=== MERGE START ===");
+    log_debug(Some(output_str), &format!("Output path: {}", output_str));
+    log_debug(Some(output_str), &format!("Input paths raw string: {}", paths_str));
+
     let paths: Vec<&str> = paths_str.split(';').filter(|s| !s.is_empty()).collect();
+    log_debug(Some(output_str), &format!("Parsed {} input files", paths.len()));
     if paths.is_empty() {
+        log_debug(Some(output_str), "Error: No input paths parsed.");
         return false;
     }
 
@@ -127,10 +156,17 @@ pub extern "C" fn merge_pdfs_with_progress(
     let mut documents = Vec::new();
 
     // Load documents
-    for path in &paths {
+    for (idx, path) in paths.iter().enumerate() {
+        log_debug(Some(output_str), &format!("Loading file {}: {}", idx + 1, path));
         match Document::load(path) {
-            Ok(doc) => documents.push(doc),
-            Err(_) => return false,
+            Ok(doc) => {
+                log_debug(Some(output_str), &format!("Loaded file {} successfully. Version: {}, Object count: {}", idx + 1, doc.version, doc.objects.len()));
+                documents.push(doc);
+            }
+            Err(e) => {
+                log_debug(Some(output_str), &format!("Error loading file {}: {:?}", idx + 1, e));
+                return false;
+            }
         }
     }
 
@@ -144,6 +180,7 @@ pub extern "C" fn merge_pdfs_with_progress(
     let mut target_objects = BTreeMap::new();
 
     for (i, mut doc) in documents.into_iter().enumerate() {
+        log_debug(Some(output_str), &format!("--- Processing document {} ---", i + 1));
         // Resolve Catalog and Pages root IDs using trailer first (before renumbering)
         let mut catalog_id = doc.trailer.get(b"Root").and_then(|obj| obj.as_reference()).ok();
         let mut pages_id = None;
@@ -153,15 +190,21 @@ pub extern "C" fn merge_pdfs_with_progress(
             }
         }
 
+        log_debug(Some(output_str), &format!("Catalog ID (from trailer): {:?}", catalog_id));
+        log_debug(Some(output_str), &format!("Pages ID (from trailer Catalog): {:?}", pages_id));
+
         // Fallback search if trailer is missing Root or Pages
         if catalog_id.is_none() || pages_id.is_none() {
+            log_debug(Some(output_str), "Catalog ID or Pages ID not found from trailer. Starting fallback scan...");
             for (id, object) in doc.objects.iter() {
                 if let Ok(dict) = object.as_dict() {
                     let type_name = dict.type_name().unwrap_or("");
                     if type_name == "Catalog" && catalog_id.is_none() {
                         catalog_id = Some(*id);
+                        log_debug(Some(output_str), &format!("Found Catalog ID via fallback scan: {:?}", catalog_id));
                     } else if type_name == "Pages" && pages_id.is_none() {
                         pages_id = Some(*id);
+                        log_debug(Some(output_str), &format!("Found Pages ID via fallback scan: {:?}", pages_id));
                     }
                 }
             }
@@ -171,16 +214,22 @@ pub extern "C" fn merge_pdfs_with_progress(
         let mut pages = Vec::new();
         let mut visited = std::collections::HashSet::new();
         if let Some(p_id) = pages_id {
+            log_debug(Some(output_str), "Running collect_pages_from_tree...");
             collect_pages_from_tree(&doc, p_id, &mut pages, &mut visited);
         }
 
+        log_debug(Some(output_str), &format!("collect_pages_from_tree found {} pages", pages.len()));
+
         if pages.is_empty() {
+            log_debug(Some(output_str), "collect_pages_from_tree returned 0 pages. Trying doc.get_pages() fallback...");
             for (_num, id) in doc.get_pages() {
                 pages.push(id);
             }
+            log_debug(Some(output_str), &format!("doc.get_pages() fallback found {} pages", pages.len()));
         }
 
         if pages.is_empty() {
+            log_debug(Some(output_str), "doc.get_pages() fallback returned 0 pages. Trying direct scan fallback...");
             for (id, object) in doc.objects.iter() {
                 if let Ok(dict) = object.as_dict() {
                     if dict.type_name().unwrap_or("") == "Page" {
@@ -188,36 +237,51 @@ pub extern "C" fn merge_pdfs_with_progress(
                     }
                 }
             }
+            log_debug(Some(output_str), &format!("Direct scan fallback found {} pages", pages.len()));
         }
+
+        log_debug(Some(output_str), &format!("Collected pages final list: {:?}", pages));
 
         // Get sorted keys of doc.objects before renumbering
         let keys: Vec<lopdf::ObjectId> = doc.objects.keys().cloned().collect();
 
         // Renumber objects
+        let start_renumber_id = max_id;
         doc.renumber_objects_with(max_id);
+        log_debug(Some(output_str), &format!("Renumbered objects starting from {}. Document max_id is now {}.", start_renumber_id, doc.max_id));
 
         // Map original page IDs to new renumbered page IDs
+        let mut mapped_count = 0;
         for page_id in pages {
             if let Ok(idx) = keys.binary_search(&page_id) {
-                let new_page_id = (max_id + idx as u32, 0);
+                let new_page_id = (start_renumber_id + idx as u32, 0);
                 pages_kids.push(Object::Reference(new_page_id));
+                mapped_count += 1;
+            } else {
+                log_debug(Some(output_str), &format!("Warning: Could not find page ID {:?} in original objects keys!", page_id));
             }
         }
+        log_debug(Some(output_str), &format!("Mapped {} page IDs successfully. Total kids so far: {}", mapped_count, pages_kids.len()));
 
         // Map catalog and pages root to their new renumbered IDs
         let new_catalog_id = catalog_id.and_then(|orig_id| {
-            keys.binary_search(&orig_id).ok().map(|idx| (max_id + idx as u32, 0))
+            keys.binary_search(&orig_id).ok().map(|idx| (start_renumber_id + idx as u32, 0))
         });
         let new_pages_id = pages_id.and_then(|orig_id| {
-            keys.binary_search(&orig_id).ok().map(|idx| (max_id + idx as u32, 0))
+            keys.binary_search(&orig_id).ok().map(|idx| (start_renumber_id + idx as u32, 0))
         });
+        log_debug(Some(output_str), &format!("New Catalog ID: {:?}", new_catalog_id));
+        log_debug(Some(output_str), &format!("New Pages ID: {:?}", new_pages_id));
 
         // Add all objects to the target dictionary, except catalog and root pages
+        let mut copied_objects = 0;
         for (id, object) in doc.objects {
             if Some(id) != new_catalog_id && Some(id) != new_pages_id {
                 target_objects.insert(id, object);
+                copied_objects += 1;
             }
         }
+        log_debug(Some(output_str), &format!("Copied {} objects to target", copied_objects));
 
         max_id = doc.max_id + 1;
 
@@ -225,6 +289,9 @@ pub extern "C" fn merge_pdfs_with_progress(
             cb((i + 1) as u32, total_files);
         }
     }
+
+    log_debug(Some(output_str), "--- Finalizing merged document ---");
+    log_debug(Some(output_str), &format!("Total pages collected in kids: {}", pages_kids.len()));
 
     // Create the Pages dictionary
     let pages_id = (max_id, 0);
@@ -248,15 +315,21 @@ pub extern "C" fn merge_pdfs_with_progress(
     target_doc.max_id = max_id;
 
     // Adjust parent reference of all kids pages
+    let mut adjusted_parents = 0;
     for kid in &pages_kids {
         if let Ok(ref_id) = kid.as_reference() {
             if let Ok(Object::Dictionary(ref mut kid_dict)) = target_doc.get_object_mut(ref_id) {
                 kid_dict.set("Parent", Object::Reference(pages_id));
+                adjusted_parents += 1;
             }
         }
     }
+    log_debug(Some(output_str), &format!("Adjusted parent reference for {}/{} page objects", adjusted_parents, pages_kids.len()));
 
-    target_doc.save(output_str).is_ok()
+    log_debug(Some(output_str), &format!("Saving merged PDF to {}...", output_str));
+    let save_success = target_doc.save(output_str).is_ok();
+    log_debug(Some(output_str), &format!("Merge finished. Save status: {}", save_success));
+    save_success
 }
 
 
