@@ -308,29 +308,30 @@ public partial class MergeDialog : Window, IComponentConnector
 
 	public static string CreateAutoOutputPath(string firstSourcePath)
 	{
-		string text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfPro", "Merged");
-		Directory.CreateDirectory(text);
-		string text2 = "MergedDocument";
+		// Save to system temp dir — treated as temporary, user saves manually via Save As
+		string tempDir = Path.GetTempPath();
+		string baseName = "MergedDocument";
 		if (!string.IsNullOrWhiteSpace(firstSourcePath))
 		{
-			text2 = new string((from ch in Path.GetFileNameWithoutExtension(firstSourcePath)
+			baseName = new string((from ch in Path.GetFileNameWithoutExtension(firstSourcePath)
 				where !Path.GetInvalidFileNameChars().Contains(ch)
 				select ch).ToArray()).Trim();
-			if (string.IsNullOrWhiteSpace(text2))
+			if (string.IsNullOrWhiteSpace(baseName))
 			{
-				text2 = "MergedDocument";
+				baseName = "MergedDocument";
 			}
 		}
-		string text3 = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-		string text4 = Path.Combine(text, text2 + "_merged_" + text3 + ".pdf");
+		string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+		string outputPath = Path.Combine(tempDir, baseName + "_merged_" + timestamp + ".pdf");
 		int num = 1;
-		while (File.Exists(text4))
+		while (File.Exists(outputPath))
 		{
-			text4 = Path.Combine(text, $"{text2}_merged_{text3}_{num}.pdf");
+			outputPath = Path.Combine(tempDir, $"{baseName}_merged_{timestamp}_{num}.pdf");
 			num++;
 		}
-		return text4;
+		return outputPath;
 	}
+
 
 	private static bool TryNormalizePdfPath(string path, out string normalized)
 	{

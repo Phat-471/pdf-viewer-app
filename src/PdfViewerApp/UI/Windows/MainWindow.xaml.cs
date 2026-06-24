@@ -2286,13 +2286,13 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			return;
 		}
-		string mergedFilePath = mergeDialog.MergedFilePath;
-		LogStatus("Đã gộp file: " + Path.GetFileName(mergedFilePath));
+		string tempMergedPath = mergeDialog.MergedFilePath;
+		LogStatus("Đã gộp file: " + Path.GetFileName(tempMergedPath));
 		if (openMergedExternally)
 		{
 			try
 			{
-				Process.Start(new ProcessStartInfo(mergedFilePath)
+				Process.Start(new ProcessStartInfo(tempMergedPath)
 				{
 					UseShellExecute = true
 				});
@@ -2305,10 +2305,39 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 		else
 		{
-			MessageBox.Show("Gộp file thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
-			await OpenPdfTabWhenReadyAsync(mergedFilePath);
+			// Open merged result in viewer first
+			await OpenPdfTabWhenReadyAsync(tempMergedPath);
+
+			// Then immediately prompt user to save to their chosen location
+			var saveDialog = new Microsoft.Win32.SaveFileDialog
+			{
+				Title = "Lưu file đã gộp",
+				Filter = "PDF files (*.pdf)|*.pdf",
+				FileName = Path.GetFileNameWithoutExtension(tempMergedPath).Replace("_merged_" + DateTime.Now.ToString("yyyyMMdd"), "") + "_merged",
+				DefaultExt = ".pdf"
+			};
+			if (saveDialog.ShowDialog() == true)
+			{
+				try
+				{
+					File.Copy(tempMergedPath, saveDialog.FileName, overwrite: true);
+					LogStatus("Đã lưu: " + saveDialog.FileName);
+					// Reload tab from saved location
+					await OpenPdfTabWhenReadyAsync(saveDialog.FileName);
+				}
+				catch (Exception ex2)
+				{
+					MessageBox.Show("Không thể lưu file: " + ex2.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				}
+				finally
+				{
+					// Clean up temp file
+					try { File.Delete(tempMergedPath); } catch { }
+				}
+			}
 		}
 	}
+
 
 	private async Task HandleExplorerMergeStartupAsync(string[] initialFiles)
 	{
