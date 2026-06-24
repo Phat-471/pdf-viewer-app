@@ -266,3 +266,38 @@ Write-Host "Zip package created at: $zipPath" -ForegroundColor White
 Write-Host "Manifest created at: $manifestPath" -ForegroundColor White
 Write-Host "Summary created at: $packageSummaryPath" -ForegroundColor White
 Write-Host "SHA256: $sha256" -ForegroundColor White
+
+# 6. Local Hot-Deploy: Automatically sync DLL and EXE to local install directory
+# This ensures the developer's local installation always matches the freshly built output.
+Write-Host "`n[6/6] Local Hot-Deploy..." -ForegroundColor Yellow
+
+$localInstallDir = "$env:LOCALAPPDATA\PDF Pro"
+$newDll = Join-Path $scriptDir "src\PdfCore\target\release\pdf_core.dll"
+$newExe = Join-Path $publishOut "PdfViewerApp.exe"
+
+if (Test-Path $localInstallDir) {
+    # Stop app if running
+    $proc = Get-Process -Name "PdfViewerApp" -ErrorAction SilentlyContinue
+    if ($proc) {
+        Write-Host "    Stopping running PdfViewerApp..." -ForegroundColor DarkGray
+        Stop-Process -Name "PdfViewerApp" -Force
+        Start-Sleep -Seconds 1
+    }
+
+    # Copy pdf_core.dll
+    if (Test-Path $newDll) {
+        Copy-Item -LiteralPath $newDll -Destination "$localInstallDir\pdf_core.dll" -Force
+        Write-Host "    [OK] pdf_core.dll -> $localInstallDir" -ForegroundColor Green
+    }
+
+    # Copy PdfViewerApp.exe
+    if (Test-Path $newExe) {
+        Copy-Item -LiteralPath $newExe -Destination "$localInstallDir\PdfViewerApp.exe" -Force
+        Write-Host "    [OK] PdfViewerApp.exe -> $localInstallDir" -ForegroundColor Green
+    }
+
+    Write-Host "    Local install synced to v$version" -ForegroundColor Green
+} else {
+    Write-Host "    Local install dir not found ($localInstallDir). Skipping hot-deploy." -ForegroundColor DarkYellow
+    Write-Host "    Run the installer first: releases\PDFPro_Setup_v$safeVersion.exe" -ForegroundColor DarkYellow
+}
