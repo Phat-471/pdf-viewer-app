@@ -1306,7 +1306,14 @@ exit 0
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab != null)
 		{
-			await activeTab.SaveDocumentAsync();
+			if (!string.IsNullOrEmpty(activeTab.CurrentPdfPath) && activeTab.CurrentPdfPath.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase))
+			{
+				SavePdfAs_Click(sender, e);
+			}
+			else
+			{
+				await activeTab.SaveDocumentAsync();
+			}
 		}
 		else
 		{
@@ -2305,35 +2312,19 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 		else
 		{
-			// Open merged result in viewer first
-			await OpenPdfTabWhenReadyAsync(tempMergedPath);
-
-			// Then immediately prompt user to save to their chosen location
-			var saveDialog = new Microsoft.Win32.SaveFileDialog
+			try
 			{
-				Title = "Lưu file đã gộp",
-				Filter = "PDF files (*.pdf)|*.pdf",
-				FileName = Path.GetFileNameWithoutExtension(tempMergedPath).Replace("_merged_" + DateTime.Now.ToString("yyyyMMdd"), "") + "_merged",
-				DefaultExt = ".pdf"
-			};
-			if (saveDialog.ShowDialog() == true)
+				string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+				string exeFile = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? exePath;
+				if (exeFile.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+				{
+					exeFile = Path.ChangeExtension(exeFile, ".exe");
+				}
+				Process.Start(new ProcessStartInfo(exeFile, $"\"{tempMergedPath}\" --new-window") { UseShellExecute = true });
+			}
+			catch (Exception ex)
 			{
-				try
-				{
-					File.Copy(tempMergedPath, saveDialog.FileName, overwrite: true);
-					LogStatus("Đã lưu: " + saveDialog.FileName);
-					// Reload tab from saved location
-					await OpenPdfTabWhenReadyAsync(saveDialog.FileName);
-				}
-				catch (Exception ex2)
-				{
-					MessageBox.Show("Không thể lưu file: " + ex2.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-				}
-				finally
-				{
-					// Clean up temp file
-					try { File.Delete(tempMergedPath); } catch { }
-				}
+				MessageBox.Show("Không thể mở file gộp: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
 			}
 		}
 	}

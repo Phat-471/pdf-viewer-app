@@ -2082,7 +2082,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			MessageBox.Show("Open a PDF first.", "Info", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
-		PrintOptionsDialog optionsDialog = new PrintOptionsDialog(PageCount, SelectedPageNumber, CurrentPdfPath)
+		App.IsPrinting = true;
+		try
+		{
+			PrintOptionsDialog optionsDialog = new PrintOptionsDialog(PageCount, SelectedPageNumber, CurrentPdfPath)
 		{
 			Owner = Window.GetWindow(this)
 		};
@@ -2323,6 +2326,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			progressDialog.MarkFailed("In that bai: " + ex3.Message);
 			MessageBox.Show("Error while printing: " + ex3.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 			LogStatus("Print failed");
+		}
+		}
+		finally
+		{
+			App.IsPrinting = false;
+			App.ResetPrintBusyNotification();
+			App.OpenPendingFiles();
 		}
 	}
 

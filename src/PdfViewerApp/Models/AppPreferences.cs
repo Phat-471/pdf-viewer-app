@@ -33,7 +33,7 @@ internal sealed class AppPreferences
 		}
 	}
 
-	public bool AllowMultipleInstances { get; set; } = true;
+	public bool AllowMultipleInstances { get; set; } = false;
 
 	public string OcrLanguage { get; set; } = "";
 

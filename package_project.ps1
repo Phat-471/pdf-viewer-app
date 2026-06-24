@@ -79,9 +79,9 @@ Copy-Item "src/PdfCore/target/release/pdf_core.dll" -Destination "libs/pdf_core.
 # 3. Publish C# WPF App (self-contained, win-x64)
 Write-Host "`n[3/4] Publishing WPF application..." -ForegroundColor Yellow
 cd src/PdfViewerApp
-dotnet clean -c Release -r win-x64
-dotnet restore -r win-x64
-dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=false
+dotnet clean PdfViewerApp.csproj -c Release -r win-x64
+dotnet restore PdfViewerApp.csproj -r win-x64
+dotnet publish PdfViewerApp.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=false
 if ($LASTEXITCODE -ne 0) {
     Write-Error "WPF application publish failed!"
     exit 2

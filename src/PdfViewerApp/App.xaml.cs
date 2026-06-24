@@ -21,6 +21,39 @@ public partial class App : Application
 
 	private static CancellationTokenSource? _pipeServerCts;
 
+	public static bool IsPrinting { get; set; } = false;
+	public static bool HasShownPrintBusyNotification { get; set; } = false;
+	public static readonly System.Collections.Concurrent.ConcurrentQueue<string> PendingFilesToOpen = new();
+
+	public static void ResetPrintBusyNotification()
+	{
+		HasShownPrintBusyNotification = false;
+	}
+
+	public static void OpenPendingFiles()
+	{
+		Application.Current.Dispatcher.BeginInvoke(new Action(delegate
+		{
+			MainWindow mainWindow = Application.Current.MainWindow as MainWindow;
+			if (mainWindow != null)
+			{
+				while (PendingFilesToOpen.TryDequeue(out string? result))
+				{
+					if (!string.IsNullOrEmpty(result))
+					{
+						mainWindow.OpenPdfTab(result);
+					}
+				}
+				if (mainWindow.WindowState == WindowState.Minimized)
+				{
+					mainWindow.WindowState = WindowState.Normal;
+				}
+				mainWindow.Activate();
+				mainWindow.Focus();
+			}
+		}));
+	}
+
 	public App()
 	{
 		base.Startup += async delegate(object sender, StartupEventArgs e)
@@ -56,8 +89,9 @@ public partial class App : Application
 			{
 				AppPreferences appPreferences = AppPreferences.Load();
 				bool launchNewInstance = false;
+				bool forceNewWindow = args.Any((string arg) => arg.Equals("--new-window", StringComparison.OrdinalIgnoreCase));
 
-				if (appPreferences.AllowMultipleInstances)
+				if (appPreferences.AllowMultipleInstances || forceNewWindow)
 				{
 					launchNewInstance = true;
 				}
@@ -156,53 +190,20 @@ public partial class App : Application
 
 	public static void HandlePostMergeOpen(string outputPath)
 	{
-		AppPreferences appPreferences = AppPreferences.Load();
-		bool launchNewInstance = false;
-		if (appPreferences.AllowMultipleInstances)
+		try
 		{
-			launchNewInstance = true;
-		}
-		else
-		{
-			_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
-			if (!createdNew)
+			string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+			string exeFile = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? exePath;
+			if (exeFile.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
 			{
-				bool sent = SendArgsToExistingInstance(new string[] { outputPath });
-				if (sent)
-				{
-					Environment.Exit(0);
-				}
-				else
-				{
-					_singleInstanceMutex.Dispose();
-					_singleInstanceMutex = null;
-					launchNewInstance = true;
-				}
+				exeFile = Path.ChangeExtension(exeFile, ".exe");
 			}
+			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exeFile, $"\"{outputPath}\" --new-window") { UseShellExecute = true });
 		}
-
-		if (launchNewInstance || _singleInstanceMutex != null)
+		catch
 		{
-			Application.Current.Dispatcher.Invoke(delegate
-			{
-				Application.Current.ShutdownMode = ShutdownMode.OnLastWindowClose;
-				SplashWindow splashWindow = new SplashWindow();
-				splashWindow.Show();
-				PdfiumEngine.Initialize();
-				PdfViewerApp.MainWindow.SkipStartupMergeArgs = true;
-				MainWindow mainWindow = new MainWindow();
-				Application.Current.MainWindow = mainWindow;
-				mainWindow.Show();
-				splashWindow.Close();
-				mainWindow.OpenPdfTab(outputPath);
-				if (_singleInstanceMutex != null)
-				{
-					StartSingleInstanceServer(mainWindow);
-				}
-				mainWindow.Activate();
-				mainWindow.Focus();
-			});
 		}
+		Environment.Exit(0);
 	}
 
 	private static bool SendArgsToExistingInstance(string[] args)
@@ -248,22 +249,37 @@ public partial class App : Application
 							paths.Add(text);
 						}
 					}
-					mainWindow.Dispatcher.Invoke(delegate
+					mainWindow.Dispatcher.BeginInvoke(new Action(delegate
 					{
 						if (paths.Count > 0)
 						{
-							foreach (string item in paths)
+							if (App.IsPrinting)
 							{
-								mainWindow.OpenPdfTab(item);
+								foreach (string item in paths)
+								{
+									App.PendingFilesToOpen.Enqueue(item);
+								}
+								if (!App.HasShownPrintBusyNotification)
+								{
+									App.HasShownPrintBusyNotification = true;
+									MessageBox.Show(mainWindow, "Ứng dụng đang bận gửi lệnh in. File của bạn sẽ tự động mở sau khi hoàn thành gửi lệnh in.", "Đang in ấn", MessageBoxButton.OK, MessageBoxImage.Information);
+								}
+							}
+							else
+							{
+								foreach (string item in paths)
+								{
+									mainWindow.OpenPdfTab(item);
+								}
+								if (mainWindow.WindowState == WindowState.Minimized)
+								{
+									mainWindow.WindowState = WindowState.Normal;
+								}
+								mainWindow.Activate();
+								mainWindow.Focus();
 							}
 						}
-						if (mainWindow.WindowState == WindowState.Minimized)
-						{
-							mainWindow.WindowState = WindowState.Normal;
-						}
-						mainWindow.Activate();
-						mainWindow.Focus();
-					});
+					}));
 				}
 				catch (OperationCanceledException)
 				{

@@ -1,3 +1,8 @@
+v1.6.4:
+- Gộp thành công sẽ tự động mở trong cửa sổ mới, hỗ trợ lưu thủ công sau (Save As).
+- Mặc định mở file thường dưới dạng tab trên cùng một ứng dụng.
+- Tự động phát hiện trạng thái bận in và lưu file mở mới vào hàng chờ, mở lại ngay sau khi hoàn thành gửi lệnh in.
+
 v1.6.2:
 - Sửa triệt để lỗi gộp PDF từ menu chuột phải.
 - Nâng cấp bộ cài tự động dọn dẹp sạch sẽ menu chuột phải cũ và ứng dụng cũ trước khi cài đặt.
