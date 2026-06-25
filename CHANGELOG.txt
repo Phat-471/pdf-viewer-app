@@ -1,11 +1,7 @@
-v1.6.5:
-- Vá lỗi nghiêm trọng (Thread Affinity Exception) khi thực hiện lệnh in trên một số dòng máy in (như Canon iX6700).
+v1.6.8:
+- Sửa lỗi Thread Affinity (The calling thread cannot access this object) sau khi hoàn tất lệnh in.
+- Hỗ trợ in Giữ kích thước thật (Keep Actual Size) chuẩn tỉ lệ và sắc nét.
+- Sửa lỗi co lệch trang in và cho phép căn giữa thông minh khi bản vẽ vượt vùng in.
 
-v1.6.4:
-- Gộp thành công sẽ tự động mở trong cửa sổ mới, hỗ trợ lưu thủ công sau (Save As).
-- Mặc định mở file thường dưới dạng tab trên cùng một ứng dụng.
-- Tự động phát hiện trạng thái bận in và lưu file mở mới vào hàng chờ, mở lại ngay sau khi hoàn thành gửi lệnh in.
-
-v1.6.2:
-- Sửa triệt để lỗi gộp PDF từ menu chuột phải.
-- Nâng cấp bộ cài tự động dọn dẹp sạch sẽ menu chuột phải cũ và ứng dụng cũ trước khi cài đặt.
+v1.6.6:
+- Sửa lỗi khi chọn khổ in ngang (Landscape) bị báo lỗi Thread Affinity Exception.

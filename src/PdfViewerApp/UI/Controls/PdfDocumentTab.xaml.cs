@@ -2112,12 +2112,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				throw new InvalidOperationException("Vui lòng chọn máy in hợp lệ.");
 			}
 
-			// Capture print settings/objects on UI thread to avoid thread affinity exceptions on background thread
-			var printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
-			string printerName = selectedQueue.FullName;
-			int clientSchemaVersion = selectedQueue.ClientPrintSchemaVersion;
-			var cancellationToken = progressDialog.CancellationToken;
-
 			// Capture options from UI thread
 			var baseTicket = optionsDialog.SelectedPrintTicket ?? selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket ?? new PrintTicket();
 			int copies = optionsDialog.Copies;
@@ -2136,30 +2130,75 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			bool forceRasterize = optionsDialog.OptimizeCadDrawings;
 			var annotationsList = Annotations.ToList();
 
+			// Capture print settings/objects on UI thread to avoid thread affinity exceptions on background thread
+			var printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
+			string printerName = selectedQueue.FullName;
+			int clientSchemaVersion = selectedQueue.ClientPrintSchemaVersion;
+			var cancellationToken = progressDialog.CancellationToken;
+
+			// Get Capabilities on UI thread to avoid invalid printer name exceptions for network/shared printers on the background thread
+			printProgress.Report(new PrintProgressInfo("Đang truy vấn cấu hình máy in...", 0, 0, IsIndeterminate: true));
+			PrintCapabilities printCapabilities = selectedQueue.GetPrintCapabilities(baseTicket);
+
+			// 1. Cấu hình PrintTicket trên UI thread để tránh Thread Affinity exceptions
+			PrintTicket printTicket = baseTicket.Clone();
+			printTicket.CopyCount = copies;
+			if (pageMediaSize != null)
+			{
+				printTicket.PageMediaSize = pageMediaSize;
+			}
+			if (pageOrientation.HasValue)
+			{
+				printTicket.PageOrientation = pageOrientation;
+			}
+			ApplyRequestedPageResolution(printTicket, printDpi);
+
+			// Capture pageMediaSize values safely to avoid accessing the object on the background thread
+			string pageMediaSizeName = pageMediaSize?.PageMediaSizeName?.ToString() ?? "Unknown";
+			double pageMediaSizeWidth = pageMediaSize?.Width ?? 0.0;
+			double pageMediaSizeHeight = pageMediaSize?.Height ?? 0.0;
+			int? resolutionX = printTicket.PageResolution?.X;
+			int? resolutionY = printTicket.PageResolution?.Y;
+
+			// Calculate oriented page dimensions on UI thread
+			double orientedWidth = printCapabilities.OrientedPageMediaWidth ?? pageMediaSize?.Width ?? 8.5 * 96.0;
+			double orientedHeight = printCapabilities.OrientedPageMediaHeight ?? pageMediaSize?.Height ?? 11.0 * 96.0;
+			if (pageOrientation == PageOrientation.Landscape)
+			{
+				double num3 = Math.Max(orientedWidth, orientedHeight);
+				double num4 = Math.Min(orientedWidth, orientedHeight);
+				orientedWidth = num3;
+				orientedHeight = num4;
+			}
+			else if (pageOrientation == PageOrientation.Portrait)
+			{
+				double num5 = Math.Min(orientedWidth, orientedHeight);
+				double num6 = Math.Max(orientedWidth, orientedHeight);
+				orientedWidth = num5;
+				orientedHeight = num6;
+			}
+
+			// Pre-convert PrintTicket to DevMode on UI thread for native engines
+			byte[] devModeBytes = null;
+			if (printEngineMode == "NativePdfium" || printEngineMode == "NativePdfium_Optimized")
+			{
+				try
+				{
+					PrintTicket singleTicket = printTicket.Clone();
+					singleTicket.CopyCount = 1;
+					using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
+					devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
+				}
+				catch (Exception ex)
+				{
+					PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode on UI thread: " + ex.Message + ". Using default printer settings.");
+				}
+			}
+
 			await Task.Run(async delegate
 			{
-				// 1. Cấu hình PrintTicket trên thread nền
 				printProgress.Report(new PrintProgressInfo("Đang cấu hình máy in...", 0, 0, IsIndeterminate: true));
-				PrintTicket printTicket = baseTicket.Clone();
-				printTicket.CopyCount = copies;
-				if (pageMediaSize != null)
-				{
-					printTicket.PageMediaSize = pageMediaSize;
-				}
-				if (pageOrientation.HasValue)
-				{
-					printTicket.PageOrientation = pageOrientation;
-				}
-				ApplyRequestedPageResolution(printTicket, printDpi);
 
-				// 2. Truy vấn PrintCapabilities (Get Capabilities) trên thread nền để tránh treo UI
-				printProgress.Report(new PrintProgressInfo("Đang truy vấn cấu hình máy in...", 0, 0, IsIndeterminate: true));
-				PrintCapabilities printCapabilities;
-				using (var server = new LocalPrintServer())
-				using (var bgQueue = server.GetPrintQueue(printerName))
-				{
-					printCapabilities = bgQueue.GetPrintCapabilities(printTicket);
-				}
 				PdfPerfLogger.Log("Profile: " + printerProfile.Name);
 
 				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" || 
@@ -2172,28 +2211,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				PdfPerfLogger.Log($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
 				PdfPerfLogger.Log($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
 				PdfPerfLogger.Log($"Hướng xoay giấy: {pageOrientation}");
-				PdfPerfLogger.Log($"Khổ giấy đã chọn: {pageMediaSize?.PageMediaSizeName} (Rộng: {pageMediaSize?.Width} x Cao: {pageMediaSize?.Height})");
-				PdfPerfLogger.Log($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={printTicket.PageResolution?.X}x{printTicket.PageResolution?.Y}");
+				PdfPerfLogger.Log($"Khổ giấy đã chọn: {pageMediaSizeName} (Rộng: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
+				PdfPerfLogger.Log($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
 				PdfPerfLogger.Log("Chế độ in đã chọn: " + printEngineMode);
 				PdfPerfLogger.Log($"Native separate page jobs: {separatePageJobs}");
 				PdfPerfLogger.Log($"Reverse page order: {reversePageOrder}");
-
-				double orientedWidth = printCapabilities.OrientedPageMediaWidth ?? pageMediaSize?.Width ?? 8.5 * 96.0;
-				double orientedHeight = printCapabilities.OrientedPageMediaHeight ?? pageMediaSize?.Height ?? 11.0 * 96.0;
-				if (pageOrientation == PageOrientation.Landscape)
-				{
-					double num3 = Math.Max(orientedWidth, orientedHeight);
-					double num4 = Math.Min(orientedWidth, orientedHeight);
-					orientedWidth = num3;
-					orientedHeight = num4;
-				}
-				else if (pageOrientation == PageOrientation.Portrait)
-				{
-					double num5 = Math.Min(orientedWidth, orientedHeight);
-					double num6 = Math.Max(orientedWidth, orientedHeight);
-					orientedWidth = num5;
-					orientedHeight = num6;
-				}
 
 				if (printEngineMode == "NativePdfium" && !printTestFrame)
 				{
@@ -2201,22 +2223,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					{
 						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
 					}
-					PrintTicket singleTicket = printTicket.Clone();
-					singleTicket.CopyCount = 1;
-					string queueName = printerName;
-					byte[] devModeBytes = null;
-					try
-					{
-						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
-						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
-					}
-					catch (Exception ex)
-					{
-						PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
-					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.Print(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
+					NativePdfPrinter.Print(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
 					PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in vao may in.");
@@ -2228,22 +2237,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					{
 						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
 					}
-					PrintTicket singleTicket = printTicket.Clone();
-					singleTicket.CopyCount = 1;
-					string queueName = printerName;
-					byte[] devModeBytes = null;
-					try
-					{
-						using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
-						devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
-					}
-					catch (Exception ex)
-					{
-						PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode: " + ex.Message + ". Using default printer settings.");
-					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.PrintOptimized(CurrentPdfPath, queueName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
+					NativePdfPrinter.PrintOptimized(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
 					PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
@@ -2251,19 +2247,17 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else if (printEngineMode == "PdfDirect")
 				{
-					string queueName = printerName;
 					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
 					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, queueName, docName, cancellationToken);
+					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, printerName, docName, cancellationToken);
 					progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
 					LogStatus("Print job sent");
 				}
 				else if (printEngineMode == "PdfDirect_Optimized")
 				{
-					string queueName = printerName;
 					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
 					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, queueName, docName, cancellationToken);
+					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, printerName, docName, cancellationToken);
 					progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
 					LogStatus("Print job sent");
 				}
@@ -4148,7 +4142,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void LogStatus(string message)
 	{
 		LastStatusMessage = message;
-		this.StatusChanged?.Invoke(this, EventArgs.Empty);
+		if (Dispatcher.CheckAccess())
+		{
+			this.StatusChanged?.Invoke(this, EventArgs.Empty);
+		}
+		else
+		{
+			Dispatcher.BeginInvoke(new Action(() => this.StatusChanged?.Invoke(this, EventArgs.Empty)));
+		}
 	}
 
 	private void ReportZoomChanged()

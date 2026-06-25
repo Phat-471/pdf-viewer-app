@@ -323,7 +323,7 @@
             
             <TextBlock Text="Xử lý trang" FontWeight="SemiBold" FontSize="14" Foreground="#F8FAFC" Margin="0,0,0,8" />
             <RadioButton Name="FitMarginsRadio" Content="Vừa vùng in của máy" IsChecked="True" Margin="0,0,0,7" />
-            <RadioButton Content="Giữ kích thước thật" IsEnabled="False" Margin="0,0,0,7" />
+            <RadioButton Name="ActualSizeRadio" Content="Giữ kích thước thật" IsEnabled="True" Margin="0,0,0,7" />
             <CheckBox Name="AutoCenterCheckBox" Content="Tự căn giữa" IsChecked="True" Margin="0,0,0,12" />
             
             <Separator Height="1" Background="#1E293B" Margin="0,4,0,12" />

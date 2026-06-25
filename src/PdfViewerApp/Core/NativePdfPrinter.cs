@@ -36,6 +36,8 @@ internal static class NativePdfPrinter
 		public int Stride { get; set; }
 		public int DrawX { get; set; }
 		public int DrawY { get; set; }
+		public int DestWidth { get; set; }
+		public int DestHeight { get; set; }
 		public bool IsRasterized { get; set; }
 		public nint PageHandle { get; set; }
 	}
@@ -107,7 +109,9 @@ internal static class NativePdfPrinter
 			int num15 = Math.Max(1, num7 - num13);
 			PdfPerfLogger.Log($"Native printer DC: printable={num6}x{num7}, dpi={num8}x{num9}, physicalOffset={num10},{num11}");
 			PdfPerfLogger.Log($"Native safe area: {num14}x{num15}, rightPaddingPx={num12}, bottomPaddingPx={num13}");
-			int flags = 2049;
+			// FPDF_PRINTING (0x800) = tối ưu chất lượng in, FPDF_ANNOT (0x01) = hiển thị annotation
+			// FPDF_LCD_TEXT (0x800 cũ tức 2048) bị gỡ vì không phù hợp với GDI printer DC
+			int flags = 0x800 | 0x01; // FPDF_PRINTING | FPDF_ANNOT
 			if (!separatePageJobs)
 			{
 				DOCINFO lpdi = CreateDocInfo(pdfPath, null);
@@ -235,87 +239,9 @@ internal static class NativePdfPrinter
 				stopwatch5.Stop();
 				PdfPerfLogger.Log($"Native EndDoc spool: {stopwatch5.ElapsedMilliseconds} ms");
 			}
-			// Advanced Print Spooling Status Monitoring
-			try
-			{
-				progress?.Report(new PrintProgressInfo("Dang theo doi trang thai may in...", num4, num4, IsIndeterminate: true));
-				using (var localServer = new System.Printing.LocalPrintServer())
-				{
-					using (var queue = localServer.GetPrintQueue(printQueueName))
-					{
-						queue.Refresh();
-						int watchTimeoutMs = 15000;
-						int elapsedMs = 0;
-						int pollIntervalMs = 500;
-
-						while (elapsedMs < watchTimeoutMs && !cancellationToken.IsCancellationRequested)
-						{
-							queue.Refresh();
-							var jobs = queue.GetPrintJobInfoCollection();
-							System.Printing.PrintSystemJobInfo? activeJob = null;
-							
-							// Duyệt qua danh sách để tìm job tương ứng
-							foreach (System.Printing.PrintSystemJobInfo job in jobs)
-							{
-								if (job.Name.Contains(Path.GetFileName(pdfPath)) || job.Name.Contains("PDF Pro"))
-								{
-									activeJob = job;
-									break;
-								}
-							}
-
-							if (activeJob == null)
-							{
-								// Nếu không tìm thấy job trong hàng đợi nữa, có nghĩa là đã in thành công xong
-								break;
-							}
-
-							// Nhận trạng thái chi tiết của job in
-							string statusMsg = "Dang truyen lenh in...";
-							var status = activeJob.JobStatus;
-							
-							// Lấy số trang bằng Reflection để tương thích tối đa với WPF Target Framework
-							int pagesPrinted = 0;
-							try
-							{
-								var prop = activeJob.GetType().GetProperty("PagesPrinted");
-								if (prop != null)
-								{
-									pagesPrinted = (int)(prop.GetValue(activeJob) ?? 0);
-								}
-							}
-							catch {}
-
-							if ((status & System.Printing.PrintJobStatus.Printing) != 0)
-							{
-								statusMsg = $"May in dang in (Trang {pagesPrinted}/{num4})...";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Spooling) != 0)
-							{
-								statusMsg = $"Spooler dang chuan bi du lieu ({pagesPrinted}/{num4})...";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Error) != 0 || 
-									 (status & System.Printing.PrintJobStatus.PaperOut) != 0)
-							{
-								statusMsg = $"Loi may in: {status}. Vui long kiem tra giay/muc.";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Paused) != 0)
-							{
-								statusMsg = "Lenh in bi tam dung.";
-							}
-
-							progress?.Report(new PrintProgressInfo(statusMsg, pagesPrinted, num4, IsIndeterminate: false));
-							Thread.Sleep(pollIntervalMs);
-							elapsedMs += pollIntervalMs;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				PdfPerfLogger.Log($"Warning: Spooler status monitor skipped: {ex.Message}");
-			}
-
+			// Ghi log đơn giản – KHÔNG dùng LocalPrintServer/PrintQueue trên background thread
+			// vì System.Printing objects có thread affinity → gây crash "The calling thread cannot access this object"
+			PdfPerfLogger.Log("Print job sent to spooler successfully.");
 			progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
 		}
 		finally
@@ -390,7 +316,8 @@ internal static class NativePdfPrinter
 			int num15 = Math.Max(1, num7 - num13);
 			PdfPerfLogger.Log($"Native printer DC: printable={num6}x{num7}, dpi={num8}x{num9}, physicalOffset={num10},{num11}");
 			PdfPerfLogger.Log($"Native safe area: {num14}x{num15}, rightPaddingPx={num12}, bottomPaddingPx={num13}");
-			int flags = 2049;
+			// FPDF_PRINTING (0x800) = tối ưu chất lượng in, FPDF_ANNOT (0x01) = hiển thị annotation
+			int flags = 0x800 | 0x01; // FPDF_PRINTING | FPDF_ANNOT
 			if (!separatePageJobs)
 			{
 				DOCINFO lpdi = CreateDocInfo(pdfPath, null);
@@ -536,87 +463,10 @@ internal static class NativePdfPrinter
 				stopwatch5.Stop();
 				PdfPerfLogger.Log($"Native EndDoc spool: {stopwatch5.ElapsedMilliseconds} ms");
 			}
-			// Advanced Print Spooling Status Monitoring
-			try
-			{
-				progress?.Report(new PrintProgressInfo("Dang theo doi trang thai may in...", num4, num4, IsIndeterminate: true));
-				using (var localServer = new System.Printing.LocalPrintServer())
-				{
-					using (var queue = localServer.GetPrintQueue(printQueueName))
-					{
-						queue.Refresh();
-						int watchTimeoutMs = 15000;
-						int elapsedMs = 0;
-						int pollIntervalMs = 500;
 
-						while (elapsedMs < watchTimeoutMs && !cancellationToken.IsCancellationRequested)
-						{
-							queue.Refresh();
-							var jobs = queue.GetPrintJobInfoCollection();
-							System.Printing.PrintSystemJobInfo? activeJob = null;
-							
-							// Duyệt qua danh sách để tìm job tương ứng
-							foreach (System.Printing.PrintSystemJobInfo job in jobs)
-							{
-								if (job.Name.Contains(Path.GetFileName(pdfPath)) || job.Name.Contains("PDF Pro"))
-								{
-									activeJob = job;
-									break;
-								}
-							}
-
-							if (activeJob == null)
-							{
-								// Nếu không tìm thấy job trong hàng đợi nữa, có nghĩa là đã in thành công xong
-								break;
-							}
-
-							// Nhận trạng thái chi tiết của job in
-							string statusMsg = "Dang truyen lenh in...";
-							var status = activeJob.JobStatus;
-							
-							// Lấy số trang bằng Reflection để tương thích tối đa với WPF Target Framework
-							int pagesPrinted = 0;
-							try
-							{
-								var prop = activeJob.GetType().GetProperty("PagesPrinted");
-								if (prop != null)
-								{
-									pagesPrinted = (int)(prop.GetValue(activeJob) ?? 0);
-								}
-							}
-							catch {}
-
-							if ((status & System.Printing.PrintJobStatus.Printing) != 0)
-							{
-								statusMsg = $"May in dang in (Trang {pagesPrinted}/{num4})...";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Spooling) != 0)
-							{
-								statusMsg = $"Spooler dang chuan bi du lieu ({pagesPrinted}/{num4})...";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Error) != 0 || 
-									 (status & System.Printing.PrintJobStatus.PaperOut) != 0)
-							{
-								statusMsg = $"Loi may in: {status}. Vui long kiem tra giay/muc.";
-							}
-							else if ((status & System.Printing.PrintJobStatus.Paused) != 0)
-							{
-								statusMsg = "Lenh in bi tam dung.";
-							}
-
-							progress?.Report(new PrintProgressInfo(statusMsg, pagesPrinted, num4, IsIndeterminate: false));
-							Thread.Sleep(pollIntervalMs);
-							elapsedMs += pollIntervalMs;
-						}
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				PdfPerfLogger.Log($"Warning: Spooler status monitor skipped: {ex.Message}");
-			}
-
+			// Ghi log đơn giản – KHÔNG dùng LocalPrintServer/PrintQueue trên background thread
+			// vì System.Printing objects có thread affinity → gây crash "The calling thread cannot access this object"
+			PdfPerfLogger.Log("Print job sent to spooler successfully.");
 			progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
 		}
 		finally
@@ -660,6 +510,32 @@ internal static class NativePdfPrinter
 				num3 = PdfiumEngine.FPDF_GetPageHeight(num);
 			}
 			
+			// 1. Calculate destination size in physical printer GDI pixels
+			double physicalWidthPx = num2 / 72.0 * dpiX;
+			double physicalHeightPx = num3 / 72.0 * dpiY;
+			double scale = 1.0;
+			if (fitToPrintableArea)
+			{
+				scale = Math.Min((double)safeWidth / physicalWidthPx, (double)safeHeight / physicalHeightPx);
+			}
+			int destWidth = Math.Max(1, (int)Math.Round(physicalWidthPx * scale));
+			int destHeight = Math.Max(1, (int)Math.Round(physicalHeightPx * scale));
+
+			// Centering draw offset in physical GDI pixels
+			int drawX = (autoCenter ? ((safeWidth - destWidth) / 2) : 0);
+			int drawY = (autoCenter ? ((safeHeight - destHeight) / 2) : 0);
+			if (!driverAlreadyOffsetsPrintableArea)
+			{
+				drawX += physicalOffsetX;
+				drawY += physicalOffsetY;
+			}
+			if (!autoCenter)
+			{
+				drawX = Math.Max(0, drawX);
+				drawY = Math.Max(0, drawY);
+			}
+
+			// 2. Determine target rendering DPI for bitmap generation (to save memory & spool size)
 			double targetDpiX = Math.Min(dpiX, printDpi);
 			double targetDpiY = Math.Min(dpiY, printDpi);
 			
@@ -672,34 +548,30 @@ internal static class NativePdfPrinter
 			double currentPrintPixels = (num2 / 72.0 * targetDpiX) * (num3 / 72.0 * targetDpiY);
 			if (currentPrintPixels > maxPrintPixels)
 			{
-				double scale = Math.Sqrt(maxPrintPixels / currentPrintPixels);
-				targetDpiX *= scale;
-				targetDpiY *= scale;
-				PdfPerfLogger.Log($"Native print page {pageIndex + 1} - Adaptive DPI active: scaled down resolution by {scale:F2}x (Target DPI: {targetDpiX:F1}x{targetDpiY:F1})");
+				double adpScale = Math.Sqrt(maxPrintPixels / currentPrintPixels);
+				targetDpiX *= adpScale;
+				targetDpiY *= adpScale;
+				PdfPerfLogger.Log($"Native print page {pageIndex + 1} - Adaptive DPI active: scaled down resolution by {adpScale:F2}x (Target DPI: {targetDpiX:F1}x{targetDpiY:F1})");
 			}
 
-			double num4 = num2 / 72.0 * targetDpiX;
-			double num5 = num3 / 72.0 * targetDpiY;
+			double bmpWidth = num2 / 72.0 * targetDpiX;
+			double bmpHeight = num3 / 72.0 * targetDpiY;
+
 			if (fitToPrintableArea)
 			{
-				double num6 = Math.Min((double)safeWidth / num4, (double)safeHeight / num5);
-				num4 *= num6;
-				num5 *= num6;
+				// In bitmap mode, if we fit to printable area, the bitmap only needs to be as large as the destination size at targetDpi
+				double targetSafeWidth = safeWidth * (targetDpiX / dpiX);
+				double targetSafeHeight = safeHeight * (targetDpiY / dpiY);
+				double bmpScale = Math.Min(targetSafeWidth / bmpWidth, targetSafeHeight / bmpHeight);
+				bmpWidth *= bmpScale;
+				bmpHeight *= bmpScale;
 			}
-			int num7 = Math.Max(1, (int)Math.Round(num4));
-			int num8 = Math.Max(1, (int)Math.Round(num5));
-			int num9 = (autoCenter ? ((safeWidth - num7) / 2) : 0);
-			int num10 = (autoCenter ? ((safeHeight - num8) / 2) : 0);
-			if (!driverAlreadyOffsetsPrintableArea)
-			{
-				num9 += physicalOffsetX;
-				num10 += physicalOffsetY;
-			}
-			num9 = Math.Max(0, num9);
-			num10 = Math.Max(0, num10);
 
-			int stride = num7 * 4;
-			byte[] array = new byte[stride * num8];
+			int width = Math.Max(1, (int)Math.Round(bmpWidth));
+			int height = Math.Max(1, (int)Math.Round(bmpHeight));
+
+			int stride = width * 4;
+			byte[] array = new byte[stride * height];
 			GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
 			try
 			{
@@ -707,11 +579,11 @@ internal static class NativePdfPrinter
 				nint num5_bmp = IntPtr.Zero;
 				lock (PdfiumEngine.SyncRoot)
 				{
-					num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(num7, num8, 4, first_scan, stride);
+					num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(width, height, 4, first_scan, stride);
 					if (num5_bmp != IntPtr.Zero)
 					{
-						PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, num7, num8, uint.MaxValue);
-						PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num, 0, 0, num7, num8, 0, flags);
+						PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, width, height, uint.MaxValue);
+						PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num, 0, 0, width, height, 0, flags);
 						PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
 					}
 				}
@@ -722,13 +594,13 @@ internal static class NativePdfPrinter
 			}
 
 			// Chuyển đổi từ BGRA 32-bit (4 bytes/pixel) sang BGR 24-bit (3 bytes/pixel) để giảm 25% dung lượng spool
-			int stride24 = ((num7 * 3 + 3) / 4) * 4; // Căn chỉnh stride 4-byte cho Windows GDI
-			byte[] array24 = new byte[stride24 * num8];
-			for (int y = 0; y < num8; y++)
+			int stride24 = ((width * 3 + 3) / 4) * 4; // Căn chỉnh stride 4-byte cho Windows GDI
+			byte[] array24 = new byte[stride24 * height];
+			for (int y = 0; y < height; y++)
 			{
 				int srcRowOffset = y * stride;
 				int destRowOffset = y * stride24;
-				for (int x = 0; x < num7; x++)
+				for (int x = 0; x < width; x++)
 				{
 					int srcIndex = srcRowOffset + x * 4;
 					int destIndex = destRowOffset + x * 3;
@@ -744,11 +616,13 @@ internal static class NativePdfPrinter
 				Copy = copy,
 				IsRasterized = true,
 				BitmapBuffer = array24,
-				Width = num7,
-				Height = num8,
+				Width = width,
+				Height = height,
 				Stride = stride24,
-				DrawX = num9,
-				DrawY = num10
+				DrawX = drawX,
+				DrawY = drawY,
+				DestWidth = destWidth,
+				DestHeight = destHeight
 			};
 		}
 		finally
@@ -793,7 +667,7 @@ internal static class NativePdfPrinter
 			{
 				if (rendered.BitmapBuffer != null)
 				{
-					PdfPerfLogger.Log($"Native print spooling page {rendered.PageIndex + 1}, copy {rendered.Copy} (Rasterized): {rendered.Width}x{rendered.Height} at {rendered.DrawX},{rendered.DrawY}");
+					PdfPerfLogger.Log($"Native print spooling page {rendered.PageIndex + 1}, copy {rendered.Copy} (Rasterized): {rendered.Width}x{rendered.Height} stretched to {rendered.DestWidth}x{rendered.DestHeight} at {rendered.DrawX},{rendered.DrawY}");
 					GCHandle gCHandle = GCHandle.Alloc(rendered.BitmapBuffer, GCHandleType.Pinned);
 					try
 					{
@@ -811,8 +685,8 @@ internal static class NativePdfPrinter
 							hdc,
 							rendered.DrawX,
 							rendered.DrawY,
-							rendered.Width,
-							rendered.Height,
+							rendered.DestWidth,
+							rendered.DestHeight,
 							0,
 							0,
 							rendered.Width,
@@ -846,30 +720,34 @@ internal static class NativePdfPrinter
 							num2 = PdfiumEngine.FPDF_GetPageWidth(rendered.PageHandle);
 							num3 = PdfiumEngine.FPDF_GetPageHeight(rendered.PageHandle);
 						}
-						double num4 = num2 / 72.0 * (double)dpiX;
-						double num5 = num3 / 72.0 * (double)dpiY;
+						
+						double physicalWidthPx = num2 / 72.0 * dpiX;
+						double physicalHeightPx = num3 / 72.0 * dpiY;
+						double scale = 1.0;
 						if (fitToPrintableArea)
 						{
-							double num6 = Math.Min((double)safeWidth / num4, (double)safeHeight / num5);
-							num4 *= num6;
-							num5 *= num6;
+							scale = Math.Min((double)safeWidth / physicalWidthPx, (double)safeHeight / physicalHeightPx);
 						}
-						int num7 = Math.Max(1, (int)Math.Round(num4));
-						int num8 = Math.Max(1, (int)Math.Round(num5));
-						int num9 = (autoCenter ? ((safeWidth - num7) / 2) : 0);
-						int num10 = (autoCenter ? ((safeHeight - num8) / 2) : 0);
+						int destWidth = Math.Max(1, (int)Math.Round(physicalWidthPx * scale));
+						int destHeight = Math.Max(1, (int)Math.Round(physicalHeightPx * scale));
+
+						int drawX = (autoCenter ? ((safeWidth - destWidth) / 2) : 0);
+						int drawY = (autoCenter ? ((safeHeight - destHeight) / 2) : 0);
 						if (!driverAlreadyOffsetsPrintableArea)
 						{
-							num9 += physicalOffsetX;
-							num10 += physicalOffsetY;
+							drawX += physicalOffsetX;
+							drawY += physicalOffsetY;
 						}
-						num9 = Math.Max(0, num9);
-						num10 = Math.Max(0, num10);
+						if (!autoCenter)
+						{
+							drawX = Math.Max(0, drawX);
+							drawY = Math.Max(0, drawY);
+						}
 
-						PdfPerfLogger.Log($"Native print spooling page {rendered.PageIndex + 1}, copy {rendered.Copy} (Vector): {num7}x{num8} at {num9},{num10}");
+						PdfPerfLogger.Log($"Native print spooling page {rendered.PageIndex + 1}, copy {rendered.Copy} (Vector): {destWidth}x{destHeight} at {drawX},{drawY}");
 						lock (PdfiumEngine.SyncRoot)
 						{
-							PdfiumEngine.FPDF_RenderPage(hdc, rendered.PageHandle, num9, num10, num7, num8, 0, flags);
+							PdfiumEngine.FPDF_RenderPage(hdc, rendered.PageHandle, drawX, drawY, destWidth, destHeight, 0, flags);
 						}
 					}
 					finally

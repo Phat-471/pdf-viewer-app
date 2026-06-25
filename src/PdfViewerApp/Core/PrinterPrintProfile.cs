@@ -1,4 +1,4 @@
-﻿using System.Printing;
+using System.Printing;
 
 namespace PdfViewerApp;
 
@@ -11,8 +11,11 @@ internal sealed record PrinterPrintProfile(string Name, bool DriverAlreadyOffset
 		string text3 = text + " " + text2;
 		if (text3.Contains("ix6770") || text3.Contains("ix6700"))
 		{
-			return new PrinterPrintProfile("Canon iX6770 profile", DriverAlreadyOffsetsPrintableArea: true, 30.0, 10.0);
+			// Driver Canon iX6770 đã tự tính HORZRES/VERTRES là vùng in thực tế (sau margin)
+			// nên không cần padding thêm, tránh nội dung bị cắt/mất mép
+			return new PrinterPrintProfile("Canon iX6770 profile", DriverAlreadyOffsetsPrintableArea: true, 0.0, 0.0);
 		}
-		return new PrinterPrintProfile("Default profile", DriverAlreadyOffsetsPrintableArea: true, 12.0, 6.0);
+		// Hầu hết driver hiện đại đã xử lý margin nội bộ, HORZRES/VERTRES là vùng in thực
+		return new PrinterPrintProfile("Default profile", DriverAlreadyOffsetsPrintableArea: true, 0.0, 0.0);
 	}
 }
