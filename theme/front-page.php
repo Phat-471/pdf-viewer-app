@@ -557,27 +557,6 @@ $zalo_url = get_theme_mod('sanitary_zalo_url', 'https://zalo.me/0901234567');
 				break;
 
 			case 'projects':
-				$projects_json = get_theme_mod( 'sanitary_projects' );
-				$projects_data = ! empty( $projects_json ) ? json_decode( $projects_json, true ) : [];
-				if ( empty( $projects_data ) || ! is_array( $projects_data ) ) {
-					$project_defaults = [
-						1 => [ 'title' => 'Thi công phòng tắm Biệt Thự Ecopark', 'desc' => 'Thương hiệu sử dụng: GIFTO GOLD & MANDY', 'img' => '' ],
-						2 => [ 'title' => 'Lắp đặt thiết bị vệ sinh Căn Hộ Vinhomes', 'desc' => 'Thương hiệu sử dụng: TAKAMI & TQC', 'img' => '' ],
-						3 => [ 'title' => 'Thiết kế & Thi công trọn gói Nhà Phố Quận 2', 'desc' => 'Thương hiệu sử dụng: GIFTO & SDUY', 'img' => '' ]
-					];
-					$projects_data = [];
-					for ( $i = 1; $i <= 3; $i++ ) {
-						$projects_data[] = [
-							'title'   => get_theme_mod( 'sanitary_project' . $i . '_title', $project_defaults[$i]['title'] ),
-							'desc'    => get_theme_mod( 'sanitary_project' . $i . '_desc', $project_defaults[$i]['desc'] ),
-							'img'     => get_theme_mod( 'sanitary_project' . $i . '_img', $project_defaults[$i]['img'] ),
-							'visible' => 1
-						];
-					}
-				}
-				$projects_data = array_filter( $projects_data, function( $item ) {
-					return ! isset( $item['visible'] ) || $item['visible'] == 1;
-				} );
 				?>
 				<!-- 8. REAL CONSTRUCTIONS & PROJECTS -->
 				<section class="projects-section container">
@@ -585,19 +564,58 @@ $zalo_url = get_theme_mod('sanitary_zalo_url', 'https://zalo.me/0901234567');
 					<p class="section-subtitle"><?php echo esc_html( get_theme_mod( 'sanitary_subtitle_projects', 'Hình ảnh thực tế bàn giao phòng tắm hoàn thiện cho khách hàng.' ) ); ?></p>
 
 					<div class="projects-grid">
-						<?php foreach ( $projects_data as $item ) : 
-							$p_img = ! empty( $item['img'] ) ? $item['img'] : get_template_directory_uri() . '/assets/images/placeholder.jpg';
+						<?php 
+						$project_args = [
+							'post_type'      => 'sanitary_project',
+							'posts_per_page' => 3,
+						];
+						$project_query = new WP_Query( $project_args );
+
+						if ( $project_query->have_posts() ) :
+							while ( $project_query->have_posts() ) : $project_query->the_post();
+								$p_img = has_post_thumbnail() ? get_the_post_thumbnail_url( get_the_ID(), 'medium_large' ) : get_template_directory_uri() . '/assets/images/placeholder.jpg';
+								
+								// Get brands used from the content if possible
+								$content = get_the_content();
+								$brands_used = 'Thiết bị vệ sinh cao cấp';
+								if (preg_match('/Thương hiệu sử dụng:<\/strong>\s*([^<]+)/i', $content, $matches)) {
+									$brands_used = trim($matches[1]);
+								}
+						?>
+							<a href="<?php the_permalink(); ?>" class="project-item" style="text-decoration: none; color: inherit; display: block; position: relative;">
+								<div class="project-img-wrapper">
+									<img src="<?php echo esc_url($p_img); ?>" alt="<?php the_title_attribute(); ?>">
+								</div>
+								<div class="project-meta">
+									<h4><?php the_title(); ?></h4>
+									<p><?php echo esc_html($brands_used); ?></p>
+								</div>
+							</a>
+						<?php 
+							endwhile;
+							wp_reset_postdata();
+						else :
+							// Fallback if no projects exist in CPT yet
+							$project_defaults = [
+								1 => [ 'title' => 'Thi công phòng tắm Biệt Thự Ecopark', 'desc' => 'Thương hiệu sử dụng: GIFTO GOLD & MANDY' ],
+								2 => [ 'title' => 'Lắp đặt thiết bị vệ sinh Căn Hộ Vinhomes', 'desc' => 'Thương hiệu sử dụng: TAKAMI & TQC' ],
+								3 => [ 'title' => 'Thiết kế & Thi công trọn gói Nhà Phố Quận 2', 'desc' => 'Thương hiệu sử dụng: GIFTO & SDUY' ]
+							];
+							for ( $i = 1; $i <= 3; $i++ ) :
 						?>
 							<div class="project-item">
 								<div class="project-img-wrapper">
-									<img src="<?php echo esc_url($p_img); ?>" alt="<?php echo esc_attr($item['title']); ?>">
+									<img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/placeholder.jpg'); ?>" alt="Project placeholder">
 								</div>
 								<div class="project-meta">
-									<h4><?php echo esc_html($item['title']); ?></h4>
-									<p><?php echo esc_html($item['desc']); ?></p>
+									<h4><?php echo esc_html($project_defaults[$i]['title']); ?></h4>
+									<p><?php echo esc_html($project_defaults[$i]['desc']); ?></p>
 								</div>
 							</div>
-						<?php endforeach; ?>
+						<?php 
+							endfor;
+						endif; 
+						?>
 					</div>
 				</section>
 				<?php

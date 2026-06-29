@@ -238,7 +238,7 @@
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0EA5E9" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Name="BatchCompressBtn" Header="Nén Hàng Loạt" Margin="8,0,8,0" Click="BatchCompress_Click" ToolTip="Nén giảm dung lượng hàng loạt nhiều tệp PDF cùng lúc">
+        <fluent:Button Name="BatchCompressBtn" Header="ạt" Margin="8,0,8,0" Click="BatchCompress_Click" ToolTip="Nén giảm dung lượng hàng loạt nhiều tệp PDF cùng lúc">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#14B8A6" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>

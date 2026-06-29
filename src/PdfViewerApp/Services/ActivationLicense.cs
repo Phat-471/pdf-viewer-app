@@ -84,15 +84,56 @@ internal static class ActivationLicense
 	{
 		try
 		{
-			string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_config.json");
-			if (File.Exists(configPath))
+			string localConfigPath = Path.Combine(LicenseDirectory, "server_config.json");
+			string baseConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "server_config.json");
+			
+			string configPath = string.Empty;
+			bool copyToLocal = false;
+
+			if (File.Exists(baseConfigPath))
 			{
-				using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(configPath, Encoding.UTF8));
+				bool useBase = true;
+				if (File.Exists(localConfigPath))
+				{
+					if (File.GetLastWriteTimeUtc(baseConfigPath) <= File.GetLastWriteTimeUtc(localConfigPath))
+					{
+						useBase = false;
+					}
+				}
+
+				if (useBase)
+				{
+					configPath = baseConfigPath;
+					copyToLocal = true;
+				}
+				else
+				{
+					configPath = localConfigPath;
+				}
+			}
+			else if (File.Exists(localConfigPath))
+			{
+				configPath = localConfigPath;
+			}
+
+			if (!string.IsNullOrEmpty(configPath))
+			{
+				string jsonContent = File.ReadAllText(configPath, Encoding.UTF8);
+				using JsonDocument doc = JsonDocument.Parse(jsonContent);
 				if (doc.RootElement.TryGetProperty("api_domain", out var prop))
 				{
 					string domain = prop.GetString() ?? string.Empty;
 					if (!string.IsNullOrWhiteSpace(domain))
 					{
+						if (copyToLocal)
+						{
+							try
+							{
+								Directory.CreateDirectory(LicenseDirectory);
+								File.WriteAllText(localConfigPath, jsonContent, Encoding.UTF8);
+							}
+							catch {}
+						}
 						return domain.TrimEnd('/');
 					}
 				}
@@ -677,10 +718,35 @@ internal static class ActivationLicense
 			}
 			else if (response.StatusCode == System.Net.HttpStatusCode.NotFound || response.StatusCode == System.Net.HttpStatusCode.Forbidden || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
 			{
-				// Server explicitly rejected the license (404, 403, 400), deactivate immediately
-				_isOfflineDetected = false;
-				_isInternetAvailable = true;
-				Deactivate();
+				bool shouldDeactivate = false;
+				try
+				{
+					using JsonDocument doc = JsonDocument.Parse(json);
+					if (doc.RootElement.TryGetProperty("success", out var successProp) && !successProp.GetBoolean())
+					{
+						string statusText = doc.RootElement.TryGetProperty("status", out var statusProp) ? (statusProp.GetString() ?? string.Empty) : string.Empty;
+						if (statusText == "suspended" || statusText == "expired" || statusText == "unregistered_device")
+						{
+							shouldDeactivate = true;
+						}
+					}
+				}
+				catch
+				{
+					// Response not valid JSON from license server (e.g. general 404 HTML during update/redirect)
+				}
+
+				if (shouldDeactivate)
+				{
+					_isOfflineDetected = false;
+					_isInternetAvailable = true;
+					Deactivate();
+				}
+				else
+				{
+					_isOfflineDetected = true;
+					_isInternetAvailable = await CheckInternetConnectionAsync();
+				}
 			}
 			else
 			{

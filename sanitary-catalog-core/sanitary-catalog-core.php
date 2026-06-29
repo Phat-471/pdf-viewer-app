@@ -2377,6 +2377,11 @@ function sanitary_submit_inquiry_handler() {
 		wp_send_json_error( [ 'message' => 'Số điện thoại không đúng định dạng Việt Nam (ví dụ: 0912345678, gồm 10 chữ số).' ] );
 	}
 
+	// GDPR / Decree 13 Consent verification
+	if ( ! isset( $_POST['data_consent'] ) || $_POST['data_consent'] !== 'yes' ) {
+		wp_send_json_error( [ 'message' => 'Bạn phải đồng ý với Điều khoản và Chính sách bảo mật thông tin cá nhân của chúng tôi.' ] );
+	}
+
 	// Insert Inquiry post
 	$post_data = [
 		'post_title'   => $fullname,

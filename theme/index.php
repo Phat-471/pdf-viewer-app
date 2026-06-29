@@ -23,6 +23,7 @@
 							<div class="post-excerpt">
 								<?php the_excerpt(); ?>
 							</div>
+							<a href="<?php the_permalink(); ?>" class="read-more-link">Đọc tiếp &rarr;</a>
 						</div>
 					</article>
 				<?php endwhile; ?>

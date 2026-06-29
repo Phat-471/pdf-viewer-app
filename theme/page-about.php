@@ -18,11 +18,10 @@ get_header(); ?>
 		<div class="container about-flex-layout">
 			<div class="about-text">
 				<h2 style="font-size: 1.8rem; font-weight: 800; margin-bottom: 20px; color: var(--color-primary);">Về Chúng Tôi</h2>
-				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;">Chào mừng Quý khách đến với <strong>Showroom Thiết Bị Vệ Sinh Hồng Miên</strong>. Chúng tôi tự hào là đơn vị cung cấp các dòng sản phẩm thiết bị vệ sinh chính hãng như bồn cầu thông minh, sen tắm đứng massage, chậu rửa lavabo chất lượng cao từ các thương hiệu đối tác lớn.</p>
-				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;">Không chỉ đơn thuần cung cấp sản phẩm catalogue, Hồng Miên mang tới cho khách hàng giải pháp thiết kế bố trí phòng tắm 2D/3D tối ưu diện tích và quy trình lắp đặt thi công trọn gói từ A-Z bởi các kỹ thuật viên lành nghề, đảm bảo công trình đạt tính thẩm mỹ và độ bền vững lâu dài.</p>
-				
-				<h3 style="font-size: 1.3rem; font-weight: 700; margin-top: 30px; margin-bottom: 15px; color: var(--color-primary);">Sứ Mệnh Của Hồng Miên</h3>
-				<p style="color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7; border-left: 3px solid var(--color-accent); padding-left: 15px; font-style: italic;">"Mang lại không gian sống tiện nghi, sạch sẽ và an toàn cho mỗi gia đình Việt Nam bằng những sản phẩm thiết bị phòng tắm hiện đại, thông minh cùng dịch vụ lắp đặt tận tâm chuyên nghiệp nhất."</p>
+				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;"><strong>CÔNG TY TNHH TMDV HỒNG MIÊN</strong> được thành lập trên cơ sở tiền thân là cửa hàng vật liệu xây dựng Hồng Miên với 25 năm kinh nghiệm trong lĩnh vực cung cấp vật liệu xây dựng.</p>
+				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;">Qua thời gian dài phát triển với những nỗ lực không ngừng vươn lên của đội ngũ lãnh đạo và nhân viên kết hợp với từng bước nghiên cứu và nâng cao chất lượng sản phẩm nhằm đáp ứng ngày càng cao của người tiêu dùng, CÔNG TY TNHH TMDV HỒNG MIÊN đã trở thành một doanh nghiệp uy tín có chỗ đứng trong lĩnh vực nhập khẩu và cung ứng thiết bị vệ sinh (GIFTO, GIFTO GOLD, SDUY, TAKAMI, TQC, MANDY).</p>
+				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;">Các sản phẩm của CÔNG TY HỒNG MIÊN đều đạt tiêu chuẩn của quốc tế, tất cả các nhóm ngành của CÔNG TY HỒNG MIÊN đều được kiểm tra 100% nhằm phát hiện những lỗi nhỏ nhất trước khi đóng gói ra thị trường. CÔNG TY HỒNG MIÊN đã được đăng ký bảo hộ quyền tác giả và bản quyền nhãn hiệu tại cục sở hữu trí tuệ Việt Nam.</p>
+				<p style="margin-bottom: 20px; color: var(--color-secondary); font-size: 1.05rem; line-height: 1.7;">Chúng tôi tự hào vì đã mang lại sự sang trọng và tiện nghi cho quý khách hàng.</p>
 			</div>
 			<div class="about-image-wrapper">
 				<img src="<?php echo esc_url( get_template_directory_uri() . '/screenshot.png' ); ?>" alt="Showroom Hồng Miên" class="about-main-img">

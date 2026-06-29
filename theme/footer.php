@@ -82,6 +82,37 @@
 		</a>
 	</div>
 
+	<!-- Privacy Consent Notification Banner (Decree 13) -->
+	<div id="privacy-consent-banner" style="position: fixed; bottom: 20px; left: 20px; right: 20px; max-width: 600px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999; display: none; align-items: center; justify-content: space-between; gap: 20px; transition: all 0.5s ease;">
+		<div style="font-size: 0.88rem; line-height: 1.5; text-align: left;">
+			Chúng tôi sử dụng cookie và xử lý dữ liệu cá nhân (Họ tên, SĐT) để tối ưu trải nghiệm và cung cấp dịch vụ tốt nhất. Bằng cách nhấn "Đồng ý", bạn cho phép chúng tôi xử lý thông tin theo <a href="<?php echo esc_url( home_url( '/chinh-sach-bao-mat/' ) ); ?>" target="_blank" style="color: var(--color-accent); text-decoration: underline; font-weight: 700;">Chính sách bảo mật</a>.
+		</div>
+		<button id="accept-privacy-btn" class="btn btn-accent" style="padding: 8px 20px; font-size: 0.85rem; white-space: nowrap;">Đồng ý</button>
+	</div>
+
+	<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		var banner = document.getElementById('privacy-consent-banner');
+		var acceptBtn = document.getElementById('accept-privacy-btn');
+		if (banner && acceptBtn) {
+			// Check if already accepted
+			if (!localStorage.getItem('privacy-consent-accepted')) {
+				setTimeout(function() {
+					banner.style.display = 'flex';
+				}, 1500); // Show after 1.5s
+			}
+			
+			acceptBtn.addEventListener('click', function() {
+				localStorage.setItem('privacy-consent-accepted', 'true');
+				banner.style.opacity = '0';
+				setTimeout(function() {
+					banner.style.display = 'none';
+				}, 500);
+			});
+		}
+	});
+	</script>
+
 <?php wp_footer(); ?>
 <script>
 document.addEventListener('DOMContentLoaded', function() {

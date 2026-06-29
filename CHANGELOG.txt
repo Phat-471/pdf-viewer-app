@@ -1,7 +1,3 @@
-v1.6.8:
-- Sửa lỗi Thread Affinity (The calling thread cannot access this object) sau khi hoàn tất lệnh in.
-- Hỗ trợ in Giữ kích thước thật (Keep Actual Size) chuẩn tỉ lệ và sắc nét.
-- Sửa lỗi co lệch trang in và cho phép căn giữa thông minh khi bản vẽ vượt vùng in.
-
-v1.6.6:
-- Sửa lỗi khi chọn khổ in ngang (Landscape) bị báo lỗi Thread Affinity Exception.
+v1.6.9:
+- Cập nhật cơ chế xác thực bản quyền và tối ưu hóa hệ thống kiểm tra.
+- Sửa một số lỗi giao diện và đồng bộ hóa cấu hình máy chủ.

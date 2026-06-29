@@ -28,18 +28,12 @@ namespace PdfViewerApp
 		{
 			InitializeComponent();
 			FileListView.ItemsSource = Files;
-			LoadPrinters();
 			UpdatePlaceholderVisibility();
 
 			// Default output folder: Desktop
 			_selectedFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-			RotateOutputDirTextBox.Text = _selectedFolder;
 			CompressOutputDirTextBox.Text = _selectedFolder;
-			OptOutputDirTextBox.Text = _selectedFolder;
 			ExtractOutputDirTextBox.Text = _selectedFolder;
-			MergeOutputDirTextBox.Text = _selectedFolder;
-			WatermarkOutputDirTextBox.Text = _selectedFolder;
-			SecurityOutputDirTextBox.Text = _selectedFolder;
 			ConvertOutputDirTextBox.Text = _selectedFolder;
 
 			if (initialTabIndex >= 0 && initialTabIndex < BatchTabControl.Items.Count)
@@ -51,90 +45,6 @@ namespace PdfViewerApp
 		private void UpdatePlaceholderVisibility()
 		{
 			DropPlaceholder.Visibility = Files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-		}
-
-		private void LoadPrinters()
-		{
-			List<PrintQueue> list = new List<PrintQueue>();
-			try
-			{
-				list = new LocalPrintServer().GetPrintQueues(new[]
-				{
-					EnumeratedPrintQueueTypes.Local,
-					EnumeratedPrintQueueTypes.Connections
-				}).ToList();
-			}
-			catch
-			{
-				try
-				{
-					list = new LocalPrintServer().GetPrintQueues(new[]
-					{
-						EnumeratedPrintQueueTypes.Local
-					}).ToList();
-				}
-				catch
-				{
-					try
-					{
-						PrintQueue defaultQueue = LocalPrintServer.GetDefaultPrintQueue();
-						if (defaultQueue != null)
-						{
-							list.Add(defaultQueue);
-						}
-					}
-					catch
-					{
-					}
-				}
-			}
-
-			PrinterComboBox.ItemsSource = list;
-			if (list.Count > 0)
-			{
-				if (!string.IsNullOrEmpty(PrintOptionsDialog.LastSelectedPrinterName))
-				{
-					var lastQueue = list.FirstOrDefault(q => q.FullName == PrintOptionsDialog.LastSelectedPrinterName);
-					if (lastQueue != null)
-					{
-						PrinterComboBox.SelectedItem = lastQueue;
-						return;
-					}
-				}
-				try
-				{
-					PrintQueue defaultQueue = LocalPrintServer.GetDefaultPrintQueue();
-					PrinterComboBox.SelectedItem = list.FirstOrDefault(q => q.FullName == defaultQueue.FullName) ?? list.FirstOrDefault();
-				}
-				catch
-				{
-					PrinterComboBox.SelectedItem = list.FirstOrDefault();
-				}
-			}
-		}
-
-		private void PrinterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-		{
-			if (PrinterComboBox.SelectedItem is PrintQueue printQueue)
-			{
-				PrintOptionsDialog.LastSelectedPrinterName = printQueue.FullName;
-			}
-		}
-
-		private void PageRangeRadio_Checked(object sender, RoutedEventArgs e)
-		{
-			if (PageRangeTextBox != null)
-			{
-				PageRangeTextBox.IsEnabled = CustomPagesRadio.IsChecked == true;
-			}
-		}
-
-		private void RotateRadio_Checked(object sender, RoutedEventArgs e)
-		{
-			if (RotatePageRangeTextBox != null)
-			{
-				RotatePageRangeTextBox.IsEnabled = RotateCustomRadio.IsChecked == true;
-			}
 		}
 
 		private void NumberValidation_KeyDown(object sender, KeyEventArgs e)
@@ -385,14 +295,24 @@ namespace PdfViewerApp
 			if (dialog.ShowDialog() == true)
 			{
 				_selectedFolder = dialog.FolderName;
-				RotateOutputDirTextBox.Text = _selectedFolder;
 				CompressOutputDirTextBox.Text = _selectedFolder;
-				OptOutputDirTextBox.Text = _selectedFolder;
 				ExtractOutputDirTextBox.Text = _selectedFolder;
-				MergeOutputDirTextBox.Text = _selectedFolder;
-				WatermarkOutputDirTextBox.Text = _selectedFolder;
-				SecurityOutputDirTextBox.Text = _selectedFolder;
 				ConvertOutputDirTextBox.Text = _selectedFolder;
+			}
+		}
+
+		private void CompressMode_Checked(object sender, RoutedEventArgs e)
+		{
+			if (LosslessOptionsPanel == null || StandardOptionsPanel == null) return;
+			if (CompressModeLossless.IsChecked == true)
+			{
+				LosslessOptionsPanel.Visibility = Visibility.Visible;
+				StandardOptionsPanel.Visibility = Visibility.Collapsed;
+			}
+			else
+			{
+				LosslessOptionsPanel.Visibility = Visibility.Collapsed;
+				StandardOptionsPanel.Visibility = Visibility.Visible;
 			}
 		}
 
@@ -426,37 +346,20 @@ namespace PdfViewerApp
 
 			try
 			{
-				if (selectedTab.Header.ToString() == "In Hàng Loạt")
+				if (selectedTab.Header.ToString() == "Nén PDF")
 				{
-					await StartPrintFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Xoay Trang")
-				{
-					await StartRotateFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Nén PDF")
-				{
-					await StartCompressFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Nén Tối Ưu")
-				{
-					await StartLosslessCompressFlowAsync(token);
+					if (CompressModeLossless.IsChecked == true)
+					{
+						await StartLosslessCompressFlowAsync(token);
+					}
+					else
+					{
+						await StartCompressFlowAsync(token);
+					}
 				}
 				else if (selectedTab.Header.ToString() == "Trích Xuất Trang")
 				{
 					await StartExtractFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Gộp File")
-				{
-					await StartMergeFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Đóng Dấu")
-				{
-					await StartWatermarkFlowAsync(token);
-				}
-				else if (selectedTab.Header.ToString() == "Bảo Mật")
-				{
-					await StartSecurityFlowAsync(token);
 				}
 				else if (selectedTab.Header.ToString() == "Chuyển Đổi")
 				{
@@ -481,270 +384,6 @@ namespace PdfViewerApp
 				SetControlsEnabled(true);
 				_cancellationTokenSource = null;
 			}
-		}
-
-		private async Task StartPrintFlowAsync(CancellationToken token)
-		{
-			if (PrinterComboBox.SelectedItem is not PrintQueue selectedQueue)
-			{
-				MessageBox.Show(this, "Vui lòng chọn máy in hợp lệ.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-
-			if (!int.TryParse(CopiesTextBox.Text, out int copies) || copies < 1)
-			{
-				MessageBox.Show(this, "Số bản sao (Copies) phải là một số nguyên dương từ 1.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-
-			string printEngine = (PrintEngineComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "NativePdfium";
-			bool fitToPrintableArea = FitMarginsRadio.IsChecked == true;
-			bool autoCenter = AutoCenterCheckBox.IsChecked == true;
-			bool separatePageJobs = SeparateJobsCheckBox.IsChecked == true;
-			bool forceRasterize = OptimizeCadCheckBox.IsChecked == true;
-
-			string printerQueueName = selectedQueue.FullName;
-			PrinterPrintProfile profile = PrinterPrintProfile.Resolve(selectedQueue);
-
-			byte[]? devModeBytes = null;
-			try
-			{
-				using var converter = new PrintTicketConverter(selectedQueue.FullName, selectedQueue.ClientPrintSchemaVersion);
-				var ticket = selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket;
-				if (ticket != null)
-				{
-					var cloned = ticket.Clone();
-					cloned.CopyCount = 1;
-					devModeBytes = converter.ConvertPrintTicketToDevMode(cloned, BaseDevModeType.UserDefault);
-				}
-			}
-			catch { }
-
-			for (int i = 0; i < Files.Count; i++)
-			{
-				token.ThrowIfCancellationRequested();
-				var fileItem = Files[i];
-				fileItem.Status = "Đang chuẩn bị in...";
-				OverallStatusText.Text = $"Đang in {i + 1}/{Files.Count}: {fileItem.FileName}...";
-
-				if (fileItem.PageCount <= 0)
-				{
-					fileItem.Status = "Lỗi đọc tệp";
-					continue;
-				}
-
-				int startPageIndex = 0;
-				int endPageIndex = fileItem.PageCount - 1;
-
-				if (CustomPagesRadio.IsChecked == true)
-				{
-					if (!TryParsePageRange(PageRangeTextBox.Text, fileItem.PageCount, out int s, out int eVal))
-					{
-						fileItem.Status = "Lỗi dải trang";
-						continue;
-					}
-					startPageIndex = s - 1;
-					endPageIndex = eVal - 1;
-				}
-
-				fileItem.Status = "Đang in...";
-
-				IProgress<PrintProgressInfo> itemProgress = new Progress<PrintProgressInfo>(info =>
-				{
-					Dispatcher.Invoke(() =>
-					{
-						if (info.TotalPages > 0)
-						{
-							fileItem.Status = $"Đang in: trang {info.CurrentPage}/{info.TotalPages}";
-						}
-						else
-						{
-							fileItem.Status = info.Message;
-						}
-					});
-				});
-
-				bool success = false;
-				string errorMessage = string.Empty;
-
-				await Task.Run(() =>
-				{
-					try
-					{
-						if (printEngine == "NativePdfium_Optimized")
-						{
-							NativePdfPrinter.PrintOptimized(
-								fileItem.FilePath,
-								printerQueueName,
-								devModeBytes,
-								startPageIndex,
-								endPageIndex,
-								copies,
-								fitToPrintableArea,
-								autoCenter,
-								profile.DriverAlreadyOffsetsPrintableArea,
-								profile.RightSafetyPadding,
-								profile.BottomSafetyPadding,
-								separatePageJobs,
-								false,
-								forceRasterize,
-								itemProgress,
-								token);
-							success = true;
-						}
-						else
-						{
-							// WPF Bitmap Printing Fallback
-							Dispatcher.Invoke(() =>
-							{
-								var printDialog = new PrintDialog();
-								printDialog.PrintQueue = selectedQueue;
-								var ticket = selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket;
-								if (ticket != null)
-								{
-									var cloned = ticket.Clone();
-									cloned.CopyCount = copies;
-									printDialog.PrintTicket = cloned;
-								}
-
-								var paginator = new PdfDocumentPaginator(fileItem.FilePath)
-								{
-									StartPage = startPageIndex,
-									EndPage = endPageIndex,
-									PrintProgress = itemProgress
-								};
-								
-								printDialog.PrintDocument(paginator, Path.GetFileName(fileItem.FilePath));
-								success = true;
-							});
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						throw;
-					}
-					catch (Exception ex)
-					{
-						errorMessage = ex.Message;
-					}
-				});
-
-				fileItem.Status = success ? "Thành công" : $"Lỗi: {errorMessage}";
-				OverallProgressBar.Value = i + 1;
-			}
-
-			OverallStatusText.Text = "Đã hoàn thành in tất cả tệp!";
-			MessageBox.Show(this, "Hoàn tất tiến trình in hàng loạt!", "In ấn hàng loạt", MessageBoxButton.OK, MessageBoxImage.Information);
-		}
-
-		private async Task StartRotateFlowAsync(CancellationToken token)
-		{
-			int rotateDelta = int.Parse((RotateAngleComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "90");
-
-			for (int i = 0; i < Files.Count; i++)
-			{
-				token.ThrowIfCancellationRequested();
-				var fileItem = Files[i];
-				fileItem.Status = "Đang xoay...";
-				OverallStatusText.Text = $"Đang xoay tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
-
-				string outPath = Path.Combine(_selectedFolder, $"rotated_{fileItem.FileName}");
-				bool success = false;
-
-				await Task.Run(() =>
-				{
-					try
-					{
-						if (RotateAllRadio.IsChecked == true)
-						{
-							// Rotate all pages by calling Rust core for each page
-							string tempIn = fileItem.FilePath;
-							string tempOut = outPath;
-							for (int page = 1; page <= fileItem.PageCount; page++)
-							{
-								token.ThrowIfCancellationRequested();
-								tempOut = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-								bool ok = PdfInterop.PdfCore.rotate_pdf_page(tempIn, page, rotateDelta, tempOut);
-								if (!ok) return;
-
-								if (tempIn != fileItem.FilePath)
-								{
-									try { File.Delete(tempIn); } catch { }
-								}
-								tempIn = tempOut;
-							}
-							if (File.Exists(outPath)) File.Delete(outPath);
-							File.Move(tempOut, outPath);
-							success = true;
-						}
-						else if (RotateOddRadio.IsChecked == true || RotateEvenRadio.IsChecked == true)
-						{
-							bool isOdd = RotateOddRadio.IsChecked == true;
-							string tempIn = fileItem.FilePath;
-							string tempOut = outPath;
-							for (int page = 1; page <= fileItem.PageCount; page++)
-							{
-								token.ThrowIfCancellationRequested();
-								if ((page % 2 == 1 && isOdd) || (page % 2 == 0 && !isOdd))
-								{
-									tempOut = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-									bool ok = PdfInterop.PdfCore.rotate_pdf_page(tempIn, page, rotateDelta, tempOut);
-									if (!ok) return;
-
-									if (tempIn != fileItem.FilePath)
-									{
-										try { File.Delete(tempIn); } catch { }
-									}
-									tempIn = tempOut;
-								}
-							}
-							if (tempIn != fileItem.FilePath)
-							{
-								if (File.Exists(outPath)) File.Delete(outPath);
-								File.Move(tempIn, outPath);
-								success = true;
-							}
-						}
-						else if (RotateCustomRadio.IsChecked == true)
-						{
-							if (TryParsePageRange(RotatePageRangeTextBox.Text, fileItem.PageCount, out int start, out int end))
-							{
-								string tempIn = fileItem.FilePath;
-								for (int page = start; page <= end; page++)
-								{
-									token.ThrowIfCancellationRequested();
-									string tempOut = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-									bool ok = PdfInterop.PdfCore.rotate_pdf_page(tempIn, page, rotateDelta, tempOut);
-									if (!ok) return;
-
-									if (tempIn != fileItem.FilePath)
-									{
-										try { File.Delete(tempIn); } catch { }
-									}
-									tempIn = tempOut;
-								}
-								if (tempIn != fileItem.FilePath)
-								{
-									if (File.Exists(outPath)) File.Delete(outPath);
-									File.Move(tempIn, outPath);
-									success = true;
-								}
-							}
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						throw;
-					}
-					catch { }
-				});
-
-				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
-				OverallProgressBar.Value = i + 1;
-			}
-
-			OverallStatusText.Text = "Đã hoàn thành xoay tất cả tệp!";
-			MessageBox.Show(this, "Hoàn tất tiến trình xoay trang hàng loạt!", "Xoay trang", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
 		private async Task StartCompressFlowAsync(CancellationToken token)
@@ -856,50 +495,7 @@ namespace PdfViewerApp
 			MessageBox.Show(this, "Hoàn tất tiến trình trích xuất hàng loạt!", "Trích xuất trang", MessageBoxButton.OK, MessageBoxImage.Information);
 		}
 
-		private async Task StartMergeFlowAsync(CancellationToken token)
-		{
-			OverallStatusText.Text = "Đang chuẩn bị gộp các tệp PDF...";
-			string mergeName = MergeFileNameTextBox.Text.Trim();
-			if (string.IsNullOrEmpty(mergeName)) mergeName = "MergedDocument.pdf";
-			if (!mergeName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) mergeName += ".pdf";
 
-			string outPath = Path.Combine(_selectedFolder, mergeName);
-			bool success = false;
-
-			string semicolonPaths = string.Join(";", Files.Select(f => f.FilePath));
-
-			await Task.Run(() =>
-			{
-				try
-				{
-					success = PdfInterop.PdfCore.merge_pdfs(semicolonPaths, outPath);
-				}
-				catch (OperationCanceledException)
-				{
-					throw;
-				}
-				catch { }
-			});
-
-			if (success)
-			{
-				foreach (var file in Files)
-				{
-					file.Status = "Thành công";
-				}
-				OverallProgressBar.Value = Files.Count;
-				OverallStatusText.Text = "Đã gộp file thành công!";
-				MessageBox.Show(this, $"Gộp file thành công! Lưu tại: {outPath}", "Gộp file PDF", MessageBoxButton.OK, MessageBoxImage.Information);
-			}
-			else
-			{
-				foreach (var file in Files)
-				{
-					file.Status = "Lỗi xử lý";
-				}
-				MessageBox.Show(this, "Không thể gộp các file PDF đã chọn.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-			}
-		}
 
 		private void SetControlsEnabled(bool enabled)
 		{
@@ -914,205 +510,21 @@ namespace PdfViewerApp
 			MoveDownBtn.IsEnabled = enabled;
 			FileListView.IsEnabled = enabled;
 
-			PrinterComboBox.IsEnabled = enabled;
-			CopiesTextBox.IsEnabled = enabled;
-			AllPagesRadio.IsEnabled = enabled;
-			CustomPagesRadio.IsEnabled = enabled;
-			if (enabled && CustomPagesRadio.IsChecked == true) PageRangeTextBox.IsEnabled = true;
-			else PageRangeTextBox.IsEnabled = false;
-			FitMarginsRadio.IsEnabled = enabled;
-			ActualSizeRadio.IsEnabled = enabled;
-			AutoCenterCheckBox.IsEnabled = enabled;
-			PrintEngineComboBox.IsEnabled = enabled;
-			OptimizeCadCheckBox.IsEnabled = enabled;
-			SeparateJobsCheckBox.IsEnabled = enabled;
-
-			RotateAngleComboBox.IsEnabled = enabled;
-			RotateAllRadio.IsEnabled = enabled;
-			RotateOddRadio.IsEnabled = enabled;
-			RotateEvenRadio.IsEnabled = enabled;
-			RotateCustomRadio.IsEnabled = enabled;
-			if (enabled && RotateCustomRadio.IsChecked == true) RotatePageRangeTextBox.IsEnabled = true;
-			else RotatePageRangeTextBox.IsEnabled = false;
-			RotateBrowseBtn.IsEnabled = enabled;
-
 			CompressQualitySlider.IsEnabled = enabled;
 			CompressBrowseBtn.IsEnabled = enabled;
 
 			OptCompressStreamsCheckBox.IsEnabled = enabled;
 			OptPruneObjectsCheckBox.IsEnabled = enabled;
 			OptRemoveMetadataCheckBox.IsEnabled = enabled;
-			OptBrowseBtn.IsEnabled = enabled;
 
 			ExtractPageRangeTextBox.IsEnabled = enabled;
 			ExtractBrowseBtn.IsEnabled = enabled;
-
-			MergeFileNameTextBox.IsEnabled = enabled;
-			MergeBrowseBtn.IsEnabled = enabled;
-
-			WatermarkTextTextBox.IsEnabled = enabled;
-			WatermarkFontSizeTextBox.IsEnabled = enabled;
-			WatermarkOpacitySlider.IsEnabled = enabled;
-			WatermarkAngleComboBox.IsEnabled = enabled;
-			WatermarkColorComboBox.IsEnabled = enabled;
-			WatermarkBrowseBtn.IsEnabled = enabled;
-
-			SecurityActionComboBox.IsEnabled = enabled;
-			SecurityUserPasswordTextBox.IsEnabled = enabled;
-			bool isEncrypt = SecurityActionComboBox == null || SecurityActionComboBox.SelectedIndex == 0;
-			SecurityOwnerPasswordTextBox.IsEnabled = enabled && isEncrypt;
-			SecurityAllowPrintCheckBox.IsEnabled = enabled && isEncrypt;
-			SecurityAllowCopyCheckBox.IsEnabled = enabled && isEncrypt;
-			SecurityBrowseBtn.IsEnabled = enabled;
 
 			ConvertDirectionComboBox.IsEnabled = enabled;
 			ConvertBrowseBtn.IsEnabled = enabled;
 		}
 
-		private async Task StartWatermarkFlowAsync(CancellationToken token)
-		{
-			string text = WatermarkTextTextBox.Text;
-			if (string.IsNullOrEmpty(text))
-			{
-				MessageBox.Show(this, "Vui lòng nhập nội dung đóng dấu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-			if (!double.TryParse(WatermarkFontSizeTextBox.Text, out double fontSize) || fontSize <= 0)
-			{
-				fontSize = 48;
-			}
-			double opacity = WatermarkOpacitySlider.Value;
-			double angle = double.Parse((WatermarkAngleComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "45");
-			string colorTag = (WatermarkColorComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "128,128,128";
-			var rgbParts = colorTag.Split(',');
-			double r = double.Parse(rgbParts[0]) / 255.0;
-			double g = double.Parse(rgbParts[1]) / 255.0;
-			double b = double.Parse(rgbParts[2]) / 255.0;
 
-			for (int i = 0; i < Files.Count; i++)
-			{
-				token.ThrowIfCancellationRequested();
-				var fileItem = Files[i];
-				fileItem.Status = "Đang đóng dấu...";
-				OverallStatusText.Text = $"Đang xử lý tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
-
-				string outPath = Path.Combine(_selectedFolder, $"watermarked_{fileItem.FileName}");
-				bool success = false;
-
-				await Task.Run(() =>
-				{
-					try
-					{
-						success = PdfInterop.PdfCore.add_pdf_watermark(fileItem.FilePath, text, angle, opacity, fontSize, r, g, b, outPath);
-					}
-					catch (OperationCanceledException)
-					{
-						throw;
-					}
-					catch { }
-				});
-
-				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
-				OverallProgressBar.Value = i + 1;
-			}
-
-			OverallStatusText.Text = "Đã hoàn thành đóng dấu tất cả tệp!";
-			MessageBox.Show(this, "Hoàn tất đóng dấu hàng loạt!", "Đóng dấu PDF", MessageBoxButton.OK, MessageBoxImage.Information);
-		}
-
-		private async Task StartSecurityFlowAsync(CancellationToken token)
-		{
-			string action = (SecurityActionComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Encrypt";
-			string userPwd = SecurityUserPasswordTextBox.Text;
-			string ownerPwd = SecurityOwnerPasswordTextBox.Text;
-			bool allowPrint = SecurityAllowPrintCheckBox.IsChecked == true;
-			bool allowCopy = SecurityAllowCopyCheckBox.IsChecked == true;
-
-			if (action == "Encrypt" && string.IsNullOrEmpty(userPwd) && string.IsNullOrEmpty(ownerPwd))
-			{
-				MessageBox.Show(this, "Vui lòng điền mật khẩu mở hoặc quản trị.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-
-			for (int i = 0; i < Files.Count; i++)
-			{
-				token.ThrowIfCancellationRequested();
-				var fileItem = Files[i];
-				fileItem.Status = action == "Encrypt" ? "Đang mã hóa..." : "Đang gỡ bảo mật...";
-				OverallStatusText.Text = $"Đang xử lý tệp {i + 1}/{Files.Count}: {fileItem.FileName}...";
-
-				string prefix = action == "Encrypt" ? "secured_" : "unsecured_";
-				string outPath = Path.Combine(_selectedFolder, $"{prefix}{fileItem.FileName}");
-				bool success = false;
-
-				await Task.Run(() =>
-				{
-					try
-					{
-						if (action == "Encrypt")
-						{
-							using (var document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify))
-							{
-								var securitySettings = document.SecuritySettings;
-								if (!string.IsNullOrEmpty(userPwd))
-									securitySettings.UserPassword = userPwd;
-								if (!string.IsNullOrEmpty(ownerPwd))
-									securitySettings.OwnerPassword = ownerPwd;
-
-								securitySettings.PermitPrint = allowPrint;
-								securitySettings.PermitExtractContent = allowCopy;
-								
-								document.Save(outPath);
-								success = true;
-							}
-						}
-						else
-						{
-							PdfSharp.Pdf.PdfDocument document = null;
-							try
-							{
-								document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, userPwd, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
-							}
-							catch
-							{
-								if (!string.IsNullOrEmpty(ownerPwd))
-								{
-									document = PdfSharp.Pdf.IO.PdfReader.Open(fileItem.FilePath, ownerPwd, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
-								}
-								else
-								{
-									throw;
-								}
-							}
-
-							using (document)
-							{
-								using (var outDoc = new PdfSharp.Pdf.PdfDocument())
-								{
-									foreach (var page in document.Pages)
-									{
-										outDoc.AddPage(page);
-									}
-									outDoc.Save(outPath);
-									success = true;
-								}
-							}
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						throw;
-					}
-					catch { }
-				});
-
-				fileItem.Status = success ? "Thành công" : "Lỗi xử lý";
-				OverallProgressBar.Value = i + 1;
-			}
-
-			OverallStatusText.Text = action == "Encrypt" ? "Đã hoàn thành bảo mật tất cả tệp!" : "Đã hoàn thành gỡ bảo mật tất cả tệp!";
-			MessageBox.Show(this, action == "Encrypt" ? "Hoàn tất bảo mật hàng loạt!" : "Hoàn tất gỡ bỏ bảo mật hàng loạt!", "Bảo mật PDF", MessageBoxButton.OK, MessageBoxImage.Information);
-		}
 
 		private async Task StartConvertFlowAsync(CancellationToken token)
 		{
@@ -1244,26 +656,7 @@ namespace PdfViewerApp
 			return false;
 		}
 
-		private void SecurityActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-		{
-			if (SecurityActionComboBox == null || SecurityOwnerPasswordTextBox == null || SecurityAllowPrintCheckBox == null || SecurityAllowCopyCheckBox == null)
-				return;
 
-			string action = (SecurityActionComboBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "Encrypt";
-			if (action == "Decrypt")
-			{
-				SecurityOwnerPasswordTextBox.Text = string.Empty;
-				SecurityOwnerPasswordTextBox.IsEnabled = false;
-				SecurityAllowPrintCheckBox.IsEnabled = false;
-				SecurityAllowCopyCheckBox.IsEnabled = false;
-			}
-			else
-			{
-				SecurityOwnerPasswordTextBox.IsEnabled = true;
-				SecurityAllowPrintCheckBox.IsEnabled = true;
-				SecurityAllowCopyCheckBox.IsEnabled = true;
-			}
-		}
 	}
 
 	public class BatchToolFileItem : INotifyPropertyChanged

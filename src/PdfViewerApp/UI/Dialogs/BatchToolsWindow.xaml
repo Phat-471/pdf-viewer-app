@@ -371,106 +371,40 @@
       <Border Grid.Column="2" Background="#1E293B" BorderBrush="#334155" BorderThickness="1.5" CornerRadius="8">
         <TabControl Name="BatchTabControl" Background="Transparent" BorderThickness="0" SelectionChanged="BatchTabControl_SelectionChanged">
           
-          <!-- TAB 1: PRINT -->
-          <TabItem Header="In Hàng Loạt">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Cấu Hình In Chung" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Select Printer -->
-                <TextBlock Text="Máy in" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="PrinterComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" DisplayMemberPath="FullName" SelectionChanged="PrinterComboBox_SelectionChanged" />
-
-                <!-- Copies -->
-                <TextBlock Text="Số bản in (Copies)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="CopiesTextBox" Text="1" Style="{StaticResource ModernTextBox}" Height="32" VerticalAlignment="Center" HorizontalAlignment="Left" Width="80" Margin="0,0,0,16" KeyDown="NumberValidation_KeyDown" TextAlignment="Center" />
-
-                <!-- Page range -->
-                <TextBlock Text="Phạm vi trang" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <RadioButton Name="AllPagesRadio" Content="Tất cả các trang" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" Checked="PageRangeRadio_Checked" />
-                <RadioButton Name="CustomPagesRadio" Content="Trang chỉ định (ví dụ: 1-5, 8)" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="PageRangeRadio_Checked" />
-                <TextBox Name="PageRangeTextBox" Style="{StaticResource ModernTextBox}" Height="32" Width="180" HorizontalAlignment="Left" Margin="24,0,0,16" IsEnabled="False" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Size options -->
-                <TextBlock Text="Căn chỉnh kích thước" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <RadioButton Name="FitMarginsRadio" Content="Tự động căn vừa vùng in (Fit)" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" />
-                <RadioButton Name="ActualSizeRadio" Content="Kích thước thực tế (Actual size)" Foreground="#F8FAFC" Margin="0,0,0,16" />
-
-                <CheckBox Name="AutoCenterCheckBox" Content="Tự động căn giữa trang in" IsChecked="True" Margin="0,0,0,10" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Engine options -->
-                <TextBlock Text="Cơ chế in (Print Engine)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
-                  <ComboBoxItem Content="Native PDFium (Tốc độ cao, siêu nét)" Tag="NativePdfium_Optimized" />
-                  <ComboBoxItem Content="WPF Bitmap (Tương thích cao)" Tag="WpfBitmap" />
-                </ComboBox>
-
-                <CheckBox Name="OptimizeCadCheckBox" Content="Tối ưu nét in bản vẽ CAD/Vector" IsChecked="True" Margin="0,0,0,8" />
-                <CheckBox Name="SeparateJobsCheckBox" Content="Tách lệnh in từng trang (giảm lag)" IsChecked="False" Margin="0,0,0,8" />
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <!-- TAB 2: ROTATE -->
-          <TabItem Header="Xoay Trang">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Cấu Hình Xoay Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Rotate Angle -->
-                <TextBlock Text="Góc xoay (theo chiều kim đồng hồ)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="RotateAngleComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
-                  <ComboBoxItem Content="Xoay phải 90°" Tag="90" />
-                  <ComboBoxItem Content="Xoay ngược 180°" Tag="180" />
-                  <ComboBoxItem Content="Xoay trái 90° (270°)" Tag="270" />
-                </ComboBox>
-
-                <!-- Page range for rotation -->
-                <TextBlock Text="Áp dụng cho trang" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <RadioButton Name="RotateAllRadio" Content="Tất cả các trang" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
-                <RadioButton Name="RotateOddRadio" Content="Chỉ trang lẻ" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
-                <RadioButton Name="RotateEvenRadio" Content="Chỉ trang chẵn" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
-                <RadioButton Name="RotateCustomRadio" Content="Dải trang chỉ định (ví dụ: 1-3, 5)" Foreground="#F8FAFC" Margin="0,0,0,6" Checked="RotateRadio_Checked" />
-                <TextBox Name="RotatePageRangeTextBox" Style="{StaticResource ModernTextBox}" Height="32" Width="180" HorizontalAlignment="Left" Margin="24,0,0,16" IsEnabled="False" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Output Folder -->
-                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Name="RotateOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
-                  <Button Name="RotateBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
-                </Grid>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <!-- TAB 3: COMPRESS -->
+          <!-- TAB 1: COMPRESS -->
           <TabItem Header="Nén PDF">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
               <StackPanel>
-                <TextBlock Text="Cấu Hình Nén Dung Lượng Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
+                <TextBlock Text="Cấu Hình Nén PDF Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
 
-                <!-- Compression Quality -->
-                <TextBlock Text="Chất lượng ảnh nén (1-100)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <Slider Name="CompressQualitySlider" Minimum="10" Maximum="100" Value="60" SmallChange="5" LargeChange="10" Grid.Column="0" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding ElementName=CompressQualitySlider, Path=Value, StringFormat={}{0:0}}" Foreground="#38BDF8" FontWeight="Bold" FontSize="14" Width="40" TextAlignment="Right" Grid.Column="1" VerticalAlignment="Center" />
-                </Grid>
+                <!-- Mode Selection -->
+                <TextBlock Text="Phương thức nén" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,8" />
+                <StackPanel Margin="0,0,0,16">
+                  <RadioButton Name="CompressModeLossless" Content="Nén tối ưu (Không giảm chất lượng - Lossless)" Foreground="#F8FAFC" IsChecked="True" Margin="0,0,0,8" Checked="CompressMode_Checked" Unchecked="CompressMode_Checked" />
+                  <RadioButton Name="CompressModeStandard" Content="Nén hình ảnh (Giảm dung lượng - Lossy)" Foreground="#F8FAFC" Margin="0,0,0,8" Checked="CompressMode_Checked" Unchecked="CompressMode_Checked" />
+                </StackPanel>
 
-                <TextBlock Text="* Giảm chất lượng ảnh sẽ giúp tệp PDF nhẹ hơn đáng kể đối với tài liệu quét (Scan) hoặc chứa nhiều hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
+                <!-- Lossless Options -->
+                <StackPanel Name="LosslessOptionsPanel" Margin="12,0,0,16">
+                  <CheckBox Name="OptCompressStreamsCheckBox" Content="Nén các dòng dữ liệu (FlateDecode)" IsChecked="True" Margin="0,0,0,10" />
+                  <CheckBox Name="OptPruneObjectsCheckBox" Content="Dọn dẹp tài nguyên thừa (Prune)" IsChecked="True" Margin="0,0,0,10" />
+                  <CheckBox Name="OptRemoveMetadataCheckBox" Content="Loại bỏ Metadata / XML dư thừa" IsChecked="True" Margin="0,0,0,10" />
+                  <TextBlock Text="* Tối ưu hóa cấu trúc bên trong PDF, hoàn toàn KHÔNG làm giảm độ phân giải hay độ nét của hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </StackPanel>
+
+                <!-- Standard Options -->
+                <StackPanel Name="StandardOptionsPanel" Margin="12,0,0,16" Visibility="Collapsed">
+                  <TextBlock Text="Chất lượng ảnh nén (1-100)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
+                  <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Slider Name="CompressQualitySlider" Minimum="10" Maximum="100" Value="60" SmallChange="5" LargeChange="10" Grid.Column="0" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ElementName=CompressQualitySlider, Path=Value, StringFormat={}{0:0}}" Foreground="#38BDF8" FontWeight="Bold" FontSize="14" Width="40" TextAlignment="Right" Grid.Column="1" VerticalAlignment="Center" />
+                  </Grid>
+                  <TextBlock Text="* Giảm chất lượng ảnh sẽ giúp tệp PDF nhẹ hơn đáng kể đối với tài liệu quét (Scan) hoặc chứa nhiều hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
 
                 <Separator Background="#334155" Margin="0,8,0,16" />
 
@@ -488,37 +422,7 @@
             </ScrollViewer>
           </TabItem>
 
-          <!-- TAB 3B: OPTIMIZE (LOSSLESS COMPRESS) -->
-          <TabItem Header="Nén Tối Ưu">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Cấu Hình Nén Tối Ưu Không Giảm Chất Lượng" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Lossless Options -->
-                <CheckBox Name="OptCompressStreamsCheckBox" Content="Nén các dòng dữ liệu (FlateDecode)" IsChecked="True" Margin="0,0,0,10" />
-                <CheckBox Name="OptPruneObjectsCheckBox" Content="Dọn dẹp tài nguyên thừa (Prune)" IsChecked="True" Margin="0,0,0,10" />
-                <CheckBox Name="OptRemoveMetadataCheckBox" Content="Loại bỏ Metadata / XML dư thừa" IsChecked="True" Margin="0,0,0,10" />
-
-                <TextBlock Text="* Tính năng này giúp giảm dung lượng file tối đa bằng cách tối ưu hóa cấu trúc bên trong PDF, hoàn toàn KHÔNG làm giảm độ phân giải hay độ nét của hình ảnh." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,16" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Output Folder -->
-                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Name="OptOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
-                  <Button Name="OptBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
-                </Grid>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-
-          <!-- TAB 4: EXTRACT -->
+          <!-- TAB 2: EXTRACT -->
           <TabItem Header="Trích Xuất Trang">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
               <StackPanel>
@@ -546,138 +450,7 @@
             </ScrollViewer>
           </TabItem>
 
-          <!-- TAB 5: MERGE -->
-          <TabItem Header="Gộp File">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Gộp Các File PDF Thành Một" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Output File Name -->
-                <TextBlock Text="Tên file kết quả gộp" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="MergeFileNameTextBox" Text="MergedDocument.pdf" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
-
-                <TextBlock Text="* Các file PDF trong danh sách bên trái sẽ được ghép nối theo thứ tự từ trên xuống dưới." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,16" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Output Folder -->
-                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Name="MergeOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
-                  <Button Name="MergeBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
-                </Grid>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <!-- TAB 6: WATERMARK -->
-          <TabItem Header="Đóng Dấu">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Đóng Dấu Bản Quyền Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Watermark Text -->
-                <TextBlock Text="Nội dung đóng dấu (Watermark Text)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="WatermarkTextTextBox" Text="CONFIDENTIAL" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
-
-                <!-- Font Size -->
-                <TextBlock Text="Cỡ chữ (Font Size)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="WatermarkFontSizeTextBox" Text="48" Style="{StaticResource ModernTextBox}" Height="32" Width="100" HorizontalAlignment="Left" Margin="0,0,0,16" KeyDown="NumberValidation_KeyDown" TextAlignment="Center" />
-
-                <!-- Opacity -->
-                <TextBlock Text="Độ mờ (Opacity: 0.1 - 1.0)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <Slider Name="WatermarkOpacitySlider" Minimum="0.1" Maximum="1.0" Value="0.3" SmallChange="0.05" LargeChange="0.1" Grid.Column="0" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding ElementName=WatermarkOpacitySlider, Path=Value, StringFormat={}{0:0.00}}" Foreground="#38BDF8" FontWeight="Bold" FontSize="14" Width="50" TextAlignment="Right" Grid.Column="1" VerticalAlignment="Center" />
-                </Grid>
-
-                <!-- Angle -->
-                <TextBlock Text="Góc xoay (độ)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="WatermarkAngleComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="1">
-                  <ComboBoxItem Content="Ngang (0°)" Tag="0" />
-                  <ComboBoxItem Content="Chéo (45°)" Tag="45" />
-                  <ComboBoxItem Content="Dọc (90°)" Tag="90" />
-                  <ComboBoxItem Content="Chéo ngược (135°)" Tag="135" />
-                </ComboBox>
-
-                <!-- Color -->
-                <TextBlock Text="Màu sắc" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="WatermarkColorComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0">
-                  <ComboBoxItem Content="Màu Xám (Mặc định)" Tag="128,128,128" />
-                  <ComboBoxItem Content="Màu Đỏ" Tag="239,68,68" />
-                  <ComboBoxItem Content="Màu Xanh Dương" Tag="59,130,246" />
-                  <ComboBoxItem Content="Màu Đen" Tag="0,0,0" />
-                </ComboBox>
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Output Folder -->
-                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Name="WatermarkOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
-                  <Button Name="WatermarkBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
-                </Grid>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <!-- TAB 7: SECURITY -->
-          <TabItem Header="Bảo Mật">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-              <StackPanel>
-                <TextBlock Text="Bảo Mật &amp; Mã Hóa Hàng Loạt" FontSize="15" FontWeight="Bold" Foreground="#14B8A6" Margin="0,0,0,16" />
-
-                <!-- Action selection -->
-                <TextBlock Text="Hành động" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <ComboBox Name="SecurityActionComboBox" Style="{StaticResource ModernComboBox}" Height="34" Margin="0,0,0,16" SelectedIndex="0" SelectionChanged="SecurityActionComboBox_SelectionChanged">
-                  <ComboBoxItem Content="Mã hóa &amp; Đặt mật khẩu" Tag="Encrypt" />
-                  <ComboBoxItem Content="Gỡ bỏ mật khẩu &amp; Bảo mật" Tag="Decrypt" />
-                </ComboBox>
-
-                <!-- User Password -->
-                <TextBlock Text="Mật khẩu mở file (Đọc giả)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="SecurityUserPasswordTextBox" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
-
-                <!-- Owner Password -->
-                <TextBlock Text="Mật khẩu quản trị (Owner Password)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <TextBox Name="SecurityOwnerPasswordTextBox" Style="{StaticResource ModernTextBox}" Height="32" Margin="0,0,0,16" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Permissions -->
-                <TextBlock Text="Thiết lập quyền truy cập (khi có mật khẩu quản trị)" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <CheckBox Name="SecurityAllowPrintCheckBox" Content="Cho phép In tài liệu" IsChecked="True" Margin="0,0,0,8" />
-                <CheckBox Name="SecurityAllowCopyCheckBox" Content="Cho phép Sao chép nội dung &amp; Trích xuất" IsChecked="True" Margin="0,0,0,16" />
-
-                <Separator Background="#334155" Margin="0,8,0,16" />
-
-                <!-- Output Folder -->
-                <TextBlock Text="Thư mục lưu kết quả" Foreground="#94A3B8" FontSize="12" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Name="SecurityOutputDirTextBox" Style="{StaticResource ModernTextBox}" Height="32" Grid.Column="0" IsReadOnly="True" />
-                  <Button Name="SecurityBrowseBtn" Content="Duyệt..." Style="{StaticResource SecondaryButton}" Height="32" Grid.Column="1" Margin="8,0,0,0" Click="BrowseFolder_Click" />
-                </Grid>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <!-- TAB 8: CONVERT -->
+          <!-- TAB 3: CONVERT -->
           <TabItem Header="Chuyển Đổi">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
               <StackPanel>

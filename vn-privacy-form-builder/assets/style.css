@@ -1,0 +1,179 @@
+/* VN Privacy Form Builder Stylesheet */
+.vn-privacy-form-wrapper {
+    max-width: 100%;
+    width: 100%;
+    margin: 20px auto;
+    box-sizing: border-box;
+}
+
+.vn-privacy-custom-form {
+    background-color: var(--color-card-bg, #ffffff);
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+    row-gap: 18px;
+}
+
+.vn-form-heading {
+    margin-top: 0;
+    margin-bottom: 5px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--color-primary, #0f172a);
+    text-align: center;
+    width: 100%;
+}
+
+.vn-form-group {
+    margin-bottom: 0;
+    box-sizing: border-box;
+}
+
+.vn-col-100 {
+    width: 100%;
+}
+
+.vn-col-50 {
+    width: calc(50% - 8px);
+}
+
+@media (max-width: 600px) {
+    .vn-col-50 {
+        width: 100%;
+    }
+}
+
+.vn-form-label {
+    display: block;
+    font-weight: 700;
+    font-size: 0.88rem;
+    margin-bottom: 6px;
+    color: var(--color-primary, #0f172a);
+    text-align: left;
+}
+
+.vn-form-input {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 0.95rem;
+    border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: 6px;
+    box-sizing: border-box;
+    background-color: var(--color-bg, #f8fafc);
+    color: var(--color-primary, #0f172a);
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.vn-form-input:focus {
+    border-color: var(--color-accent, #d97706);
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.vn-form-textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Consent Checkbox Layout */
+.vn-consent-group {
+    margin-top: 15px;
+    margin-bottom: 20px;
+}
+
+.vn-consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-weight: normal;
+    font-size: 0.85rem;
+    color: var(--color-secondary, #475569);
+    cursor: pointer;
+    text-align: left;
+    line-height: 1.45;
+}
+
+.vn-consent-label input[type="checkbox"] {
+    margin-top: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.vn-consent-label a {
+    color: var(--color-accent, #d97706);
+    text-decoration: underline;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.vn-consent-label a:hover {
+    color: var(--color-accent-hover, #b45309);
+}
+
+/* AJAX Message Box */
+.vn-form-message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    text-align: left;
+    border: 1px solid transparent;
+}
+
+.vn-form-message.vn-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border-color: #10b981;
+}
+
+.vn-form-message.vn-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border-color: #ef4444;
+}
+
+/* Submit Button */
+.vn-form-submit-btn {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--color-accent, #d97706);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(217, 119, 6, 0.15);
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vn-form-submit-btn:hover:not(:disabled) {
+    background-color: var(--color-accent-hover, #b45309);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(217, 119, 6, 0.25);
+}
+
+.vn-form-submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-spinner {
+    font-size: 0.95rem;
+}
+
+.vn-consent-group, .vn-form-message, .vn-form-submit-btn {
+    width: 100% !important;
+}

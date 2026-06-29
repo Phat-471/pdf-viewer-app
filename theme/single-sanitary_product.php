@@ -271,18 +271,34 @@
 
 			<div class="form-group">
 				<label for="inquiry_fullname">Họ tên của bạn <span class="required">*</span></label>
-				<input type="text" name="fullname" id="inquiry_fullname" required placeholder="Ví dụ: Nguyễn Văn A" />
+				<div class="input-icon-wrapper">
+					<span class="field-icon">👤</span>
+					<input type="text" name="fullname" id="inquiry_fullname" required placeholder="Ví dụ: Nguyễn Văn A" />
+				</div>
 			</div>
 
 			<div class="form-group">
 				<label for="inquiry_phone">Số điện thoại <span class="required">*</span></label>
-				<input type="tel" name="phone" id="inquiry_phone" required placeholder="Ví dụ: 0912345678" />
+				<div class="input-icon-wrapper">
+					<span class="field-icon">📞</span>
+					<input type="tel" name="phone" id="inquiry_phone" required placeholder="Ví dụ: 0912345678" />
+				</div>
 				<span class="error-msg" id="phone-error" style="display: none; color: #ef4444; font-size: 0.85rem; margin-top: 4px;">Số điện thoại chưa hợp lệ. Vui lòng nhập số điện thoại Việt Nam 10 chữ số.</span>
 			</div>
 
 			<div class="form-group">
 				<label for="inquiry_message">Yêu cầu chi tiết (Không bắt buộc)</label>
-				<textarea name="message" id="inquiry_message" rows="3" placeholder="Ví dụ: Cần tư vấn lắp đặt tại công trình quận 2..."></textarea>
+				<div class="input-icon-wrapper">
+					<span class="field-icon" style="top: 15px; transform: none;">✉️</span>
+					<textarea name="message" id="inquiry_message" rows="3" placeholder="Ví dụ: Cần tư vấn lắp đặt tại công trình quận 2..."></textarea>
+				</div>
+			</div>
+
+			<div class="form-group consent-group" style="margin-top: 15px; margin-bottom: 15px;">
+				<label style="display: flex; align-items: flex-start; gap: 8px; font-weight: normal; font-size: 0.85rem; color: var(--color-secondary); cursor: pointer; text-align: left;">
+					<input type="checkbox" name="data_consent" id="inquiry_consent" value="yes" required style="margin-top: 3px; cursor: pointer;" />
+					<span>Tôi đồng ý cho phép Hồng Miên thu thập và xử lý thông tin cá nhân của tôi (Họ tên, SĐT) để tư vấn báo giá theo <a href="<?php echo esc_url( home_url( '/chinh-sach-bao-mat/' ) ); ?>" target="_blank" style="color: var(--color-accent); text-decoration: underline; font-weight: 600;">Chính sách bảo mật</a>. <span class="required" style="color: #ef4444;">*</span></span>
+				</label>
 			</div>
 
 			<div class="form-message" id="inquiry-form-response" style="display: none; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.9rem;"></div>
@@ -364,20 +380,42 @@ document.addEventListener('DOMContentLoaded', function() {
 		var phone = phoneInput.value.trim();
 		var phoneRegex = /^(03|05|07|08|09)\d{8}$/;
 
+		var triggerShake = function() {
+			var container = modal.querySelector('.sanitary-modal-container');
+			if (container) {
+				container.classList.remove('shake');
+				void container.offsetWidth; // Trigger reflow to restart animation
+				container.classList.add('shake');
+				setTimeout(function() {
+					container.classList.remove('shake');
+				}, 500);
+			}
+		};
+
 		// Validate
 		if (fullname === '') {
+			triggerShake();
 			alert('Vui lòng nhập Họ tên.');
 			return;
 		}
 
 		if (phone === '') {
+			triggerShake();
 			alert('Vui lòng nhập Số điện thoại.');
 			return;
 		}
 
 		if (!phoneRegex.test(phone)) {
+			triggerShake();
 			if (phoneError) phoneError.style.display = 'block';
 			phoneInput.focus();
+			return;
+		}
+
+		var consentCheckbox = document.getElementById('inquiry_consent');
+		if (consentCheckbox && !consentCheckbox.checked) {
+			triggerShake();
+			alert('Bạn cần đồng ý với Điều khoản & Chính sách bảo mật để gửi yêu cầu.');
 			return;
 		}
 

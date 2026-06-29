@@ -1,0 +1,189 @@
+/*
+ * VN Contact Buttons — Frontend Styles
+ * PC: Sidebar dọc ở góc màn hình + hover expand
+ * Mobile: Bottom bar cố định kiểu app
+ */
+
+/* ── Variables ────────────────────────────────────────────── */
+:root {
+  --vn-phone-color:     #25d366;
+  --vn-zalo-color:      #0068ff;
+  --vn-messenger-color: #0084ff;
+  --vn-btn-size:        52px;
+  --vn-mobile-bar-h:    64px;
+  --vn-shadow:          0 4px 16px rgba(0,0,0,.18);
+  --vn-radius:          30px;
+}
+
+/* ── Container tổng ───────────────────────────────────────── */
+.vn-contact-wrap {
+  position: fixed;
+  z-index: 99998;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none; /* chỉ các con mới nhận click */
+}
+.vn-contact-right { right: 18px; }
+.vn-contact-left  { left: 18px; align-items: flex-start; }
+
+/* ─────────────────────────────────────────────────────────── */
+/*  PC SIDEBAR — hiện trên tablet trở lên                     */
+/* ─────────────────────────────────────────────────────────── */
+.vn-contact-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.vn-contact-btn {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  text-decoration: none;
+  border-radius: var(--vn-radius);
+  overflow: hidden;
+  height: var(--vn-btn-size);
+  box-shadow: var(--vn-shadow);
+  transition: all .28s cubic-bezier(.4,0,.2,1);
+  white-space: nowrap;
+  max-width: var(--vn-btn-size);         /* collapsed */
+}
+
+/* Hover: mở rộng sang trái/phải tuỳ vị trí */
+.vn-contact-right .vn-contact-btn:hover { max-width: 220px; flex-direction: row-reverse; }
+.vn-contact-left  .vn-contact-btn:hover { max-width: 220px; }
+
+.vn-contact-icon {
+  width: var(--vn-btn-size);
+  height: var(--vn-btn-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+.vn-contact-btn:hover .vn-contact-icon { transform: scale(1.1); }
+
+.vn-contact-label {
+  padding: 0 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0;
+  transform: translateX(8px);
+  transition: opacity .2s .05s, transform .2s .05s;
+  overflow: hidden;
+  max-width: 0;
+}
+.vn-contact-btn:hover .vn-contact-label {
+  opacity: 1;
+  transform: translateX(0);
+  max-width: 160px;
+}
+
+/* Màu từng nút */
+.vn-btn-phone     { background: var(--vn-phone-color); }
+.vn-btn-zalo      { background: var(--vn-zalo-color); }
+.vn-btn-messenger { background: var(--vn-messenger-color); }
+
+/* Animation pulse (nhấp nháy chú ý) */
+@keyframes vn-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(37,211,102,0); }
+  100% { box-shadow: 0 0 0 0 rgba(37,211,102,0); }
+}
+.vn-btn-phone { animation: vn-pulse 2.4s infinite; }
+
+/* ─────────────────────────────────────────────────────────── */
+/*  MOBILE BOTTOM BAR                                          */
+/* ─────────────────────────────────────────────────────────── */
+.vn-contact-mobile-bar {
+  display: none; /* ẩn trên PC, hiện qua media query */
+}
+
+/* ── Device visibility controls ──────────────────────────── */
+.vn-contact-hide-desktop .vn-contact-sidebar { display: none !important; }
+.vn-contact-hide-mobile  .vn-contact-mobile-bar { display: none !important; }
+
+/* ─────────────────────────────────────────────────────────── */
+/*  RESPONSIVE — Mobile ≤ 768px                               */
+/* ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Ẩn sidebar PC */
+  .vn-contact-wrap:not(.vn-contact-hide-mobile) .vn-contact-sidebar {
+    display: none;
+  }
+
+  /* Hiện bottom bar mobile */
+  .vn-contact-wrap:not(.vn-contact-hide-mobile) .vn-contact-mobile-bar {
+    display: flex;
+  }
+
+  /* Reset wrapper để mobile bar chiếm bottom */
+  .vn-contact-wrap {
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 100%;
+    align-items: stretch;
+    gap: 0;
+    pointer-events: auto;
+  }
+
+  /* Bottom bar: full-width thanh ngang */
+  .vn-contact-mobile-bar {
+    position: relative;
+    width: 100%;
+    height: var(--vn-mobile-bar-h);
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,.1);
+    align-items: stretch;
+    justify-content: stretch;
+    gap: 0;
+    pointer-events: auto;
+  }
+
+  .vn-mobile-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 700;
+    transition: background .15s;
+    border: none;
+    padding: 6px 4px;
+  }
+  .vn-mobile-btn:active { opacity: .75; }
+
+  .vn-mobile-icon { font-size: 22px; line-height: 1; }
+  .vn-mobile-label { line-height: 1; }
+
+  .vn-mbtn-phone     { background: var(--vn-phone-color);     color: #fff; }
+  .vn-mbtn-zalo      { background: var(--vn-zalo-color);      color: #fff; }
+  .vn-mbtn-messenger { background: var(--vn-messenger-color); color: #fff; }
+
+  /* Nếu chỉ có 2 nút */
+  .vn-contact-mobile-bar .vn-mobile-btn:only-child { border-radius: 0; }
+
+  /* Separator giữa các nút */
+  .vn-mobile-btn + .vn-mobile-btn { border-left: 1px solid rgba(255,255,255,.25); }
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/*  Tablet 769–1024px: sidebar nhỏ hơn                        */
+/* ─────────────────────────────────────────────────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root { --vn-btn-size: 46px; }
+  .vn-contact-btn { font-size: 18px; }
+}

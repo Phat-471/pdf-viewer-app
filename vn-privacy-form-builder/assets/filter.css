@@ -1,0 +1,636 @@
+/* ============================================================
+   VN Product Filter - Frontend Styles
+   Plugin: vn-privacy-form-builder
+   ============================================================ */
+
+:root {
+  --vn-filter-primary: #d97706;
+  --vn-filter-primary-light: #fef3c7;
+  --vn-filter-text: #1e293b;
+  --vn-filter-muted: #64748b;
+  --vn-filter-border: #e2e8f0;
+  --vn-filter-bg: #ffffff;
+  --vn-filter-radius: 10px;
+  --vn-filter-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 20px rgba(0,0,0,.04);
+}
+
+/* ── Wrapper tổng ─────────────────────────────────────────── */
+.vn-filter-wrap {
+  display: flex;
+  gap: 28px;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--vn-filter-text);
+}
+
+.vn-filter-wrap.vn-layout-sidebar-left  { flex-direction: row; }
+.vn-filter-wrap.vn-layout-sidebar-right { flex-direction: row-reverse; }
+.vn-filter-wrap.vn-layout-top-bar       { flex-direction: column; }
+
+/* ── Sidebar ──────────────────────────────────────────────── */
+.vn-filter-sidebar {
+  flex: 0 0 260px;
+  min-width: 220px;
+}
+
+.vn-filter-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.vn-filter-content.full-width { width: 100%; }
+
+/* ── Filter Panel ─────────────────────────────────────────── */
+.vn-filter-panel {
+  background: var(--vn-filter-bg);
+  border: 1px solid var(--vn-filter-border);
+  border-radius: var(--vn-filter-radius);
+  box-shadow: var(--vn-filter-shadow);
+  overflow: hidden;
+}
+
+.vn-filter-panel.horizontal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--vn-filter-radius);
+}
+.vn-filter-panel.horizontal .vn-filter-group {
+  flex: 1;
+  min-width: 180px;
+  border: none;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.vn-filter-panel.horizontal .vn-filter-actions {
+  align-self: flex-end;
+}
+
+/* ── Filter Header ────────────────────────────────────────── */
+.vn-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--vn-filter-border);
+  background: linear-gradient(135deg, #fef9ec 0%, #fff 100%);
+}
+
+.vn-filter-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--vn-filter-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vn-reset-btn {
+  background: none;
+  border: 1px solid var(--vn-filter-border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vn-filter-muted);
+  transition: all .2s;
+}
+.vn-reset-btn:hover {
+  border-color: var(--vn-filter-primary);
+  color: var(--vn-filter-primary);
+}
+
+/* ── Filter Group (accordion) ─────────────────────────────── */
+.vn-filter-group {
+  border-bottom: 1px solid var(--vn-filter-border);
+}
+.vn-filter-group:last-child { border-bottom: none; }
+
+.vn-filter-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 13px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vn-filter-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s;
+}
+.vn-filter-group-toggle:hover { background: #f8fafc; }
+
+.vn-toggle-arrow {
+  font-size: 11px;
+  color: var(--vn-filter-muted);
+  transition: transform .2s;
+}
+.vn-filter-group.is-open .vn-toggle-arrow { transform: rotate(180deg); }
+
+.vn-filter-group-body {
+  padding: 4px 18px 14px;
+}
+.vn-filter-group-body[style*="display:none"] { display: none; }
+
+/* ── Filter List & Items ──────────────────────────────────── */
+.vn-filter-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.vn-filter-list::-webkit-scrollbar { width: 4px; }
+.vn-filter-list::-webkit-scrollbar-thumb { background: var(--vn-filter-border); border-radius: 4px; }
+
+.vn-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--vn-filter-text);
+  transition: color .15s;
+}
+.vn-filter-item:hover { color: var(--vn-filter-primary); }
+.vn-filter-item input[type="checkbox"] { display: none; }
+
+/* Custom checkbox */
+.vn-checkmark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--vn-filter-border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  background: #fff;
+}
+.vn-filter-item input:checked ~ .vn-checkmark {
+  background: var(--vn-filter-primary);
+  border-color: var(--vn-filter-primary);
+}
+.vn-filter-item input:checked ~ .vn-checkmark::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.vn-item-label { flex: 1; }
+.vn-item-count { color: var(--vn-filter-muted); font-size: 12px; }
+
+/* ── Color Swatches ───────────────────────────────────────── */
+.vn-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.1);
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform .2s, box-shadow .2s;
+}
+.vn-filter-item input:checked ~ .vn-color-swatch {
+  box-shadow: 0 0 0 3px var(--vn-filter-primary);
+  transform: scale(1.15);
+}
+
+/* ── Tag Cloud ────────────────────────────────────────────── */
+.vn-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.vn-tag-item {
+  cursor: pointer;
+}
+.vn-tag-item input { display: none; }
+.vn-tag-item span {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid var(--vn-filter-border);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--vn-filter-muted);
+  transition: all .2s;
+  background: #f8fafc;
+}
+.vn-tag-item input:checked + span {
+  background: var(--vn-filter-primary);
+  border-color: var(--vn-filter-primary);
+  color: #fff;
+}
+.vn-tag-item:hover span { border-color: var(--vn-filter-primary); color: var(--vn-filter-primary); }
+
+/* ── Price Slider ─────────────────────────────────────────── */
+.vn-price-slider-wrap {
+  padding: 8px 4px;
+}
+
+#vn-price-slider {
+  margin: 8px 6px 20px;
+}
+
+/* noUiSlider overrides */
+.noUi-target {
+  background: var(--vn-filter-border);
+  border: none;
+  box-shadow: none;
+  height: 4px;
+}
+.noUi-connect { background: var(--vn-filter-primary); }
+.noUi-handle {
+  width: 18px !important;
+  height: 18px !important;
+  top: -7px !important;
+  right: -9px !important;
+  border: 2px solid var(--vn-filter-primary);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  cursor: grab;
+}
+.noUi-handle::before, .noUi-handle::after { display: none; }
+
+.vn-price-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--vn-filter-text);
+  flex-wrap: wrap;
+}
+
+/* ── Toggle Switch (In Stock) ─────────────────────────────── */
+.vn-stock-toggle {
+  padding: 10px 0 !important;
+}
+.vn-toggle-switch {
+  width: 36px;
+  height: 20px;
+  background: var(--vn-filter-border);
+  border-radius: 10px;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .25s;
+}
+.vn-toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: transform .25s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.vn-filter-item input:checked ~ .vn-toggle-switch {
+  background: var(--vn-filter-primary);
+}
+.vn-filter-item input:checked ~ .vn-toggle-switch::after {
+  transform: translateX(16px);
+}
+
+/* ── Filter Actions ───────────────────────────────────────── */
+.vn-filter-actions {
+  padding: 14px 18px;
+  border-top: 1px solid var(--vn-filter-border);
+}
+
+.vn-btn-filter {
+  width: 100%;
+  padding: 11px 0;
+  background: var(--vn-filter-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background .2s, transform .15s;
+}
+.vn-btn-filter:hover { background: #b45309; transform: translateY(-1px); }
+.vn-btn-filter:active { transform: translateY(0); }
+.vn-btn-filter.loading { opacity: .75; pointer-events: none; }
+
+/* ── Toolbar ──────────────────────────────────────────────── */
+.vn-filter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--vn-filter-border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vn-found-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vn-filter-muted);
+  font-size: 13px;
+}
+#vn-total-count { font-weight: 600; color: var(--vn-filter-text); }
+
+.vn-sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--vn-filter-muted);
+}
+.vn-select {
+  padding: 7px 12px;
+  border: 1px solid var(--vn-filter-border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+  color: var(--vn-filter-text);
+}
+.vn-select:focus { outline: 2px solid var(--vn-filter-primary); border-color: transparent; }
+
+/* ── Product Grid ─────────────────────────────────────────── */
+.vn-products-wrapper {
+  position: relative;
+  min-height: 200px;
+  transition: opacity .3s;
+}
+.vn-products-wrapper.is-loading { opacity: .4; pointer-events: none; }
+
+.vn-products-wrapper.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.6);
+  z-index: 10;
+}
+
+.vn-products-grid {
+  display: grid;
+  gap: 20px;
+}
+.vn-cols-1 { grid-template-columns: 1fr; }
+.vn-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.vn-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.vn-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.vn-cols-5 { grid-template-columns: repeat(5, 1fr); }
+.vn-cols-6 { grid-template-columns: repeat(6, 1fr); }
+
+/* ── Product Card ─────────────────────────────────────────── */
+.vn-product-card {
+  background: var(--vn-filter-bg);
+  border: 1px solid var(--vn-filter-border);
+  border-radius: var(--vn-filter-radius);
+  overflow: hidden;
+  transition: box-shadow .25s, transform .25s;
+}
+.vn-product-card:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  transform: translateY(-3px);
+}
+
+.vn-product-image {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background: #f8fafc;
+}
+.vn-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .35s;
+}
+.vn-product-card:hover .vn-product-image img { transform: scale(1.06); }
+
+.vn-badge-sale, .vn-badge-outofstock {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.vn-badge-sale { background: #ef4444; color: #fff; }
+.vn-badge-outofstock { background: #64748b; color: #fff; }
+
+.vn-product-info { padding: 14px; }
+
+.vn-product-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.vn-product-title a { color: var(--vn-filter-text); text-decoration: none; }
+.vn-product-title a:hover { color: var(--vn-filter-primary); }
+
+.vn-product-rating { display: flex; gap: 2px; margin-bottom: 6px; }
+.vn-product-rating .star { color: #e2e8f0; font-size: 14px; }
+.vn-product-rating .star.filled { color: #f59e0b; }
+
+.vn-product-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--vn-filter-primary);
+  margin-bottom: 12px;
+}
+.vn-product-price del { color: var(--vn-filter-muted); font-weight: 400; font-size: 12px; }
+.vn-product-price ins { text-decoration: none; }
+
+.vn-add-to-cart {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  background: var(--vn-filter-primary);
+  color: #fff;
+  text-align: center;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .2s;
+}
+.vn-add-to-cart:hover { background: #b45309; color: #fff; }
+.out-of-stock .vn-add-to-cart { background: #94a3b8; cursor: default; }
+
+/* ── Empty State ──────────────────────────────────────────── */
+.vn-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--vn-filter-muted);
+}
+.vn-empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: .5; }
+.vn-btn-outline {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border: 2px solid var(--vn-filter-primary);
+  color: var(--vn-filter-primary);
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .2s;
+}
+.vn-btn-outline:hover { background: var(--vn-filter-primary); color: #fff; }
+
+/* ── Nút Đọc tiếp (Read More) ────────────────────────────── */
+/* Màu đồng bộ theo --vn-filter-primary từ cài đặt admin */
+.vn-read-more-btn {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  background: var(--vn-filter-primary);
+  color: #fff;
+  text-align: center;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity .2s, transform .15s;
+  letter-spacing: .3px;
+}
+.vn-read-more-btn:hover {
+  opacity: .85;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.vn-read-more-btn:active { transform: translateY(0); }
+
+/* ── Linked Filter — Term bị ẩn khi không có SP ──────────── */
+.vn-filter-item.vn-item-disabled {
+  opacity: .35;
+  pointer-events: none;    /* không cho click */
+  cursor: default;
+}
+/* Term vẫn đang được chọn — luôn hiện dù count = 0 */
+.vn-filter-item.vn-item-disabled.is-checked {
+  opacity: .7;
+  pointer-events: auto;
+}
+/* Badge count = 0 */
+.vn-item-count.is-zero {
+  color: #cbd5e1;
+}
+
+/* ── Pagination ───────────────────────────────────────────── */
+.vn-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.vn-page-info { color: var(--vn-filter-muted); font-size: 13px; }
+.vn-page-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.vn-page-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  background: #f8fafc;
+  border: 1px solid var(--vn-filter-border);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+  color: var(--vn-filter-text);
+}
+.vn-page-btn:hover { border-color: var(--vn-filter-primary); color: var(--vn-filter-primary); }
+.vn-page-btn.active {
+  background: var(--vn-filter-primary);
+  border-color: var(--vn-filter-primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Loading overlay ──────────────────────────────────────── */
+.vn-filter-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,.0);
+  z-index: 9999;
+  display: none;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media ( max-width: 768px ) {
+  .vn-filter-wrap,
+  .vn-filter-wrap.vn-layout-sidebar-left,
+  .vn-filter-wrap.vn-layout-sidebar-right {
+    flex-direction: column;
+  }
+  .vn-filter-sidebar { flex: unset; min-width: unset; }
+  .vn-cols-3 { grid-template-columns: repeat(2, 1fr); }
+  .vn-cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .vn-cols-5, .vn-cols-6 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media ( max-width: 480px ) {
+  .vn-cols-2, .vn-cols-3, .vn-cols-4, .vn-cols-5, .vn-cols-6 { grid-template-columns: 1fr; }
+  .vn-filter-toolbar { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Products Wrapper Loading state ────────────────────────── */
+#vn-products-wrapper {
+  position: relative;
+  transition: opacity 0.3s ease;
+}
+
+#vn-products-wrapper.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+#vn-products-wrapper.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 100px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid var(--vn-filter-primary, #d97706);
+  border-radius: 50%;
+  animation: vn-spin 0.8s linear infinite;
+  z-index: 10;
+}
+
+@keyframes vn-spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
