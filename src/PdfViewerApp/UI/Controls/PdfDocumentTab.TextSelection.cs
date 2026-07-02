@@ -2,11 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace PdfViewerApp;
 
 public partial class PdfDocumentTab
 {
+	// Giữ Page Handle sống trong bộ nhớ để Text Handle không bị crash khi click chuột
+	private readonly Dictionary<int, nint> _openedPdfPages = new Dictionary<int, nint>();
+
 	private nint GetTextPage(int pageNumber)
 	{
 		if (_textPages.TryGetValue(pageNumber, out var value))
@@ -19,13 +25,15 @@ public partial class PdfDocumentTab
 		}
 		lock (PdfiumEngine.SyncRoot)
 		{
-			nint num = PdfiumEngine.FPDF_LoadPage(_documentHandle, pageNumber - 1);
-			if (num == IntPtr.Zero)
+			nint pageHandle = PdfiumEngine.FPDF_LoadPage(_documentHandle, pageNumber - 1);
+			if (pageHandle == IntPtr.Zero)
 			{
 				return IntPtr.Zero;
 			}
-			value = PdfiumEngine.FPDFText_LoadPage(num);
-			PdfiumEngine.FPDF_ClosePage(num);
+			value = PdfiumEngine.FPDFText_LoadPage(pageHandle);
+			
+			// QUAN TRỌNG: Không ClosePage ở đây để giữ text bắt chuột nhạy bén
+			_openedPdfPages[pageNumber] = pageHandle;
 			_textPages[pageNumber] = value;
 			return value;
 		}
@@ -33,131 +41,101 @@ public partial class PdfDocumentTab
 
 	public void HighlightSelectedText(string colorHex)
 	{
-		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1)
+		if (_documentHandle == IntPtr.Zero || _selectionStartIndex == -1 || _selectionEndIndex == -1)
 		{
 			return;
 		}
 
-		int startPgIndex = Math.Min(_selectionStartPageIndex, _selectionEndPageIndex);
-		int endPgIndex = Math.Max(_selectionStartPageIndex, _selectionEndPageIndex);
-
-		SaveUndoState();
-
-		for (int pageIdx = startPgIndex; pageIdx <= endPgIndex; pageIdx++)
+		lock (PdfiumEngine.SyncRoot)
 		{
-			int pageNumber = pageIdx + 1;
-			nint textPage = GetTextPage(pageNumber);
-			if (textPage == IntPtr.Zero) continue;
-
-			int charCount;
-			lock (PdfiumEngine.SyncRoot)
+			bool flag = false;
+			int currentPage = (_selectionStartPageIndex != -1) ? _selectionStartPageIndex : SelectedPageNumber;
+			
+			int num2 = Math.Min(_selectionStartIndex, _selectionEndIndex);
+			int num3 = Math.Abs(_selectionStartIndex - _selectionEndIndex) + 1;
+			
+			nint textPage = GetTextPage(currentPage);
+			if (textPage == IntPtr.Zero)
 			{
-				charCount = PdfiumEngine.FPDFText_CountChars(textPage);
-			}
-			if (charCount <= 0) continue;
-
-			int startChar = 0;
-			int endChar = charCount - 1;
-
-			if (pageIdx == _selectionStartPageIndex && pageIdx == _selectionEndPageIndex)
-			{
-				startChar = Math.Min(_selectionStartIndex, _selectionEndIndex);
-				endChar = Math.Max(_selectionStartIndex, _selectionEndIndex);
-			}
-			else if (pageIdx == _selectionStartPageIndex)
-			{
-				if (_selectionStartPageIndex < _selectionEndPageIndex)
-					startChar = _selectionStartIndex;
-				else
-					endChar = _selectionStartIndex;
-			}
-			else if (pageIdx == _selectionEndPageIndex)
-			{
-				if (_selectionStartPageIndex < _selectionEndPageIndex)
-					endChar = _selectionEndIndex;
-				else
-					startChar = _selectionEndIndex;
+				return;
 			}
 
-			if (startChar < 0) startChar = 0;
-			if (endChar >= charCount) endChar = charCount - 1;
-
-			var pageRects = new List<Rect>();
-			lock (PdfiumEngine.SyncRoot)
+			List<Rect> list = new List<Rect>();
+			for (int j = 0; j < num3; j++)
 			{
-				Rect currentRect = Rect.Empty;
-				for (int charIdx = startChar; charIdx <= endChar; charIdx++)
+				int index = num2 + j;
+				if (PdfiumEngine.FPDFText_GetCharBox(textPage, index, out var left, out var right, out var bottom, out var top))
 				{
-					if (PdfiumEngine.FPDFText_GetCharBox(textPage, charIdx, out var left, out var right, out var bottom, out var top))
+					list.Add(new Rect(left, bottom, right - left, top - bottom));
+				}
+			}
+
+			if (list.Count == 0) return;
+
+			if (!TryGetPageSize(currentPage, out Size pageSize)) return;
+
+			List<List<Rect>> list2 = new List<List<Rect>>();
+			foreach (Rect item in list)
+			{
+				bool flag2 = false;
+				foreach (List<Rect> item2 in list2)
+				{
+					double y = item2[0].Y;
+					double height = item2[0].Height;
+					if (Math.Abs(item.Y - y) < height * 0.5)
 					{
-						double pdfX = Math.Min(left, right);
-						double pdfY = Math.Min(bottom, top);
-						double pdfW = Math.Abs(right - left);
-						double pdfH = Math.Abs(top - bottom);
-						Rect charRect = new Rect(pdfX, pdfY, pdfW, pdfH);
-
-						if (charRect.Width <= 0.0) charRect.Width = 6.0;
-						if (charRect.Height <= 0.0) charRect.Height = 12.0;
-
-						if (currentRect.IsEmpty)
-						{
-							currentRect = charRect;
-						}
-						else
-						{
-							double verticalDistance = Math.Abs(charRect.Y - currentRect.Y);
-							double heightDifference = Math.Abs(charRect.Height - currentRect.Height);
-							double horizontalGap = charRect.X - (currentRect.X + currentRect.Width);
-
-							double heightThreshold = Math.Max(currentRect.Height, charRect.Height);
-							if (verticalDistance < heightThreshold * 0.4 && 
-							    heightDifference < heightThreshold * 0.4 && 
-							    horizontalGap >= -2.0 && 
-							    horizontalGap < heightThreshold * 3.0)
-							{
-								double minX = Math.Min(currentRect.X, charRect.X);
-								double maxX = Math.Max(charRect.X + charRect.Width, currentRect.X + currentRect.Width);
-								double minY = Math.Min(currentRect.Y, charRect.Y);
-								double maxY = Math.Max(charRect.Y + charRect.Height, currentRect.Y + currentRect.Height);
-								currentRect = new Rect(minX, minY, maxX - minX, maxY - minY);
-							}
-							else
-							{
-								pageRects.Add(currentRect);
-								currentRect = charRect;
-							}
-						}
+						item2.Add(item);
+						flag2 = true;
+						break;
 					}
 				}
-				if (!currentRect.IsEmpty)
+				if (!flag2)
 				{
-					pageRects.Add(currentRect);
+					list2.Add(new List<Rect> { item });
 				}
 			}
 
-			if (!TryGetPageSize(pageNumber, out Size pageSize))
+			foreach (List<Rect> item3 in list2)
 			{
-				continue;
+				if (item3.Count != 0)
+				{
+					double num4 = double.MaxValue;
+					double num5 = double.MinValue;
+					double num6 = double.MaxValue;
+					double num7 = double.MinValue;
+					foreach (Rect item4 in item3)
+					{
+						num4 = Math.Min(num4, item4.X);
+						num5 = Math.Max(num5, item4.X + item4.Width);
+						num6 = Math.Min(num6, item4.Y);
+						num7 = Math.Max(num7, item4.Y + item4.Height);
+					}
+
+					PdfHighlightAnnotation pdfHighlightAnnotation = new PdfHighlightAnnotation
+					{
+						PageIndex = currentPage - 1,
+						X = num4 / pageSize.Width,
+						Y = (pageSize.Height - num7) / pageSize.Height,
+						Width = (num5 - num4) / pageSize.Width,
+						Height = (num7 - num6) / pageSize.Height,
+						ColorHex = colorHex
+					};
+
+					try { SaveUndoState(); } catch {} 
+					Annotations.Add(pdfHighlightAnnotation);
+					flag = true;
+				}
 			}
 
-			foreach (var rect in pageRects)
-			{
-				PdfHighlightAnnotation hl = new PdfHighlightAnnotation
-				{
-					PageIndex = pageIdx,
-					X = rect.X / pageSize.Width,
-					Y = (pageSize.Height - (rect.Y + rect.Height)) / pageSize.Height,
-					Width = rect.Width / pageSize.Width,
-					Height = rect.Height / pageSize.Height,
-					ColorHex = colorHex,
-					StrokeColor = System.Windows.Media.Colors.Yellow,
-					Opacity = 0.5
-				};
+			_selectionStartIndex = -1;
+			_selectionEndIndex = -1;
+			_selectionStartPageIndex = -1;
+			_selectionEndPageIndex = -1;
 
-				Annotations.Add(hl);
+			if (flag)
+			{
+				ClearCacheAndRender(); 
 			}
 		}
-
-		ClearAllTextSelectionHighlights();
 	}
 }

@@ -39,6 +39,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private readonly record struct OcrTextRegion(string Text, double Left, double Bottom, double Width, double Height);
 
 	private bool _isDrawing;
+	private Rect? _selectedEditRectPdf = null;
+	private int _selectedEditPageNumber = -1;
+	private int _selectedEditCharIndex = -1;
+	private System.Windows.Controls.TextBox? _activeDirectEditTextBox = null;
+	private Action? _activeDirectEditCommitAction = null;
 
 	private Point _drawStartPoint;
 
@@ -386,33 +391,48 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				return;
 			}
 		}
-		if (ActiveTool == "EditText" || ActiveTool == "SelectText")
+		if (ActiveTool == "EditText" || ActiveTool == "SelectText" || ActiveTool == "Highlight")
 		{
-			if (e.ClickCount == 2)
+			if (e.ClickCount >= 1)
 			{
 				int charIndexAtMousePos = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
 				if (charIndexAtMousePos != -1)
 				{
-					ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num);
-					e.Handled = true;
-					return;
+					if (ActiveTool == "EditText")
+					{
+						// [FIX CHỚP TẮT] Chặn luồng tại MouseDown để nhường việc mở TextBox 
+						// sang sự kiện MouseUp khi click chuột đã kết thúc hoàn toàn.
+						e.Handled = true;
+						return;
+					}
+					else if (e.ClickCount >= 2)
+					{
+						// Dành cho SelectText/Highlight nếu lỡ double click
+						e.Handled = true;
+						return;
+					}
 				}
-				if (ActiveTool == "EditText")
+				else
 				{
-					if (OperatingSystem.IsWindows() && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
+					if (ActiveTool == "EditText" || ActiveTool == "SelectText" || ActiveTool == "Highlight")
 					{
-						LogStatus("Đang nhận diện văn bản bằng OCR...");
-						TryShowOcrTextEditOverlayAsync(canvas, e.GetPosition(canvas), num);
+						LogStatus("Vùng này không có chữ (PDF dạng ảnh/scan). Hãy thử công cụ OCR để nhận diện chữ trước.");
 					}
-					else
+
+					if (ActiveTool == "EditText")
 					{
-						MessageBox.Show("Tính năng OCR chỉnh sửa văn bản chỉ hỗ trợ trên Windows 10 trở lên.", "Không hỗ trợ", MessageBoxButton.OK, MessageBoxImage.Warning);
+						if (_selectedEditRectPdf.HasValue)
+						{
+							_selectedEditRectPdf = null;
+							_selectedEditPageNumber = -1;
+							_selectedEditCharIndex = -1;
+							RedrawAllPageAnnotations();
+						}
 					}
-					e.Handled = true;
-					return;
 				}
 			}
-			if (ActiveTool == "SelectText")
+			
+			if (ActiveTool == "SelectText" || ActiveTool == "Highlight")
 			{
 				int charIndexAtMousePos2 = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
 				if (charIndexAtMousePos2 != -1)
@@ -428,7 +448,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else
 				{
-					LogStatus("Vùng này không có văn bản có thể chọn (PDF dạng ảnh/scan). Hãy thử công cụ Sửa Trực Tiếp để dùng OCR.");
+					LogStatus("Vùng này không có văn bản có thể chọn (PDF dạng ảnh/scan).");
 				}
 				return;
 			}
@@ -799,7 +819,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			EndMouseInteraction(canvas);
 		}
-		else if (_isSelectingText && ActiveTool == "SelectText")
+		else if (_isSelectingText && (ActiveTool == "SelectText" || ActiveTool == "Highlight"))
 		{
 			int charIndexAtMousePos = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
 			if (charIndexAtMousePos != -1)
@@ -951,14 +971,22 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			_selectedText = GetSelectedTextString();
 			if (!string.IsNullOrEmpty(_selectedText))
 			{
-				try
+				if (ActiveTool == "Highlight")
 				{
-					Clipboard.SetText(_selectedText);
-					LogStatus($"Đã sao chép {_selectedText.Length} ký tự vào Clipboard (Ctrl+V để dán).");
+					HighlightSelectedText("#FFFF00");
+					LogStatus("Đã tô màu (Highlight) vùng chữ được chọn.");
 				}
-				catch
+				else
 				{
-					LogStatus("Đã chọn văn bản. Nhấn Ctrl+C để sao chép.");
+					try
+					{
+						Clipboard.SetText(_selectedText);
+						LogStatus($"Đã sao chép {_selectedText.Length} ký tự vào Clipboard (Ctrl+V để dán).");
+					}
+					catch
+					{
+						LogStatus("Đã chọn văn bản. Nhấn Ctrl+C để sao chép.");
+					}
 				}
 			}
 			else
@@ -974,6 +1002,35 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		else
 		{
+			if (ActiveTool == "EditText")
+			{
+				LogToDesktop("[EDIT DEBUG] 1. MouseUp: Bắt đầu xử lý click EditText.");
+				
+				// [RẤT QUAN TRỌNG] Phải ép Canvas nhả chuột ra thì TextBox mới nhận được tiêu điểm
+				if (canvas.IsMouseCaptured)
+				{
+					LogToDesktop("[EDIT DEBUG] 1.1 MouseUp: Đang ép Canvas ReleaseMouseCapture().");
+					canvas.ReleaseMouseCapture();
+				}
+
+				int charIndexAtMousePos = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
+				LogToDesktop($"[EDIT DEBUG] 2. MouseUp: charIndexAtMousePos = {charIndexAtMousePos}");
+
+				if (charIndexAtMousePos != -1)
+				{
+					ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num);
+					e.Handled = true;
+					return;
+				}
+				else
+				{
+					LogToDesktop("[EDIT DEBUG] 2.1 MouseUp: Không tìm thấy ký tự, có thể là PDF ảnh.");
+					LogStatus("Vùng này không có chữ (PDF dạng ảnh/scan). Hãy thử công cụ OCR để nhận diện chữ trước.");
+					e.Handled = true;
+					return;
+				}
+			}
+
 			if (!_isDrawing)
 			{
 				return;
@@ -1294,10 +1351,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		try
 		{
-			PdfPerfLogger.Log("Snapshot copy image start");
+			LogToDesktop("Snapshot copy image start");
 			BitmapSource bitmapSource = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot);
 			Clipboard.SetImage(bitmapSource);
-			PdfPerfLogger.Log($"Snapshot copy image done: {bitmapSource.PixelWidth}x{bitmapSource.PixelHeight}");
+			LogToDesktop($"Snapshot copy image done: {bitmapSource.PixelWidth}x{bitmapSource.PixelHeight}");
 			LogStatus("Snapshot image copied to clipboard");
 		}
 		catch (Exception ex)
@@ -1323,10 +1380,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		try
 		{
-			PdfPerfLogger.Log("Snapshot save PNG start: " + saveFileDialog.FileName);
+			LogToDesktop("Snapshot save PNG start: " + saveFileDialog.FileName);
 			byte[] array = PdfSnapshotImageRenderer.RenderSnapshotToPngBytes(snapshot);
 			File.WriteAllBytes(saveFileDialog.FileName, array);
-			PdfPerfLogger.Log($"Snapshot save PNG done: {array.Length:N0} bytes");
+			LogToDesktop($"Snapshot save PNG done: {array.Length:N0} bytes");
 			LogStatus("Snapshot PNG saved");
 		}
 		catch (Exception ex)
@@ -2191,7 +2248,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				catch (Exception ex)
 				{
-					PdfPerfLogger.Log("Warning: Failed to convert PrintTicket to DevMode on UI thread: " + ex.Message + ". Using default printer settings.");
+					LogToDesktop("Warning: Failed to convert PrintTicket to DevMode on UI thread: " + ex.Message + ". Using default printer settings.");
 				}
 			}
 
@@ -2199,35 +2256,35 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				printProgress.Report(new PrintProgressInfo("Đang cấu hình máy in...", 0, 0, IsIndeterminate: true));
 
-				PdfPerfLogger.Log("Profile: " + printerProfile.Name);
+				LogToDesktop("Profile: " + printerProfile.Name);
 
 				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" || 
 					(!(printOffsetMode == "Physical") && printerProfile.DriverAlreadyOffsetsPrintableArea);
 
-				PdfPerfLogger.Log("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
-				PdfPerfLogger.Log("Tệp đang in: " + CurrentPdfPath);
-				PdfPerfLogger.Log("Máy in mục tiêu: " + printerName);
-				PdfPerfLogger.Log($"Số bản in (Copies): {copies}");
-				PdfPerfLogger.Log($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
-				PdfPerfLogger.Log($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
-				PdfPerfLogger.Log($"Hướng xoay giấy: {pageOrientation}");
-				PdfPerfLogger.Log($"Khổ giấy đã chọn: {pageMediaSizeName} (Rộng: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
-				PdfPerfLogger.Log($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
-				PdfPerfLogger.Log("Chế độ in đã chọn: " + printEngineMode);
-				PdfPerfLogger.Log($"Native separate page jobs: {separatePageJobs}");
-				PdfPerfLogger.Log($"Reverse page order: {reversePageOrder}");
+				LogToDesktop("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
+				LogToDesktop("Tệp đang in: " + CurrentPdfPath);
+				LogToDesktop("Máy in mục tiêu: " + printerName);
+				LogToDesktop($"Số bản in (Copies): {copies}");
+				LogToDesktop($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
+				LogToDesktop($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
+				LogToDesktop($"Hướng xoay giấy: {pageOrientation}");
+				LogToDesktop($"Khổ giấy đã chọn: {pageMediaSizeName} (Rộng: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
+				LogToDesktop($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
+				LogToDesktop("Chế độ in đã chọn: " + printEngineMode);
+				LogToDesktop($"Native separate page jobs: {separatePageJobs}");
+				LogToDesktop($"Reverse page order: {reversePageOrder}");
 
 				if (printEngineMode == "NativePdfium" && !printTestFrame)
 				{
 					if (annotationsList.Count > 0)
 					{
-						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+						LogToDesktop("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
 					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 					NativePdfPrinter.Print(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
-					PdfPerfLogger.Log($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
+					LogToDesktop($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in vao may in.");
 					LogStatus("Print job sent");
 				}
@@ -2235,13 +2292,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					if (annotationsList.Count > 0)
 					{
-						PdfPerfLogger.Log("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+						LogToDesktop("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
 					}
 
 					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
 					NativePdfPrinter.PrintOptimized(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
 					nativeSubmitSw.Stop();
-					PdfPerfLogger.Log($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
+					LogToDesktop($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
 					progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
 					LogStatus("Print job sent");
 				}
@@ -2284,11 +2341,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						{
 							paginator.StartPage = 0;
 							paginator.EndPage = 0;
-							PdfPerfLogger.Log("Print test frame enabled: forcing a single diagnostic page.");
+							LogToDesktop("Print test frame enabled: forcing a single diagnostic page.");
 						}
 
 						paginator.PageSize = new Size(Math.Max(1.0, orientedWidth), Math.Max(1.0, orientedHeight));
-						PdfPerfLogger.Log($"Kích thước trang đích (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
+						LogToDesktop($"Kích thước trang đích (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
 
 						if (printCapabilities.PageImageableArea != null)
 						{
@@ -2297,12 +2354,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 							double value = Math.Max(0.0, orientedWidth - originWidth - printCapabilities.PageImageableArea.ExtentWidth);
 							double value2 = Math.Max(0.0, orientedHeight - originHeight - printCapabilities.PageImageableArea.ExtentHeight);
 							paginator.ImageableArea = new Rect(originWidth, originHeight, printCapabilities.PageImageableArea.ExtentWidth, printCapabilities.PageImageableArea.ExtentHeight);
-							PdfPerfLogger.Log($"Vùng in được của máy in (Raw PageImageableArea): Gốc=({originWidth}, {originHeight}) Kích thước=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
-							PdfPerfLogger.Log($"Khoảng lề biên kéo giấy tính toán: Phải={value}, Dưới={value2}");
-							PdfPerfLogger.Log($"Tọa độ vùng in truyền cho Paginator (ImageableArea): Gốc=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kích thước=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
+							LogToDesktop($"Vùng in được của máy in (Raw PageImageableArea): Gốc=({originWidth}, {originHeight}) Kích thước=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
+							LogToDesktop($"Khoảng lề biên kéo giấy tính toán: Phải={value}, Dưới={value2}");
+							LogToDesktop($"Tọa độ vùng in truyền cho Paginator (ImageableArea): Gốc=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kích thước=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
 						}
 
-						PdfPerfLogger.Log("Using WPF Bitmap print pipeline.");
+						LogToDesktop("Using WPF Bitmap print pipeline.");
 						Stopwatch printSubmitSw = Stopwatch.StartNew();
 						printProgress.Report(new PrintProgressInfo("Dang gui lenh in WPF Bitmap...", 0, Math.Max(1, paginator.PageCount), IsIndeterminate: true));
 						
@@ -2311,7 +2368,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						printDialog.PrintTicket = printTicket;
 						printDialog.PrintDocument(paginator, System.IO.Path.GetFileName(CurrentPdfPath));
 						printSubmitSw.Stop();
-						PdfPerfLogger.Log($"PrintDocument submit total: {printSubmitSw.ElapsedMilliseconds} ms");
+						LogToDesktop($"PrintDocument submit total: {printSubmitSw.ElapsedMilliseconds} ms");
 						progressDialog.MarkCompleted("Da gui lenh in vao may in.");
 						LogStatus("Print job sent");
 					});
@@ -2320,13 +2377,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		catch (OperationCanceledException)
 		{
-			PdfPerfLogger.Log("Print canceled by user.");
+			LogToDesktop("Print canceled by user.");
 			progressDialog.MarkFailed("Da huy lenh in.");
 			LogStatus("Print canceled");
 		}
 		catch (Exception ex3)
 		{
-			PdfPerfLogger.Log($"Print failed: {ex3}");
+			LogToDesktop($"Print failed: {ex3}");
 			progressDialog.MarkFailed("In that bai: " + ex3.Message);
 			MessageBox.Show("Error while printing: " + ex3.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
 			LogStatus("Print failed");
@@ -2372,11 +2429,86 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return -1;
 		}
-		double xTolerance = Math.Max(2.0, 10.0 * _pageDimensions[pageNumber - 1].Width / Math.Max(1.0, canvas.Width));
-		double yTolerance = Math.Max(2.0, 10.0 * _pageDimensions[pageNumber - 1].Height / Math.Max(1.0, canvas.Height));
+		// Increased tolerance from 10.0 to 20.0 for much more reliable character click detection
+		double xTolerance = Math.Max(2.0, 20.0 * _pageDimensions[pageNumber - 1].Width / Math.Max(1.0, canvas.Width));
+		double yTolerance = Math.Max(2.0, 20.0 * _pageDimensions[pageNumber - 1].Height / Math.Max(1.0, canvas.Height));
 		lock (PdfiumEngine.SyncRoot)
 		{
 			return PdfiumEngine.FPDFText_GetCharIndexAtPos(textPage, pdfPoint.X, pdfPoint.Y, xTolerance, yTolerance);
+		}
+	}
+
+	private static string MapPdfFontToSystemFont(string pdfFontName)
+	{
+		if (string.IsNullOrEmpty(pdfFontName)) return "Segoe UI";
+
+		string clean = pdfFontName.ToLowerInvariant();
+		int plusIndex = clean.IndexOf('+');
+		if (plusIndex >= 0 && plusIndex < clean.Length - 1)
+		{
+			clean = clean.Substring(plusIndex + 1);
+		}
+
+		if (clean.Contains("times") || clean.Contains("roman") || clean.Contains("serif"))
+		{
+			return "Times New Roman";
+		}
+		if (clean.Contains("courier") || clean.Contains("mono"))
+		{
+			return "Courier New";
+		}
+		if (clean.Contains("arial") || clean.Contains("helvetica") || clean.Contains("sans"))
+		{
+			if (clean.Contains("noto")) return "Noto Sans";
+			if (clean.Contains("dejavu")) return "DejaVu Sans";
+			if (clean.Contains("open")) return "Open Sans";
+			return "Arial";
+		}
+		if (clean.Contains("calibri"))
+		{
+			return "Calibri";
+		}
+		if (clean.Contains("segoe"))
+		{
+			return "Segoe UI";
+		}
+		if (clean.Contains("georgia"))
+		{
+			return "Georgia";
+		}
+		if (clean.Contains("verdana"))
+		{
+			return "Verdana";
+		}
+		if (clean.Contains("tahoma"))
+		{
+			return "Tahoma";
+		}
+
+		string originalClean = pdfFontName;
+		if (plusIndex >= 0 && plusIndex < pdfFontName.Length - 1)
+		{
+			originalClean = pdfFontName.Substring(plusIndex + 1);
+		}
+		
+		string[] suffixes = new[] { "-Bold", "-Italic", "-BoldItalic", "-Regular", "Bold", "Italic", "MT", "PS", "Regular", "Oblique" };
+		foreach (var suffix in suffixes)
+		{
+			if (originalClean.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+			{
+				originalClean = originalClean.Substring(0, originalClean.Length - suffix.Length);
+			}
+		}
+		originalClean = originalClean.Trim('-', ' ');
+
+		try
+		{
+			var fontFamily = new System.Windows.Media.FontFamily(originalClean);
+			return originalClean;
+		}
+		catch
+		{
+			return "Arial";
 		}
 	}
 
@@ -2425,31 +2557,51 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void DrawTextSelectionHighlights(Canvas canvas, int pageNumber)
 	{
-		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1)
+		// 1. VẼ CÁC KHỐI HIGHLIGHT MÀU VÀNG ĐÃ LƯU LÊN MÀN HÌNH
+		foreach (var ann in Annotations)
 		{
-			return;
+			if (ann is PdfHighlightAnnotation hl && hl.PageIndex == pageNumber - 1)
+			{
+				double canvasX = hl.X * canvas.Width;
+				double canvasY = hl.Y * canvas.Height;
+				double canvasW = hl.Width * canvas.Width;
+				double canvasH = hl.Height * canvas.Height;
+
+				Color hlColor = Colors.Yellow;
+				try { hlColor = (Color)ColorConverter.ConvertFromString(hl.ColorHex); } catch {}
+
+				System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+				{
+					Width = Math.Max(1.0, canvasW),
+					Height = Math.Max(1.0, canvasH),
+					Fill = new SolidColorBrush(Color.FromArgb(100, hlColor.R, hlColor.G, hlColor.B)), // Vàng trong suốt để không che chữ
+					IsHitTestVisible = false // Bỏ qua bắt chuột
+				};
+				
+				Canvas.SetLeft(rect, canvasX);
+				Canvas.SetTop(rect, canvasY);
+				
+				// Đẩy lớp màu vàng xuống dưới cùng để nét chữ nổi lên trên
+				if (canvas.Children.Count > 0) canvas.Children.Insert(0, rect);
+				else canvas.Children.Add(rect);
+			}
 		}
+
+		// 2. VẼ KHỐI MÀU XANH TẠM THỜI KHI ĐANG GIỮ CHUỘT KÉO BÔI ĐEN
+		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1) return;
+
 		int num = pageNumber - 1;
 		int num2 = Math.Min(_selectionStartPageIndex, _selectionEndPageIndex);
 		int num3 = Math.Max(_selectionStartPageIndex, _selectionEndPageIndex);
-		if (num < num2 || num > num3)
-		{
-			return;
-		}
+		if (num < num2 || num > num3) return;
+
 		nint textPage = GetTextPage(pageNumber);
-		if (textPage == IntPtr.Zero)
-		{
-			return;
-		}
+		if (textPage == IntPtr.Zero) return;
+
 		int num4;
-		lock (PdfiumEngine.SyncRoot)
-		{
-			num4 = PdfiumEngine.FPDFText_CountChars(textPage);
-		}
-		if (num4 <= 0)
-		{
-			return;
-		}
+		lock (PdfiumEngine.SyncRoot) { num4 = PdfiumEngine.FPDFText_CountChars(textPage); }
+		if (num4 <= 0) return;
+
 		int num5 = 0;
 		int num6 = num4 - 1;
 		if (num == _selectionStartPageIndex && num == _selectionEndPageIndex)
@@ -2459,34 +2611,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		else if (num == _selectionStartPageIndex)
 		{
-			if (_selectionStartPageIndex < _selectionEndPageIndex)
-			{
-				num5 = _selectionStartIndex;
-			}
-			else
-			{
-				num6 = _selectionStartIndex;
-			}
+			if (_selectionStartPageIndex < _selectionEndPageIndex) num5 = _selectionStartIndex;
+			else num6 = _selectionStartIndex;
 		}
 		else if (num == _selectionEndPageIndex)
 		{
-			if (_selectionStartPageIndex < _selectionEndPageIndex)
-			{
-				num6 = _selectionEndIndex;
-			}
-			else
-			{
-				num5 = _selectionEndIndex;
-			}
+			if (_selectionStartPageIndex < _selectionEndPageIndex) num6 = _selectionEndIndex;
+			else num5 = _selectionEndIndex;
 		}
-		if (num5 < 0)
-		{
-			num5 = 0;
-		}
-		if (num6 >= num4)
-		{
-			num6 = num4 - 1;
-		}
+
+		if (num5 < 0) num5 = 0;
+		if (num6 >= num4) num6 = num4 - 1;
+
 		SolidColorBrush fill = new SolidColorBrush(Color.FromArgb(90, 51, 153, byte.MaxValue));
 		fill.Freeze();
 
@@ -2498,29 +2634,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				if (PdfiumEngine.FPDFText_GetCharBox(textPage, i, out var left, out var right, out var bottom, out var top))
 				{
-					if (!TryPdfRectToCanvasRect(canvas, pageNumber, left, right, bottom, top, out Rect canvasRect))
-					{
-						continue;
-					}
-
+					if (!TryPdfRectToCanvasRect(canvas, pageNumber, left, right, bottom, top, out Rect canvasRect)) continue;
 					if (canvasRect.Width <= 0.0) canvasRect.Width = 6.0;
 					if (canvasRect.Height <= 0.0) canvasRect.Height = 12.0;
 
-					if (currentRect.IsEmpty)
-					{
-						currentRect = canvasRect;
-					}
+					if (currentRect.IsEmpty) currentRect = canvasRect;
 					else
 					{
 						double verticalDistance = Math.Abs(canvasRect.Y - currentRect.Y);
 						double heightDifference = Math.Abs(canvasRect.Height - currentRect.Height);
 						double horizontalGap = canvasRect.X - (currentRect.X + currentRect.Width);
-
 						double heightThreshold = Math.Max(currentRect.Height, canvasRect.Height);
-						if (verticalDistance < heightThreshold * 0.4 && 
-						    heightDifference < heightThreshold * 0.4 && 
-						    horizontalGap >= -2.0 && 
-						    horizontalGap < heightThreshold * 3.0)
+						if (verticalDistance < heightThreshold * 0.4 && heightDifference < heightThreshold * 0.4 && horizontalGap >= -2.0 && horizontalGap < heightThreshold * 3.0)
 						{
 							double minX = Math.Min(currentRect.X, canvasRect.X);
 							double maxX = Math.Max(currentRect.X + currentRect.Width, canvasRect.X + canvasRect.Width);
@@ -2536,15 +2661,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 				}
 			}
-			if (!currentRect.IsEmpty)
-			{
-				mergedRects.Add(currentRect);
-			}
+			if (!currentRect.IsEmpty) mergedRects.Add(currentRect);
 		}
 
 		foreach (var rect in mergedRects)
 		{
-			Rectangle element = new Rectangle
+			System.Windows.Shapes.Rectangle element = new System.Windows.Shapes.Rectangle
 			{
 				Width = Math.Max(0.5, rect.Width),
 				Height = Math.Max(0.5, rect.Height),
@@ -2554,6 +2676,60 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			Canvas.SetLeft(element, rect.X);
 			Canvas.SetTop(element, rect.Y);
 			canvas.Children.Add(element);
+		}
+	}
+
+	private void DrawEditTextSelectionBorder(Canvas canvas, int pageNumber)
+	{
+		if (_selectedEditPageNumber != pageNumber || !_selectedEditRectPdf.HasValue)
+		{
+			return;
+		}
+
+		var rectPdf = _selectedEditRectPdf.Value;
+		if (!TryPdfRectToCanvasRect(canvas, pageNumber, rectPdf.X, rectPdf.X + rectPdf.Width, rectPdf.Y, rectPdf.Y + rectPdf.Height, out Rect canvasRect))
+		{
+			return;
+		}
+
+		// Draw selection border (dashed blue line)
+		System.Windows.Shapes.Rectangle borderRect = new System.Windows.Shapes.Rectangle
+		{
+			Width = canvasRect.Width + 4.0,
+			Height = canvasRect.Height + 4.0,
+			Stroke = new SolidColorBrush(Color.FromRgb(37, 99, 235)), // Modern soft blue border
+			StrokeThickness = 1.5,
+			StrokeDashArray = new DoubleCollection(new double[] { 4, 4 }),
+			IsHitTestVisible = false
+		};
+		Canvas.SetLeft(borderRect, canvasRect.X - 2.0);
+		Canvas.SetTop(borderRect, canvasRect.Y - 2.0);
+		canvas.Children.Add(borderRect);
+
+		// Draw 4 resize handles (thumbs) at the corners
+		double handleSize = 6.0;
+		Point[] corners = new Point[]
+		{
+			new Point(canvasRect.X - 2.0, canvasRect.Y - 2.0), // Top-Left
+			new Point(canvasRect.X + canvasRect.Width + 2.0, canvasRect.Y - 2.0), // Top-Right
+			new Point(canvasRect.X - 2.0, canvasRect.Y + canvasRect.Height + 2.0), // Bottom-Left
+			new Point(canvasRect.X + canvasRect.Width + 2.0, canvasRect.Y + canvasRect.Height + 2.0) // Bottom-Right
+		};
+
+		foreach (var pt in corners)
+		{
+			System.Windows.Shapes.Rectangle handle = new System.Windows.Shapes.Rectangle
+			{
+				Width = handleSize,
+				Height = handleSize,
+				Fill = Brushes.White,
+				Stroke = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
+				StrokeThickness = 1.5,
+				IsHitTestVisible = false
+			};
+			Canvas.SetLeft(handle, pt.X - handleSize / 2.0);
+			Canvas.SetTop(handle, pt.Y - handleSize / 2.0);
+			canvas.Children.Add(handle);
 		}
 	}
 
@@ -2665,57 +2841,76 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_selectedText = "";
 		RedrawAllPageAnnotations();
 	}
-
 	private void ShowDirectTextEditOverlay(Canvas canvas, int charIndex, int pageNumber)
 	{
-		nint textPage = GetTextPage(pageNumber);
-		if (textPage == IntPtr.Zero)
+		LogToDesktop($"[EDIT DEBUG] 3. Khởi chạy ShowDirectTextEditOverlay (CharIndex: {charIndex}, Page: {pageNumber})");
+		
+		// [QUAN TRỌNG] Nếu đang có TextBox biên tập khác, commit và đóng nó trước
+		if (_activeDirectEditCommitAction != null)
 		{
-			return;
+			try
+			{
+				var tempAction = _activeDirectEditCommitAction;
+				_activeDirectEditTextBox = null; // Đánh dấu để bypass guard < 500ms
+				_activeDirectEditCommitAction = null;
+				tempAction();
+			}
+			catch (Exception ex)
+			{
+				LogToDesktop($"[DEBUG] Error committing active edit: {ex.Message}");
+			}
 		}
+
+		nint textPage = GetTextPage(pageNumber);
+		if (textPage == IntPtr.Zero) return;
+		
 		int num = 0;
+		lock (PdfiumEngine.SyncRoot) { num = PdfiumEngine.FPDFText_CountChars(textPage); }
+		if (num <= 0) return;
+
+		// 1. Tính toán layout
+		double estFontSize = 12.0;
+		double initTop = 0;
 		lock (PdfiumEngine.SyncRoot)
 		{
-			num = PdfiumEngine.FPDFText_CountChars(textPage);
-		}
-		if (num <= 0)
-		{
-			return;
-		}
-		Func<int, char> func = delegate(int idx)
-		{
-			StringBuilder stringBuilder2 = new StringBuilder(2);
-			lock (PdfiumEngine.SyncRoot)
+			if (PdfiumEngine.FPDFText_GetCharBox(textPage, charIndex, out double cL, out double cR, out double cB, out double cT))
 			{
-				if (PdfiumEngine.FPDFText_GetText(textPage, idx, 1, stringBuilder2) > 0 && stringBuilder2.Length > 0)
-				{
-					return stringBuilder2[0];
-				}
+				estFontSize = cT - cB;
+				initTop = cT;
 			}
-			return '\0';
-		};
+		}
+
 		int num2;
+		double lastTop = initTop;
 		for (num2 = charIndex; num2 > 0; num2--)
 		{
-			char c = func(num2 - 1);
-			if (c == '\r' || c == '\n')
+			lock (PdfiumEngine.SyncRoot)
 			{
-				break;
+				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num2 - 1, out double l, out double r, out double b, out double t))
+				{
+					if (Math.Abs(lastTop - t) > estFontSize * 1.8) break;
+					lastTop = t;
+				}
+				else break;
 			}
 		}
+
 		int num3;
+		lastTop = initTop;
 		for (num3 = charIndex; num3 < num - 1; num3++)
 		{
-			char c2 = func(num3 + 1);
-			if (c2 == '\r' || c2 == '\n')
+			lock (PdfiumEngine.SyncRoot)
 			{
-				break;
+				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num3 + 1, out double l, out double r, out double b, out double t))
+				{
+					if (Math.Abs(lastTop - t) > estFontSize * 1.8) break;
+					lastTop = t;
+				}
+				else break;
 			}
 		}
-		double minLeft = double.MaxValue;
-		double maxRight = double.MinValue;
-		double minBottom = double.MaxValue;
-		double maxTop = double.MinValue;
+
+		double minLeft = double.MaxValue, maxRight = double.MinValue, minBottom = double.MaxValue, maxTop = double.MinValue;
 		bool flag = false;
 		lock (PdfiumEngine.SyncRoot)
 		{
@@ -2723,170 +2918,191 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num4, out var left, out var right, out var bottom, out var top) && right > left && top > bottom)
 				{
-					minLeft = Math.Min(minLeft, left);
-					maxRight = Math.Max(maxRight, right);
-					minBottom = Math.Min(minBottom, bottom);
-					maxTop = Math.Max(maxTop, top);
+					minLeft = Math.Min(minLeft, left); maxRight = Math.Max(maxRight, right);
+					minBottom = Math.Min(minBottom, bottom); maxTop = Math.Max(maxTop, top);
 					flag = true;
 				}
 			}
 		}
-		if (!flag)
-		{
-			return;
-		}
-		if (!TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect))
-		{
-			return;
-		}
+
+		if (!flag || !TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect)) return;
+
 		int num9 = num3 - num2 + 1;
 		string existingText = "";
 		if (num9 > 0)
 		{
 			StringBuilder stringBuilder = new StringBuilder(num9 + 2);
-			lock (PdfiumEngine.SyncRoot)
-			{
-				if (PdfiumEngine.FPDFText_GetText(textPage, num2, num9, stringBuilder) > 0)
-				{
-					existingText = stringBuilder.ToString().Trim('\r', '\n');
-				}
-			}
+			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, num9, stringBuilder) > 0) existingText = stringBuilder.ToString(); }
 		}
-		double fontSizePoints = maxTop - minBottom;
-		if (fontSizePoints <= 0.0)
-		{
-			fontSizePoints = 12.0;
-		}
+
+		// 2. Tạo UI TextBox
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
 			Width = Math.Max(50.0, editRect.Width + 12.0),
 			Height = Math.Max(20.0, editRect.Height + 6.0),
 			Text = existingText,
 			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = Math.Max(8.0, fontSizePoints * canvas.Height / pageSize.Height),
-			FontWeight = FontWeights.Normal,
-			FontStyle = FontStyles.Normal,
+			FontSize = Math.Max(8.0, (estFontSize > 0 ? estFontSize : 12.0) * canvas.Height / pageSize.Height),
 			Foreground = Brushes.Black,
 			TextWrapping = TextWrapping.Wrap,
-			AcceptsReturn = false,
-			BorderBrush = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
-			BorderThickness = new Thickness(2.0),
+			AcceptsReturn = true,
+			BorderBrush = new SolidColorBrush(Color.FromRgb(153, 193, 241)),
+			BorderThickness = new Thickness(1.0),
 			Background = Brushes.White,
-			Padding = new Thickness(2.0)
+			Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
 		};
+		
 		Canvas.SetLeft(tbInput, editRect.X - 2.0);
 		Canvas.SetTop(tbInput, editRect.Y - 3.0);
 		canvas.Children.Add(tbInput);
-		tbInput.Focus();
-		tbInput.SelectAll();
+		_activeDirectEditTextBox = tbInput;
+
+		// 3. Tính CaretIndex và xử lý Focus an toàn
+		int countBefore = charIndex - num2;
+		int caretPos = 0;
+		if (countBefore > 0)
+		{
+			StringBuilder sbBefore = new StringBuilder(countBefore + 2);
+			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, countBefore, sbBefore) > 0) caretPos = sbBefore.ToString().Length; }
+		}
+
+		// Gọi Focus trực tiếp thông qua Dispatcher thay vì chờ Loaded
+		Dispatcher.BeginInvoke(new Action(() => {
+			tbInput.Focus();
+			Keyboard.Focus(tbInput);
+			if (caretPos >= 0 && caretPos <= tbInput.Text.Length) tbInput.CaretIndex = caretPos;
+		}), System.Windows.Threading.DispatcherPriority.Input);
+
+		long creationTime = Environment.TickCount;
 		bool editCommitted = false;
 		Action commitEdit = delegate
 		{
-			if (editCommitted)
+			if (editCommitted) return;
+			
+			// [QUAN TRỌNG] Chỉ chặn LostFocus nếu là do sự kiện trôi tiêu điểm tự động của TextBox hiện tại
+			if (Environment.TickCount - creationTime < 500 && _activeDirectEditTextBox == tbInput)
 			{
+				LogToDesktop("[DEBUG] Bỏ qua LostFocus do thời gian sống quá ngắn (tránh trôi focus sau click). Refocus TextBox.");
+				Dispatcher.BeginInvoke(new Action(() => {
+					if (_activeDirectEditTextBox == tbInput)
+					{
+						tbInput.Focus();
+						Keyboard.Focus(tbInput);
+					}
+				}), System.Windows.Threading.DispatcherPriority.Input);
 				return;
 			}
+
 			editCommitted = true;
-			string text = tbInput.Text.Trim();
-			canvas.Children.Remove(tbInput);
+			if (_activeDirectEditTextBox == tbInput)
+			{
+				_activeDirectEditTextBox = null;
+				_activeDirectEditCommitAction = null;
+			}
+			
+			string text = tbInput.Text;
+			if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
+
 			if (text != existingText)
 			{
-				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation
-				{
-					PageIndex = pageNumber - 1,
-					X = minLeft / pageSize.Width,
-					Y = (pageSize.Height - maxTop) / pageSize.Height,
-					Width = (maxRight - minLeft) / pageSize.Width,
-					Height = (maxTop - minBottom) / pageSize.Height,
-					Text = "",
-					BgColor = Colors.White,
-					StrokeColor = Colors.Transparent,
-					Opacity = 1.0
-				};
-				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
-				{
-					PageIndex = pageNumber - 1,
-					X = minLeft / pageSize.Width,
-					Y = (pageSize.Height - maxTop) / pageSize.Height,
-					Width = (maxRight - minLeft) / pageSize.Width,
-					Height = (maxTop - minBottom) / pageSize.Height,
-					Text = text,
-					BgColor = Colors.Transparent,
-					StrokeColor = Colors.Black,
-					FontFamily = ActiveFontFamily,
-					FontSize = fontSizePoints,
-					Opacity = 1.0
-				};
-				SaveUndoState();
-				Annotations.Add(whiteout);
-				Annotations.Add(replacement);
+				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = Colors.White, StrokeColor = Colors.Transparent, Opacity = 1.0 };
+				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = text, BgColor = Colors.Transparent, StrokeColor = Colors.Black, FontFamily = ActiveFontFamily, FontSize = estFontSize, Opacity = 1.0 };
+				
+				try { SaveUndoState(); } catch {}
+				Annotations.Add(whiteout); Annotations.Add(replacement); 
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
 				RedrawPageAnnotations(canvas, pageNumber);
-				LogStatus("Staged text replacement. Save the PDF to apply the actual content change.");
 			}
 		};
-		tbInput.LostFocus += delegate
+		_activeDirectEditCommitAction = commitEdit;
+
+		tbInput.LostFocus += (s, ev) =>
 		{
-			commitEdit();
+			// [QUAN TRỌNG] Trì hoãn việc kiểm tra Focus bằng Dispatcher.
+			// Nếu TextBox thực sự mất focus (click ra ngoài), nó mới gọi commitEdit().
+			Dispatcher.BeginInvoke(new Action(() =>
+			{
+				if (!tbInput.IsFocused && !tbInput.IsKeyboardFocusWithin)
+				{
+					commitEdit();
+				}
+			}), System.Windows.Threading.DispatcherPriority.Input);
 		};
+
 		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
 		{
-			if (ev.Key == Key.Return)
+			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
 				commitEdit();
 				ev.Handled = true;
 			}
 			else if (ev.Key == Key.Escape)
 			{
-				canvas.Children.Remove(tbInput);
+				if (_activeDirectEditTextBox == tbInput)
+				{
+					_activeDirectEditTextBox = null;
+					_activeDirectEditCommitAction = null;
+				}
+				if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
 				ev.Handled = true;
 			}
 		};
 	}
-
 	private void ShowDirectTextEditOverlayFromBounds(Canvas canvas, int pageNumber, double minLeft, double minBottom, double maxRight, double maxTop, string existingText)
 	{
-		if (!TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect))
-		{
-			return;
-		}
+		if (!TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect)) return;
+
 		double fontSizePoints = maxTop - minBottom;
-		if (fontSizePoints <= 0.0)
-		{
-			fontSizePoints = 12.0;
-		}
+		if (fontSizePoints <= 0.0) fontSizePoints = 12.0;
+
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
-			Width = Math.Max(50.0, editRect.Width + 12.0),
+			Width = Math.Max(50.0, editRect.Width + 30.0),
 			Height = Math.Max(20.0, editRect.Height + 6.0),
 			Text = existingText,
 			FontFamily = new FontFamily(ActiveFontFamily),
 			FontSize = Math.Max(8.0, fontSizePoints * canvas.Height / pageSize.Height),
-			FontWeight = FontWeights.Normal,
-			FontStyle = FontStyles.Normal,
 			Foreground = Brushes.Black,
-			TextWrapping = TextWrapping.Wrap,
+			TextWrapping = TextWrapping.NoWrap,
 			AcceptsReturn = false,
-			BorderBrush = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
-			BorderThickness = new Thickness(2.0),
+			BorderBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
+			BorderThickness = new Thickness(1.5),
 			Background = Brushes.White,
-			Padding = new Thickness(2.0)
+			Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
 		};
+		
 		Canvas.SetLeft(tbInput, editRect.X - 2.0);
 		Canvas.SetTop(tbInput, editRect.Y - 3.0);
 		canvas.Children.Add(tbInput);
-		tbInput.Focus();
-		tbInput.SelectAll();
+
+		// VÁ LỖI MẤT CON TRỎ:
+		tbInput.Loaded += (s, e) =>
+		{
+			tbInput.Focus();
+			Keyboard.Focus(tbInput);
+			tbInput.SelectAll();
+			tbInput.CaretIndex = tbInput.Text.Length;
+		};
+		long creationTime = Environment.TickCount; 
+
 		bool editCommitted = false;
 		Action commitEdit = delegate
 		{
-			if (editCommitted)
+			if (editCommitted) return;		
+			if (tbInput.IsFocused)
 			{
+				LogToDesktop("[DEBUG] Bỏ qua LostFocus vì TextBox vẫn đang được Focus (Focus giả).");
 				return;
 			}
+
+			long aliveTime = Environment.TickCount - creationTime;
+			LogToDesktop($"[DEBUG] Đóng TextBox thật sự. Thời gian sống: {aliveTime}ms");
+
 			editCommitted = true;
-			string text = tbInput.Text.Trim();
-			canvas.Children.Remove(tbInput);
+			
+			string text = tbInput.Text;
+			if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
+
 			if (text != existingText)
 			{
 				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation
@@ -2915,33 +3131,32 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					FontSize = fontSizePoints,
 					Opacity = 1.0
 				};
-				SaveUndoState();
-				Annotations.Add(whiteout);
-				Annotations.Add(replacement);
+				
+				try { SaveUndoState(); } catch {}
+				Annotations.Add(whiteout);     
+				Annotations.Add(replacement); 
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
 				RedrawPageAnnotations(canvas, pageNumber);
 				LogStatus("Staged text replacement. Save the PDF to apply the actual content change.");
 			}
 		};
-		tbInput.LostFocus += delegate
-		{
-			commitEdit();
-		};
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
-		{
-			if (ev.Key == Key.Return)
+
+		tbInput.PreviewLostKeyboardFocus += (s, ev) => 
+		{ 
+			// Nếu người dùng click vào một cái gì đó hợp lệ (như thanh Ribbon), 
+			// thì mới cho đóng TextBox. Nếu click vào canvas, vẫn giữ TextBox.
+			if (Keyboard.FocusedElement is DependencyObject focused && 
+			   (focused is Fluent.Button || focused is Fluent.MenuItem))
 			{
 				commitEdit();
-				ev.Handled = true;
 			}
-			else if (ev.Key == Key.Escape)
+			else if (Keyboard.FocusedElement == null)
 			{
-				canvas.Children.Remove(tbInput);
-				ev.Handled = true;
+				// Click vào vùng trống, chặn đóng
+				ev.Handled = true; 
 			}
 		};
 	}
-
 	private string RenderReplacementOverlayImage(PendingTextEdit pendingTextEdit)
 	{
 		double dpi = 192.0;
@@ -3115,30 +3330,30 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		CloseActiveDocument();
 		ReportZoomChanged();
 		LogStatus("Opening file: " + System.IO.Path.GetFileName(path));
-		PdfPerfLogger.Log("LoadDocument start: " + System.IO.Path.GetFileName(path));
+		LogToDesktop("LoadDocument start: " + System.IO.Path.GetFileName(path));
 		try
 		{
 			Stopwatch stopwatch = Stopwatch.StartNew();
 			nint tempDoc = PdfiumEngine.FPDF_LoadDocument(path, null);
 			stopwatch.Stop();
-			PdfPerfLogger.Log($"FPDF_LoadDocument: {stopwatch.ElapsedMilliseconds} ms");
+			LogToDesktop($"FPDF_LoadDocument: {stopwatch.ElapsedMilliseconds} ms");
 			if (tempDoc == IntPtr.Zero)
 			{
 				MessageBox.Show("Unable to load the selected PDF file.", "Load error", MessageBoxButton.OK, MessageBoxImage.Hand);
 				LogStatus("Failed to load PDF");
-				PdfPerfLogger.Log("LoadDocument failed: document handle is null");
+				LogToDesktop("LoadDocument failed: document handle is null");
 				return;
 			}
 			_documentHandle = tempDoc;
 			Stopwatch stopwatch2 = Stopwatch.StartNew();
 			int pageCount = PdfiumEngine.FPDF_GetPageCount(tempDoc);
 			stopwatch2.Stop();
-			PdfPerfLogger.Log($"FPDF_GetPageCount: {stopwatch2.ElapsedMilliseconds} ms (pages={pageCount})");
+			LogToDesktop($"FPDF_GetPageCount: {stopwatch2.ElapsedMilliseconds} ms (pages={pageCount})");
 			if (pageCount < 0)
 			{
 				MessageBox.Show("Unable to load the selected PDF file.", "Load error", MessageBoxButton.OK, MessageBoxImage.Hand);
 				LogStatus("Failed to load PDF");
-				PdfPerfLogger.Log("LoadDocument failed: invalid page count");
+				LogToDesktop("LoadDocument failed: invalid page count");
 				CloseActiveDocument();
 				return;
 			}
@@ -3170,20 +3385,20 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					ReportZoomChanged();
 				}
 				stopwatch3.Stop();
-				PdfPerfLogger.Log($"First page size probe: {stopwatch3.ElapsedMilliseconds} ms");
+				LogToDesktop($"First page size probe: {stopwatch3.ElapsedMilliseconds} ms");
 				_isFirstLoad = false;
 			}
 			Stopwatch dimensionSw = Stopwatch.StartNew();
 			List<Size> collection = await Task.Run(() => CollectPageDimensions(tempDoc, pageCount));
 			dimensionSw.Stop();
-			PdfPerfLogger.Log($"CollectPageDimensions({pageCount}): {dimensionSw.ElapsedMilliseconds} ms");
+			LogToDesktop($"CollectPageDimensions({pageCount}): {dimensionSw.ElapsedMilliseconds} ms");
 			if (loadGeneration == _loadGeneration)
 			{
 				_pageDimensions.Clear();
 				_pageDimensions.AddRange(collection);
 				if (base.IsLoaded)
 				{
-					PdfPerfLogger.Log("LoadDocument triggering initial render");
+					LogToDesktop("LoadDocument triggering initial render");
 					FitWidth();
 				}
 			}
@@ -3196,13 +3411,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		catch (Exception ex2)
 		{
 			MessageBox.Show("Unexpected error: " + ex2.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
-			PdfPerfLogger.Log("LoadDocument exception: " + ex2.Message);
+			LogToDesktop("LoadDocument exception: " + ex2.Message);
 			CloseActiveDocument();
 		}
 		finally
 		{
 			totalSw.Stop();
-			PdfPerfLogger.Log($"LoadDocument total: {totalSw.ElapsedMilliseconds} ms");
+			LogToDesktop($"LoadDocument total: {totalSw.ElapsedMilliseconds} ms");
 		}
 	}
 
@@ -3216,7 +3431,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			PdfiumEngine.CloseDocument(_documentHandle);
 			_documentHandle = IntPtr.Zero;
-			PdfPerfLogger.Log("CloseActiveDocument closed the cached document handle.");
+			LogToDesktop("CloseActiveDocument closed the cached document handle.");
 		}
 	}
 
@@ -4171,5 +4386,16 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		ClearBitmapCache();
 		RenderPdfPages();
+	}
+	private void LogToDesktop(string message)
+	{
+		try
+		{
+			string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+			string logPath = System.IO.Path.Combine(desktopPath, "debug_log.txt");
+			string logMessage = $"{DateTime.Now:HH:mm:ss.fff} - {message}{Environment.NewLine}";
+			File.AppendAllText(logPath, logMessage);
+		}
+		catch { /* Bỏ qua lỗi ghi log để không ảnh hưởng app */ }
 	}
 }

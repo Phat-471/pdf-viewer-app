@@ -272,6 +272,7 @@ public partial class PdfDocumentTab
 				double num2 = pdfTextBoxAnnotation.Height * canvas.Height;
 				double num3 = pdfTextBoxAnnotation.X * canvas.Width;
 				double num4 = pdfTextBoxAnnotation.Y * canvas.Height;
+				Size pageSize = _pageDimensions[pageNumber - 1];
 				Border border = new Border
 				{
 					Width = num,
@@ -286,7 +287,7 @@ public partial class PdfDocumentTab
 				{
 					Text = pdfTextBoxAnnotation.Text,
 					FontFamily = new FontFamily(pdfTextBoxAnnotation.FontFamily),
-					FontSize = pdfTextBoxAnnotation.FontSize,
+					FontSize = pdfTextBoxAnnotation.FontSize * (canvas.Height / pageSize.Height),
 					FontWeight = (pdfTextBoxAnnotation.IsBold ? FontWeights.Bold : FontWeights.Normal),
 					FontStyle = (pdfTextBoxAnnotation.IsItalic ? FontStyles.Italic : FontStyles.Normal),
 					Foreground = new SolidColorBrush(pdfTextBoxAnnotation.StrokeColor),
@@ -298,16 +299,15 @@ public partial class PdfDocumentTab
 				if (pdfTextBoxAnnotation.IsUnderline) decors.Add(TextDecorations.Underline[0]);
 				if (pdfTextBoxAnnotation.IsStrikeout) decors.Add(TextDecorations.Strikethrough[0]);
 				child.TextDecorations = decors;
-
 				if (pdfTextBoxAnnotation.IsSubscript)
 				{
-					child.FontSize = pdfTextBoxAnnotation.FontSize * 0.7;
-					child.Margin = new Thickness(0, pdfTextBoxAnnotation.FontSize * 0.3, 0, 0);
+					child.FontSize = child.FontSize * 0.7;
+					child.Margin = new Thickness(0, child.FontSize * 0.3, 0, 0);
 				}
 				else if (pdfTextBoxAnnotation.IsSuperscript)
 				{
-					child.FontSize = pdfTextBoxAnnotation.FontSize * 0.7;
-					child.Margin = new Thickness(0, 0, 0, pdfTextBoxAnnotation.FontSize * 0.3);
+					child.FontSize = child.FontSize * 0.7;
+					child.Margin = new Thickness(0, 0, 0, child.FontSize * 0.3);
 				}
 				border.Child = child;
 				Canvas.SetLeft(border, num3);
@@ -363,19 +363,63 @@ public partial class PdfDocumentTab
 					Canvas.SetLeft(element3, num3 - 2.0);
 					Canvas.SetTop(element3, num4 - 2.0);
 					canvas.Children.Add(element3);
-					Border element4 = new Border
+
+					// Draw 8 resize handles (4 corners + 4 midpoints) matching professional PDF editors
+					Func<double, double, Cursor, Border> createHandle = (xPos, yPos, cursor) =>
 					{
-						Width = 10.0,
-						Height = 10.0,
-						Background = Brushes.DodgerBlue,
-						BorderBrush = Brushes.White,
-						BorderThickness = new Thickness(1.0),
-						Cursor = Cursors.SizeNWSE,
-						Tag = "ResizeHandle"
+						return new Border
+						{
+							Width = 8.0,
+							Height = 8.0,
+							Background = Brushes.White,
+							BorderBrush = Brushes.DodgerBlue,
+							BorderThickness = new Thickness(1.5),
+							Cursor = cursor,
+							Tag = "ResizeHandle"
+						};
 					};
-					Canvas.SetLeft(element4, num3 + num - 5.0);
-					Canvas.SetTop(element4, num4 + num2 - 5.0);
-					canvas.Children.Add(element4);
+
+					// Corners
+					Border hTopLeft = createHandle(num3, num4, Cursors.SizeNWSE);
+					Canvas.SetLeft(hTopLeft, num3 - 4.0);
+					Canvas.SetTop(hTopLeft, num4 - 4.0);
+					canvas.Children.Add(hTopLeft);
+
+					Border hTopRight = createHandle(num3 + num, num4, Cursors.SizeNESW);
+					Canvas.SetLeft(hTopRight, num3 + num - 4.0);
+					Canvas.SetTop(hTopRight, num4 - 4.0);
+					canvas.Children.Add(hTopRight);
+
+					Border hBottomLeft = createHandle(num3, num4 + num2, Cursors.SizeNESW);
+					Canvas.SetLeft(hBottomLeft, num3 - 4.0);
+					Canvas.SetTop(hBottomLeft, num4 + num2 - 4.0);
+					canvas.Children.Add(hBottomLeft);
+
+					Border hBottomRight = createHandle(num3 + num, num4 + num2, Cursors.SizeNWSE);
+					Canvas.SetLeft(hBottomRight, num3 + num - 4.0);
+					Canvas.SetTop(hBottomRight, num4 + num2 - 4.0);
+					canvas.Children.Add(hBottomRight);
+
+					// Midpoints
+					Border hTopMiddle = createHandle(num3 + num / 2.0, num4, Cursors.SizeNS);
+					Canvas.SetLeft(hTopMiddle, num3 + num / 2.0 - 4.0);
+					Canvas.SetTop(hTopMiddle, num4 - 4.0);
+					canvas.Children.Add(hTopMiddle);
+
+					Border hBottomMiddle = createHandle(num3 + num / 2.0, num4 + num2, Cursors.SizeNS);
+					Canvas.SetLeft(hBottomMiddle, num3 + num / 2.0 - 4.0);
+					Canvas.SetTop(hBottomMiddle, num4 + num2 - 4.0);
+					canvas.Children.Add(hBottomMiddle);
+
+					Border hMiddleLeft = createHandle(num3, num4 + num2 / 2.0, Cursors.SizeWE);
+					Canvas.SetLeft(hMiddleLeft, num3 - 4.0);
+					Canvas.SetTop(hMiddleLeft, num4 + num2 / 2.0 - 4.0);
+					canvas.Children.Add(hMiddleLeft);
+
+					Border hMiddleRight = createHandle(num3 + num, num4 + num2 / 2.0, Cursors.SizeWE);
+					Canvas.SetLeft(hMiddleRight, num3 + num - 4.0);
+					Canvas.SetTop(hMiddleRight, num4 + num2 / 2.0 - 4.0);
+					canvas.Children.Add(hMiddleRight);
 				}
 			}
 			else if (item is PdfInkAnnotation pdfInkAnnotation)
@@ -603,15 +647,19 @@ public partial class PdfDocumentTab
 				}
 				catch {}
 				
-				System.Windows.Shapes.Rectangle rect = new System.Windows.Shapes.Rectangle
+				Rectangle rect = new Rectangle
 				{
 					Width = numH,
 					Height = numV,
-					Fill = new SolidColorBrush(color),
-					Opacity = pdfHighlightAnnotation.Opacity * 0.4,
+					// SỬ DỤNG ALPHA THẤP (95) ĐỂ ĐẢM BẢO CHỮ ĐEN PDF KHÔNG BỊ XÁM, GIỮ ĐỘ ĐẬM GỐC CỰC TỐT
+					Fill = new SolidColorBrush(Color.FromArgb(95, color.R, color.G, color.B)),
 					IsHitTestVisible = true,
 					Tag = pdfHighlightAnnotation
 				};
+				
+				// Thiết lập BitmapScaling Mode để chống răng cưa biên khối Highlight
+				RenderOptions.SetBitmapScalingMode(rect, BitmapScalingMode.LowQuality);
+				
 				Canvas.SetLeft(rect, numX);
 				Canvas.SetTop(rect, numY);
 				canvas.Children.Add(rect);
@@ -913,6 +961,7 @@ public partial class PdfDocumentTab
 			}
 		}
 		DrawTextSelectionHighlights(canvas, pageNumber);
+		DrawEditTextSelectionBorder(canvas, pageNumber);
 	}
 
 	private void DrawEndTick(Canvas canvas, Point p1, Point p2, Color color)

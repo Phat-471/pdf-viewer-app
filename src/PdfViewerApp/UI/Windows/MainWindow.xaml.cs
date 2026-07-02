@@ -654,6 +654,19 @@ exit 0
 		{
 			return;
 		}
+		PdfDocumentTab currentTab = GetActiveTab();
+		string activeTool = currentTab?.ActiveTool;
+		if (activeTool == "EditText" || activeTool == "SelectText" || activeTool == "Highlight")
+		{
+			if (Keyboard.Modifiers == ModifierKeys.None)
+			{
+				if (e.Key != Key.Escape && e.Key != Key.Prior && e.Key != Key.Next && e.Key != Key.Home && e.Key != Key.End)
+				{
+					return;
+				}
+			}
+		}
+
 		if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None && ActiveTool != "Select")
 		{
 			ActiveTool = "Select";
@@ -847,12 +860,38 @@ exit 0
 
 	private static bool IsTextInputFocused()
 	{
-		for (DependencyObject dependencyObject = Keyboard.FocusedElement as DependencyObject; dependencyObject != null; dependencyObject = VisualTreeHelper.GetParent(dependencyObject))
+		DependencyObject dependencyObject = Keyboard.FocusedElement as DependencyObject;
+		while (dependencyObject != null)
 		{
-			if (dependencyObject is TextBox || dependencyObject is ComboBox)
+			if (dependencyObject is TextBox || 
+			    dependencyObject is ComboBox || 
+			    dependencyObject is RichTextBox || 
+			    dependencyObject is PasswordBox ||
+			    dependencyObject.GetType().Name.Contains("TextBox") ||
+			    dependencyObject.GetType().Name.Contains("ComboBox"))
 			{
 				return true;
 			}
+			DependencyObject parent = null;
+			try
+			{
+				parent = VisualTreeHelper.GetParent(dependencyObject);
+			}
+			catch
+			{
+			}
+			if (parent == null)
+			{
+				if (dependencyObject is FrameworkElement fe)
+				{
+					parent = fe.Parent ?? fe.TemplatedParent;
+				}
+				else if (dependencyObject is FrameworkContentElement fce)
+				{
+					parent = fce.Parent;
+				}
+			}
+			dependencyObject = parent;
 		}
 		return false;
 	}
@@ -2734,18 +2773,16 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab != null)
 		{
+			activeTab.ActiveTool = "Highlight";
 			string selectedText = activeTab.GetSelectedTextString();
 			if (!string.IsNullOrEmpty(selectedText))
 			{
 				activeTab.HighlightSelectedText("#FFFF00");
 				LogStatus("Đã tô màu (Highlight) vùng chữ được chọn.");
-				ActiveTool = "SelectText";
-				activeTab.ActiveTool = "SelectText";
 			}
 			else
 			{
-				activeTab.ActiveTool = "SelectText";
-				LogStatus("Hãy bôi đen văn bản để thực hiện tô màu (Highlight).");
+				LogStatus("Đang ở chế độ tô màu. Hãy bôi đen văn bản để tô màu ngay lập tức.");
 			}
 		}
 	}

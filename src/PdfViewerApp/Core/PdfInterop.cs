@@ -76,6 +76,15 @@ public static class PdfInterop
 
         [DllImport("pdfium.dll", EntryPoint = "FPDFText_GetCharBox")]
         public static extern bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top);
+
+        [DllImport("pdfium.dll", EntryPoint = "FPDFText_GetFontSize")]
+        public static extern double FPDFText_GetFontSize(nint text_page, int index);
+
+        [DllImport("pdfium.dll", EntryPoint = "FPDFText_GetFontInfo")]
+        public static extern uint FPDFText_GetFontInfo(nint text_page, int index, nint buffer, uint buflen, out int flags);
+
+        [DllImport("pdfium.dll", EntryPoint = "FPDFText_GetFontWeight")]
+        public static extern int FPDFText_GetFontWeight(nint text_page, int index);
     }
 
     // =========================================================================
