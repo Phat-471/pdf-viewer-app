@@ -116,6 +116,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private readonly List<Size> _pageDimensions = new List<Size>();
 
+	private readonly List<int> _inherentPageRotations = new List<int>();
+
+	private struct PageInfo
+	{
+		public Size Size;
+		public int Rotation;
+	}
+
 	private readonly List<int> _pageOrder = new List<int>();
 
 	private readonly HashSet<int> _selectedPages = new HashSet<int>();
@@ -2544,9 +2552,49 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			return false;
 		}
 
-		double x = canvasPoint.X * pageSize.Width / canvas.Width;
-		double y = (canvas.Height - canvasPoint.Y) * pageSize.Height / canvas.Height;
-		pdfPoint = new Point(x, y);
+		double nx = canvasPoint.X / canvas.Width;
+		double ny = canvasPoint.Y / canvas.Height;
+
+		int rotation = 0;
+		int index = pageNumber - 1;
+		if (index >= 0 && index < _inherentPageRotations.Count)
+		{
+			rotation = _inherentPageRotations[index];
+		}
+		
+		rotation = ((rotation % 360) + 360) % 360;
+
+		double x_p, y_p;
+		if (rotation == 90)
+		{
+			double W_pdf = pageSize.Height;
+			double H_pdf = pageSize.Width;
+			x_p = ny * W_pdf;
+			y_p = (1 - nx) * H_pdf;
+		}
+		else if (rotation == 180)
+		{
+			double W_pdf = pageSize.Width;
+			double H_pdf = pageSize.Height;
+			x_p = (1 - nx) * W_pdf;
+			y_p = ny * H_pdf;
+		}
+		else if (rotation == 270)
+		{
+			double W_pdf = pageSize.Height;
+			double H_pdf = pageSize.Width;
+			x_p = (1 - ny) * W_pdf;
+			y_p = nx * H_pdf;
+		}
+		else // 0 hoặc góc xoay khác
+		{
+			double W_pdf = pageSize.Width;
+			double H_pdf = pageSize.Height;
+			x_p = nx * W_pdf;
+			y_p = (1 - ny) * H_pdf;
+		}
+
+		pdfPoint = new Point(x_p, y_p);
 		return true;
 	}
 
@@ -2558,11 +2606,64 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			return false;
 		}
 
-		double x = left * canvas.Width / pageSize.Width;
-		double y = (pageSize.Height - top) * canvas.Height / pageSize.Height;
-		double width = (right - left) * canvas.Width / pageSize.Width;
-		double height = (top - bottom) * canvas.Height / pageSize.Height;
-		canvasRect = new Rect(x, y, width, height);
+		int rotation = 0;
+		int index = pageNumber - 1;
+		if (index >= 0 && index < _inherentPageRotations.Count)
+		{
+			rotation = _inherentPageRotations[index];
+		}
+		
+		rotation = ((rotation % 360) + 360) % 360;
+
+		double nx1, ny1, nx2, ny2;
+		if (rotation == 90)
+		{
+			double W_pdf = pageSize.Height;
+			double H_pdf = pageSize.Width;
+			nx1 = 1 - (bottom / H_pdf);
+			ny1 = left / W_pdf;
+			nx2 = 1 - (top / H_pdf);
+			ny2 = right / W_pdf;
+		}
+		else if (rotation == 180)
+		{
+			double W_pdf = pageSize.Width;
+			double H_pdf = pageSize.Height;
+			nx1 = 1 - (left / W_pdf);
+			ny1 = bottom / H_pdf;
+			nx2 = 1 - (right / W_pdf);
+			ny2 = top / H_pdf;
+		}
+		else if (rotation == 270)
+		{
+			double W_pdf = pageSize.Height;
+			double H_pdf = pageSize.Width;
+			nx1 = bottom / H_pdf;
+			ny1 = 1 - (left / W_pdf);
+			nx2 = top / H_pdf;
+			ny2 = 1 - (right / W_pdf);
+		}
+		else // 0 hoặc khác
+		{
+			double W_pdf = pageSize.Width;
+			double H_pdf = pageSize.Height;
+			nx1 = left / W_pdf;
+			ny1 = 1 - (bottom / H_pdf);
+			nx2 = right / W_pdf;
+			ny2 = 1 - (top / H_pdf);
+		}
+
+		double x1 = nx1 * canvas.Width;
+		double y1 = ny1 * canvas.Height;
+		double x2 = nx2 * canvas.Width;
+		double y2 = ny2 * canvas.Height;
+
+		double minX = Math.Min(x1, x2);
+		double maxX = Math.Max(x1, x2);
+		double minY = Math.Min(y1, y2);
+		double maxY = Math.Max(y1, y2);
+
+		canvasRect = new Rect(minX, minY, maxX - minX, maxY - minY);
 		return true;
 	}
 
@@ -3453,6 +3554,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_pendingZoomViewportPoint = null;
 		_resetScrollAfterRender = true;
 		_pageDimensions.Clear();
+		_inherentPageRotations.Clear();
 		_pageOrder.Clear();
 		_selectedPages.Clear();
 		_selectionAnchorPage = 1;
@@ -3527,13 +3629,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_isFirstLoad = false;
 			}
 			Stopwatch dimensionSw = Stopwatch.StartNew();
-			List<Size> collection = await Task.Run(() => CollectPageDimensions(tempDoc, pageCount));
+			List<PageInfo> collection = await Task.Run(() => CollectPageInfo(tempDoc, pageCount));
 			dimensionSw.Stop();
-			LogToDesktop($"CollectPageDimensions({pageCount}): {dimensionSw.ElapsedMilliseconds} ms");
+			LogToDesktop($"CollectPageInfo({pageCount}): {dimensionSw.ElapsedMilliseconds} ms");
 			if (loadGeneration == _loadGeneration)
 			{
 				_pageDimensions.Clear();
-				_pageDimensions.AddRange(collection);
+				_inherentPageRotations.Clear();
+				foreach (var info in collection)
+				{
+					_pageDimensions.Add(info.Size);
+					_inherentPageRotations.Add(info.Rotation);
+				}
 				if (base.IsLoaded)
 				{
 					LogToDesktop("LoadDocument triggering initial render");
@@ -3573,23 +3680,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	private static List<Size> CollectPageDimensions(nint document, int pageCount)
+	private static List<PageInfo> CollectPageInfo(nint document, int pageCount)
 	{
-		List<Size> list = new List<Size>(pageCount);
+		List<PageInfo> list = new List<PageInfo>(pageCount);
 		for (int i = 0; i < pageCount; i++)
 		{
 			double width = 0;
 			double height = 0;
-			bool success = false;
-			lock (PdfiumEngine.SyncRoot)
-			{
-				success = PdfiumEngine.TryGetPageSizeByIndex(document, i, out width, out height);
-			}
-			if (success)
-			{
-				list.Add(new Size(width, height));
-				continue;
-			}
+			int rotation = 0;
 			nint num = IntPtr.Zero;
 			lock (PdfiumEngine.SyncRoot)
 			{
@@ -3600,6 +3698,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					{
 						width = PdfiumEngine.FPDF_GetPageWidth(num);
 						height = PdfiumEngine.FPDF_GetPageHeight(num);
+						rotation = PdfInterop.Pdfium.FPDFPage_GetRotation(num) * 90;
 					}
 					finally
 					{
@@ -3609,11 +3708,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			if (num != IntPtr.Zero)
 			{
-				list.Add(new Size(width, height));
+				list.Add(new PageInfo { Size = new Size(width, height), Rotation = rotation });
 			}
 			else
 			{
-				list.Add(new Size(800.0, 1100.0));
+				list.Add(new PageInfo { Size = new Size(800.0, 1100.0), Rotation = 0 });
 			}
 		}
 		return list;

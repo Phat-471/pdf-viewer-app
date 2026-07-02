@@ -616,6 +616,7 @@ public partial class PdfDocumentTab
 
 			int pageCount = 0;
 			List<Size> pageDimensions = new List<Size>();
+			List<int> inherentRotations = new List<int>();
 			try
 			{
 				Stopwatch stopwatch2 = Stopwatch.StartNew();
@@ -632,11 +633,14 @@ public partial class PdfDocumentTab
 						if (num != IntPtr.Zero)
 						{
 							pageDimensions.Add(new Size(PdfiumEngine.FPDF_GetPageWidth(num), PdfiumEngine.FPDF_GetPageHeight(num)));
+							int rot = PdfInterop.Pdfium.FPDFPage_GetRotation(num) * 90;
+							inherentRotations.Add(rot);
 							PdfiumEngine.FPDF_ClosePage(num);
 						}
 						else
 						{
 							pageDimensions.Add(new Size(800.0, 1100.0));
+							inherentRotations.Add(0);
 						}
 					}
 				});
@@ -654,6 +658,8 @@ public partial class PdfDocumentTab
 			}
 			_pageDimensions.Clear();
 			_pageDimensions.AddRange(pageDimensions);
+			_inherentPageRotations.Clear();
+			_inherentPageRotations.AddRange(inherentRotations);
 			await RenderPdfPagesFromCacheAsync(renderGeneration, rebuildThumbnails);
 			totalSw.Stop();
 			PdfPerfLogger.Log($"RenderPdfPagesCoreAsync total: {totalSw.ElapsedMilliseconds} ms");

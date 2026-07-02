@@ -1,3 +1,4 @@
 - Khắc phục lỗi đóng khung nhập liệu khi click chuột chỉnh sửa văn bản.
 - Tối ưu hóa việc tự động khớp định dạng font chữ và cỡ chữ khi chỉnh sửa văn bản.
 - Dọn dẹp mã nguồn chẩn đoán lỗi trong lõi hiển thị.
+- Sửa lỗi không chọn/sửa được chữ đối với các trang PDF có góc xoay gốc (inherent rotation 90/180/270 độ).

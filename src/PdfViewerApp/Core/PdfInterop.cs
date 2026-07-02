@@ -41,6 +41,9 @@ public static class PdfInterop
         [DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageHeight")]
         public static extern double FPDF_GetPageHeight(nint page);
 
+        [DllImport("pdfium.dll", EntryPoint = "FPDFPage_GetRotation")]
+        public static extern int FPDFPage_GetRotation(nint page);
+
         [DllImport("pdfium.dll", EntryPoint = "FPDF_GetPageSizeByIndex")]
         public static extern int FPDF_GetPageSizeByIndex(nint document, int page_index, out double width, out double height);
 
