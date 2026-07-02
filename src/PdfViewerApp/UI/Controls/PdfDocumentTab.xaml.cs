@@ -345,6 +345,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
+		if (_activeDirectEditTextBox != null)
+		{
+			DependencyObject clickedObj = e.OriginalSource as DependencyObject;
+			while (clickedObj != null)
+			{
+				if (clickedObj == _activeDirectEditTextBox)
+				{
+					return;
+				}
+				clickedObj = VisualTreeHelper.GetParent(clickedObj);
+			}
+		}
 		if (ActiveTool != "EditText" && ActiveTool != "SelectText")
 		{
 			FrameworkElement clickedElement = e.Source as FrameworkElement;
@@ -963,6 +975,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (!(sender is Canvas { Tag: var tag } canvas) || !(tag is int num))
 		{
 			return;
+		}
+		if (_activeDirectEditTextBox != null)
+		{
+			DependencyObject clickedObj = e.OriginalSource as DependencyObject;
+			while (clickedObj != null)
+			{
+				if (clickedObj == _activeDirectEditTextBox)
+				{
+					return;
+				}
+				clickedObj = VisualTreeHelper.GetParent(clickedObj);
+			}
 		}
 		if (_isSelectingText)
 		{
@@ -2841,6 +2865,60 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_selectedText = "";
 		RedrawAllPageAnnotations();
 	}
+	private string CleanPdfFontName(string rawName)
+	{
+		if (string.IsNullOrEmpty(rawName)) return ActiveFontFamily;
+
+		int plusIdx = rawName.IndexOf('+');
+		if (plusIdx >= 0 && plusIdx < rawName.Length - 1)
+		{
+			rawName = rawName.Substring(plusIdx + 1);
+		}
+
+		int commaIdx = rawName.IndexOf(',');
+		if (commaIdx >= 0)
+		{
+			rawName = rawName.Substring(0, commaIdx);
+		}
+		
+		int hyphenIdx = rawName.IndexOf('-');
+		if (hyphenIdx >= 0)
+		{
+			string baseName = rawName.Substring(0, hyphenIdx);
+			if (baseName.Equals("Arial", StringComparison.OrdinalIgnoreCase) ||
+			    baseName.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
+			    baseName.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
+			    baseName.Equals("Courier", StringComparison.OrdinalIgnoreCase))
+			{
+				rawName = baseName;
+			}
+		}
+
+		if (rawName.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) || 
+		    rawName.Equals("ArialMT", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.StartsWith("Arial", StringComparison.OrdinalIgnoreCase))
+		{
+			return "Arial";
+		}
+		if (rawName.Equals("Times", StringComparison.OrdinalIgnoreCase) || 
+		    rawName.Equals("TimesNewRomanPSMT", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.StartsWith("TimesNewRoman", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.Equals("TimesNewRomanPS-BoldMT", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.Equals("TimesNewRomanPS-ItalicMT", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.Equals("TimesNewRomanPS-BoldItalicMT", StringComparison.OrdinalIgnoreCase))
+		{
+			return "Times New Roman";
+		}
+		if (rawName.Equals("Courier", StringComparison.OrdinalIgnoreCase) || 
+		    rawName.Equals("CourierNewPSMT", StringComparison.OrdinalIgnoreCase) ||
+		    rawName.StartsWith("Courier", StringComparison.OrdinalIgnoreCase))
+		{
+			return "Courier New";
+		}
+
+		return rawName;
+	}
+
 	private void ShowDirectTextEditOverlay(Canvas canvas, int charIndex, int pageNumber)
 	{
 		LogToDesktop($"[EDIT DEBUG] 3. Khởi chạy ShowDirectTextEditOverlay (CharIndex: {charIndex}, Page: {pageNumber})");
@@ -2868,7 +2946,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		lock (PdfiumEngine.SyncRoot) { num = PdfiumEngine.FPDFText_CountChars(textPage); }
 		if (num <= 0) return;
 
-		// 1. Tính toán layout
+		// 1. Tính toán layout và lấy font details
 		double estFontSize = 12.0;
 		double initTop = 0;
 		lock (PdfiumEngine.SyncRoot)
@@ -2878,6 +2956,38 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				estFontSize = cT - cB;
 				initTop = cT;
 			}
+			
+			double fs = PdfiumEngine.FPDFText_GetFontSize(textPage, charIndex);
+			if (fs > 0)
+			{
+				estFontSize = fs;
+			}
+		}
+
+		bool isBold = false;
+		bool isItalic = false;
+		string pdfFontName = ActiveFontFamily;
+		int fontFlags = 0;
+		string rawFontName = "";
+		
+		lock (PdfiumEngine.SyncRoot)
+		{
+			rawFontName = PdfiumEngine.FPDFText_GetFontName(textPage, charIndex, out fontFlags);
+			int weight = PdfiumEngine.FPDFText_GetFontWeight(textPage, charIndex);
+			if (weight > 550)
+			{
+				isBold = true;
+			}
+		}
+		
+		if (!string.IsNullOrEmpty(rawFontName))
+		{
+			pdfFontName = CleanPdfFontName(rawFontName);
+		}
+		
+		if ((fontFlags & 64) != 0)
+		{
+			isItalic = true;
 		}
 
 		int num2;
@@ -2941,8 +3051,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			Width = Math.Max(50.0, editRect.Width + 12.0),
 			Height = Math.Max(20.0, editRect.Height + 6.0),
 			Text = existingText,
-			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = Math.Max(8.0, (estFontSize > 0 ? estFontSize : 12.0) * canvas.Height / pageSize.Height),
+			FontFamily = new FontFamily(pdfFontName),
+			FontSize = Math.Max(8.0, estFontSize * canvas.Height / pageSize.Height),
+			FontWeight = isBold ? FontWeights.Bold : FontWeights.Normal,
+			FontStyle = isItalic ? FontStyles.Italic : FontStyles.Normal,
 			Foreground = Brushes.Black,
 			TextWrapping = TextWrapping.Wrap,
 			AcceptsReturn = true,
@@ -2966,7 +3078,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, countBefore, sbBefore) > 0) caretPos = sbBefore.ToString().Length; }
 		}
 
-		// Gọi Focus trực tiếp thông qua Dispatcher thay vì chờ Loaded
+		// VÁ LỖI MẤT CON TRỎ: Gán Loaded để chắc chắn textbox được focus và set cursor index đúng
+		tbInput.Loaded += (s, ev) =>
+		{
+			tbInput.Focus();
+			Keyboard.Focus(tbInput);
+			if (caretPos >= 0 && caretPos <= tbInput.Text.Length)
+			{
+				tbInput.CaretIndex = caretPos;
+			}
+		};
+
+		// Gọi Focus trực tiếp thông qua Dispatcher thay vì chờ Loaded (để chạy song song/sớm)
 		Dispatcher.BeginInvoke(new Action(() => {
 			tbInput.Focus();
 			Keyboard.Focus(tbInput);
@@ -3006,7 +3129,22 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			if (text != existingText)
 			{
 				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = Colors.White, StrokeColor = Colors.Transparent, Opacity = 1.0 };
-				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = text, BgColor = Colors.Transparent, StrokeColor = Colors.Black, FontFamily = ActiveFontFamily, FontSize = estFontSize, Opacity = 1.0 };
+				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation 
+				{ 
+					PageIndex = pageNumber - 1, 
+					X = minLeft / pageSize.Width, 
+					Y = (pageSize.Height - maxTop) / pageSize.Height, 
+					Width = (maxRight - minLeft) / pageSize.Width, 
+					Height = (maxTop - minBottom) / pageSize.Height, 
+					Text = text, 
+					BgColor = Colors.Transparent, 
+					StrokeColor = Colors.Black, 
+					FontFamily = pdfFontName, 
+					FontSize = estFontSize, 
+					IsBold = isBold,
+					IsItalic = isItalic,
+					Opacity = 1.0 
+				};
 				
 				try { SaveUndoState(); } catch {}
 				Annotations.Add(whiteout); Annotations.Add(replacement); 

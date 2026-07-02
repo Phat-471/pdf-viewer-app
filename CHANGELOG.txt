@@ -1,3 +1,3 @@
-v1.6.9:
-- Cập nhật cơ chế xác thực bản quyền và tối ưu hóa hệ thống kiểm tra.
-- Sửa một số lỗi giao diện và đồng bộ hóa cấu hình máy chủ.
+- Khắc phục lỗi đóng khung nhập liệu khi click chuột chỉnh sửa văn bản.
+- Tối ưu hóa việc tự động khớp định dạng font chữ và cỡ chữ khi chỉnh sửa văn bản.
+- Dọn dẹp mã nguồn chẩn đoán lỗi trong lõi hiển thị.

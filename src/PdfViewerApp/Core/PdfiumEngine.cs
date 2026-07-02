@@ -378,16 +378,13 @@ public static class PdfiumEngine
 		}
 	}
 
-	public static string FPDFText_GetFontName(nint text_page, int index)
+	public static string FPDFText_GetFontName(nint text_page, int index, out int flags)
 	{
-		System.Windows.MessageBox.Show("Debug Engine: Enter FPDFText_GetFontName");
+		flags = 0;
 		LockSlim.EnterReadLock();
 		try
 		{
-			int flags;
-			System.Windows.MessageBox.Show("Debug Engine: Call Native.FPDFText_GetFontInfo 1 (query length)");
 			uint length = Native.FPDFText_GetFontInfo(text_page, index, IntPtr.Zero, 0, out flags);
-			System.Windows.MessageBox.Show($"Debug Engine: length={length}, flags={flags}");
 			if (length <= 0)
 			{
 				return "";
@@ -396,9 +393,7 @@ public static class PdfiumEngine
 			GCHandle handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
 			try
 			{
-				System.Windows.MessageBox.Show("Debug Engine: Call Native.FPDFText_GetFontInfo 2 (fetch name)");
 				Native.FPDFText_GetFontInfo(text_page, index, handle.AddrOfPinnedObject(), length, out flags);
-				System.Windows.MessageBox.Show("Debug Engine: Fetch name success");
 			}
 			finally
 			{
@@ -406,21 +401,23 @@ public static class PdfiumEngine
 			}
 			return Encoding.UTF8.GetString(buffer).TrimEnd('\0');
 		}
-		catch (EntryPointNotFoundException ex)
+		catch (EntryPointNotFoundException)
 		{
-			System.Windows.MessageBox.Show($"Debug Engine EntryPointNotFoundException: {ex.Message}");
 			return "";
 		}
-		catch (Exception ex)
+		catch (Exception)
 		{
-			System.Windows.MessageBox.Show($"Debug Engine Exception: {ex.Message}");
 			return "";
 		}
 		finally
 		{
 			LockSlim.ExitReadLock();
-			System.Windows.MessageBox.Show("Debug Engine: Exit FPDFText_GetFontName");
 		}
+	}
+
+	public static string FPDFText_GetFontName(nint text_page, int index)
+	{
+		return FPDFText_GetFontName(text_page, index, out _);
 	}
 
 	public static void Initialize()
