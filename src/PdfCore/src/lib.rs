@@ -736,6 +736,14 @@ pub extern "C" fn extract_pdf_pages(
         return false;
     }
 
+    // Explicitly delete unselected page objects to ensure their resources (streams, fonts, images)
+    // are unreferenced and can be successfully pruned to reduce file size.
+    for (&p, &page_id) in &pages {
+        if !target_pages.contains(&p) {
+            doc.objects.remove(&page_id);
+        }
+    }
+
     // Prune unused objects to minimize file size
     let _ = doc.prune_objects();
     doc.save(output_str).is_ok()
