@@ -4,6 +4,136 @@
              xmlns:fluent="urn:fluent-ribbon"
              Background="#00FFFFFF">
   <UserControl.Resources>
+    <!-- Vector Icons from SVG (e:\code\pdf\icon) -->
+    <DrawingImage x:Key="IconOpen">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#D3AC51" Geometry="M582.4 384c0 14.08-11.52 25.6-25.6 25.6l-384 409.6c-14.08 0-25.6-11.52-25.6-25.6V192c0-14.08 11.52-25.6 25.6-25.6h230.4c14.08 0 25.6 11.52 25.6 25.6l153.6 192z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M177.92 832h-5.12c-21.76 0-38.4-16.64-38.4-38.4V192c0-21.76 16.64-38.4 38.4-38.4h230.4c19.2 0 35.84 14.08 38.4 33.28l153.6 192v5.12c0 19.2-14.08 34.56-32 38.4L177.92 832z m-5.12-652.8c-7.68 0-12.8 5.12-12.8 12.8v601.6c0 5.12 3.84 10.24 7.68 11.52L550.4 396.8h5.12c5.12 0 10.24-3.84 12.8-8.96l-153.6-190.72V192c0-7.68-5.12-12.8-12.8-12.8H172.8z" />
+          <GeometryDrawing Brush="#FAC546" Geometry="M864 793.6c0 14.08-11.52 25.6-25.6 25.6h-665.6c-14.08 0-25.6-11.52-25.6-25.6l64-512c0-14.08 11.52-25.6 25.6-25.6h678.4c14.08 0 25.6 11.52 25.6 25.6l-76.8 512z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M838.4 832h-665.6c-21.76 0-38.4-16.64-38.4-38.4v-1.28l64-510.72c0-20.48 17.92-37.12 38.4-37.12h678.4c21.76 0 38.4 16.64 38.4 38.4v1.28l-76.8 510.72c-1.28 20.48-17.92 37.12-38.4 37.12z m-678.4-37.12c0 6.4 6.4 11.52 12.8 11.52h665.6c7.68 0 12.8-5.12 12.8-12.8v-1.28l76.8-510.72c0-6.4-6.4-11.52-12.8-11.52h-678.4c-7.68 0-12.8 5.12-12.8 12.8v1.28l-64 510.72z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconPrinter">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#F2E5CA" Geometry="M270.08 186.88h512v102.4h-512z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M794.88 302.08h-537.6v-128h537.6v128z m-512-25.6h486.4v-76.8h-486.4v76.8z" />
+          <GeometryDrawing Brush="#A7BFB7" Geometry="M743.68 378.88c0 14.08-11.52 25.6-25.6 25.6h-384c-14.08 0-25.6-11.52-25.6-25.6v-204.8c0-14.08 11.52-25.6 25.6-25.6h384c14.08 0 25.6 11.52 25.6 25.6v204.8z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M718.08 417.28h-384c-21.76 0-38.4-16.64-38.4-38.4v-204.8c0-21.76 16.64-38.4 38.4-38.4h384c21.76 0 38.4 16.64 38.4 38.4v204.8c0 21.76-17.92 38.4-38.4 38.4z m-384-256c-7.68 0-12.8 5.12-12.8 12.8v204.8c0 7.68 5.12 12.8 12.8 12.8h384c7.68 0 12.8-5.12 12.8-12.8v-204.8c0-7.68-5.12-12.8-12.8-12.8h-384z" />
+          <GeometryDrawing Brush="#E1E0A6" Geometry="M346.88 225.28h358.4v268.8h-358.4z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M718.08 506.88h-384v-294.4h384v294.4z m-358.4-25.6h332.8v-243.2h-332.8v243.2z" />
+          <GeometryDrawing Brush="#FAC546" Geometry="M922.88 698.88c0 14.08-11.52 25.6-25.6 25.6h-742.4c-14.08 0-25.6-11.52-25.6-25.6v-384c0-14.08 11.52-25.6 25.6-25.6h742.4c14.08 0 25.6 11.52 25.6 25.6v384z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M897.28 737.28h-742.4c-21.76 0-38.4-16.64-38.4-38.4v-384c0-21.76 16.64-38.4 38.4-38.4h742.4c21.76 0 38.4 16.64 38.4 38.4v384c0 21.76-17.92 38.4-38.4 38.4z m-742.4-435.2c-7.68 0-12.8 5.12-12.8 12.8v384c0 7.68 5.12 12.8 12.8 12.8h742.4c7.68 0 12.8-5.12 12.8-12.8v-384c0-7.68-5.12-12.8-12.8-12.8h-742.4z" />
+          <GeometryDrawing Brush="#F2E5CA" Geometry="M756.48 826.88c0 14.08-11.52 25.6-25.6 25.6h-409.6c-14.08 0-25.6-11.52-25.6-25.6v-256c0-14.08 11.52-25.6 25.6-25.6h409.6c14.08 0 25.6 11.52 25.6 25.6v256z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M730.88 865.28h-409.6c-21.76 0-38.4-16.64-38.4-38.4v-256c0-21.76 16.64-38.4 38.4-38.4h409.6c21.76 0 38.4 16.64 38.4 38.4v256c0 21.76-17.92 38.4-38.4 38.4z m-409.6-307.2c-7.68 0-12.8 5.12-12.8 12.8v256c0 7.68 5.12 12.8 12.8 12.8h409.6c7.68 0 12.8-5.12 12.8-12.8v-256c0-7.68-5.12-12.8-12.8-12.8h-409.6z" />
+          <GeometryDrawing Brush="#E1E0A6" Geometry="M346.88 545.28h358.4v256h-358.4z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M718.08 814.08h-384v-281.6h384v281.6z m-358.4-25.6h332.8v-230.4h-332.8v230.4z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M423.68 596.48h204.8v25.6h-204.8z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M423.68 647.68h204.8v25.6h-204.8z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M423.68 698.88h204.8v25.6h-204.8z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M794.88 340.48h64v25.6h-64z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M732.16 340.48H768v25.6h-35.84z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M129.28 494.08h793.6v25.6h-793.6z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconSetting">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#FAC546" Geometry="M897.28 597.76l-74.24-53.76c1.28-10.24 1.28-21.76 1.28-32 0-11.52 0-21.76-1.28-32l74.24-53.76c12.8-7.68 16.64-23.04 8.96-34.56l-90.88-154.88c-7.68-12.8-23.04-16.64-35.84-8.96l-84.48 37.12c-17.92-12.8-37.12-23.04-57.6-32l-7.68-92.16c0-14.08-11.52-25.6-25.6-25.6H422.4c-14.08 0-25.6 11.52-25.6 25.6l-8.96 90.88c-20.48 8.96-39.68 19.2-57.6 32l-84.48-37.12c-12.8-7.68-28.16-2.56-35.84 8.96l-89.6 156.16c-7.68 12.8-2.56 28.16 8.96 34.56l74.24 53.76c-1.28 10.24-1.28 21.76-1.28 32s0 21.76 1.28 32l-74.24 53.76c-1.28 7.68-16.64 23.04-8.96 34.56l90.88 154.88c7.68 12.8 23.04 16.64 35.84 8.96l84.48-37.12c17.92 12.8 37.12 23.04 57.6 32L396.8 883.2c0 14.08 11.52 25.6 25.6 25.6h181.76c14.08 0 25.6-11.52 25.6-25.6l8.96-90.88c20.48-8.96 39.68-19.2 57.6-32l84.48 37.12c12.8 7.68 28.16 2.56 35.84-8.96l90.88-154.88c6.4-12.8 1.28-28.16-10.24-35.84z m-384 65.28c-84.48 0-153.6-67.84-153.6-151.04s69.12-151.04 153.6-151.04 153.6 67.84 153.6 151.04-69.12 151.04-153.6 151.04z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M604.16 921.6H422.4c-20.48 0-38.4-16.64-38.4-37.12l-8.96-81.92c-16.64-7.68-32-16.64-46.08-26.88l-76.8 34.56c-17.92 10.24-42.24 3.84-52.48-14.08L108.8 638.72c-5.12-8.96-6.4-19.2-3.84-29.44 2.56-10.24 8.96-17.92 17.92-23.04l67.84-48.64c-1.28-8.96-1.28-17.92-1.28-26.88s0-17.92 1.28-26.88L122.88 435.2c-8.96-5.12-15.36-12.8-17.92-23.04-2.56-10.24-1.28-20.48 3.84-29.44l90.88-154.88c10.24-17.92 33.28-24.32 52.48-14.08l76.8 34.56c14.08-10.24 30.72-19.2 46.08-26.88l8.96-81.92C384 119.04 400.64 102.4 422.4 102.4h181.76c20.48 0 38.4 16.64 38.4 37.12l8.96 81.92c16.64 7.68 32 16.64 46.08 26.88l76.8-34.56c17.92-10.24 42.24-3.84 52.48 14.08l90.88 154.88c5.12 8.96 6.4 19.2 3.84 29.44-2.56 10.24-8.96 17.92-17.92 23.04l-67.84 48.64c1.28 8.96 1.28 17.92 1.28 26.88 0 8.96 0 17.92-1.28 26.88l67.84 48.64c8.96 5.12 15.36 12.8 17.92 23.04 2.56 10.24 1.28 20.48-3.84 29.44L826.88 793.6c-10.24 17.92-33.28 24.32-52.48 14.08l-76.8-34.56c-14.08 10.24-30.72 19.2-46.08 26.88l-8.96 81.92c0 23.04-17.92 39.68-38.4 39.68zM330.24 747.52c2.56 0 5.12 1.28 7.68 2.56 16.64 12.8 35.84 23.04 55.04 30.72 3.84 1.28 7.68 6.4 7.68 10.24l8.96 90.88v1.28c0 7.68 6.4 12.8 12.8 12.8h181.76c7.68 0 12.8-5.12 12.8-12.8v-1.28l8.96-90.88c0-5.12 3.84-8.96 7.68-10.24 19.2-8.96 37.12-19.2 55.04-30.72 3.84-2.56 8.96-2.56 12.8-1.28l84.48 37.12h1.28c6.4 3.84 14.08 1.28 17.92-5.12L896 625.92c1.28-2.56 2.56-6.4 1.28-8.96-1.28-3.84-2.56-6.4-6.4-7.68 0 0-1.28 0-1.28-1.28l-74.24-53.76c-3.84-2.56-6.4-7.68-5.12-11.52 1.28-10.24 1.28-20.48 1.28-30.72 0-10.24 0-20.48-1.28-30.72 0-5.12 1.28-8.96 5.12-11.52l74.24-53.76s1.28 0 1.28-1.28c2.56-1.28 5.12-5.12 6.4-7.68 1.28-3.84 0-6.4-1.28-8.96L805.12 243.2c-3.84-6.4-11.52-7.68-17.92-5.12h-1.28l-84.48 37.12c-3.84 1.28-8.96 1.28-12.8-1.28-16.64-12.8-35.84-23.04-55.04-30.72-3.84-1.28-7.68-6.4-7.68-10.24l-8.96-90.88V140.8c0-7.68-6.4-12.8-12.8-12.8H422.4c-7.68 0-12.8 5.12-12.8 12.8v1.28l-8.96 90.88c0 5.12-3.84 8.96-7.68 10.24-19.2 8.96-37.12 19.2-55.04 30.72-3.84 2.56-8.96 2.56-12.8 1.28l-84.48-37.12h-1.28c-6.4-3.84-14.08-1.28-17.92 5.12l-90.88 154.88c-1.28 2.56-2.56 6.4-1.28 8.96 1.28 3.84 2.56 6.4 6.4 7.68 0 0 1.28 0 1.28 1.28l74.24 53.76c3.84 2.56 6.4 7.68 5.12 11.52-1.28 10.24-1.28 20.48-1.28 30.72s0 20.48 1.28 30.72c0 5.12-1.28 8.96-5.12 11.52l-74.24 53.76s-1.28 0-1.28 1.28c-2.56 1.28-5.12 5.12-6.4 7.68-1.28 3.84 0 6.4 1.28 8.96L221.44 780.8c3.84 6.4 11.52 7.68 17.92 5.12h1.28l84.48-37.12c1.28-1.28 2.56-1.28 5.12-1.28z m183.04-71.68c-92.16 0-166.4-74.24-166.4-163.84s74.24-163.84 166.4-163.84 166.4 74.24 166.4 163.84-75.52 163.84-166.4 163.84z m0-302.08c-78.08 0-140.8 62.72-140.8 138.24 0 76.8 62.72 138.24 140.8 138.24s140.8-62.72 140.8-138.24c0-76.8-64-138.24-140.8-138.24z" />
+          <GeometryDrawing Brush="#E1E0A6" Geometry="M513.28 332.8C413.44 332.8 332.8 413.44 332.8 512s80.64 179.2 180.48 179.2 180.48-80.64 180.48-179.2-81.92-179.2-180.48-179.2z m0 281.6c-57.6 0-103.68-46.08-103.68-102.4s46.08-102.4 103.68-102.4 103.68 46.08 103.68 102.4-47.36 102.4-103.68 102.4z" />
+          <GeometryDrawing Brush="#231C1C" Geometry="M513.28 704C407.04 704 320 618.24 320 512s87.04-192 193.28-192 193.28 85.76 193.28 192c-1.28 106.24-87.04 192-193.28 192z m0-358.4C421.12 345.6 345.6 419.84 345.6 512s75.52 166.4 167.68 166.4c92.16 0 167.68-74.24 167.68-166.4-1.28-92.16-75.52-166.4-167.68-166.4z m0 281.6c-64 0-116.48-51.2-116.48-115.2s52.48-115.2 116.48-115.2 116.48 51.2 116.48 115.2-52.48 115.2-116.48 115.2z m0-204.8c-49.92 0-90.88 39.68-90.88 89.6s40.96 89.6 90.88 89.6c49.92 0 90.88-39.68 90.88-89.6s-40.96-89.6-90.88-89.6z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconZoomIn">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#2CA9BC" Geometry="M21,22a1,1,0,0,1-.71-.29L16,17.37A1,1,0,0,1,17.37,16l4.34,4.34a1,1,0,0,1,0,1.42A1,1,0,0,1,21,22Z" />
+          <GeometryDrawing Brush="Black" Geometry="M11,2 A9,9 0 1,1 11,20 A9,9 0 1,1 11,2 Z" />
+          <GeometryDrawing Brush="#2CA9BC" Geometry="M11,15a1,1,0,0,1-1-1V12H8a1,1,0,0,1,0-2h2V8a1,1,0,0,1,2,0v2h2a1,1,0,0,1,0,2H12v2A1,1,0,0,1,11,15Z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconZoomOut">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#2CA9BC" Geometry="M10,3 A7,7 0 1,1 10,17 A7,7 0 1,1 10,3 Z" />
+          <GeometryDrawing Brush="Black" Geometry="M7,10h6 M10,3a7,7,0,1,0,7,7A7,7,0,0,0,10,3Z M21,21l-6-6" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconTurnLeft">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#FFD15D">
+            <GeometryDrawing.Geometry>
+              <EllipseGeometry Center="256,256" RadiusX="256" RadiusY="256" />
+            </GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#F9B54C" Geometry="M501.184,329.799L362.139,190.357l-113.726,9.499l-53.917-53.27l-30.868,32.701l-48.135,35.528 l264.975,264.921C438,447.662,481.87,394.05,501.184,329.799z" />
+          <GeometryDrawing Brush="#324A5E" Geometry="M349.953,185.32H199.89v-26.227c0-6.606-3.775-12.631-9.719-15.513 c-5.946-2.884-13.014-2.112-18.199,1.979l-55.082,43.467c-4.143,3.27-6.559,8.256-6.559,13.534s2.417,10.264,6.559,13.534 l55.082,43.467c3.101,2.446,6.877,3.705,10.681,3.705c2.557,0,5.129-0.569,7.516-1.726c5.944-2.882,9.719-8.907,9.719-15.513 v-26.228h132.825v149.98c0,9.519,7.718,17.239,17.239,17.239s17.239-7.72,17.239-17.239V202.559 C367.192,193.04,359.474,185.32,349.953,185.32z" />
+          <GeometryDrawing Brush="#2B3B4E" Geometry="M349.953,185.32h-92.229v34.478h74.99v149.98c0,9.519,7.718,17.239,17.239,17.239 s17.239-7.72,17.239-17.239V202.559C367.192,193.04,359.474,185.32,349.953,185.32z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconTurnRight">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#FFD15D">
+            <GeometryDrawing.Geometry>
+              <EllipseGeometry Center="256,256" RadiusX="256" RadiusY="256" />
+            </GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#F9B54C" Geometry="M425.188,307.593l-45.27,21.345L187.906,136.926l-20.111,96.377l-14.367,91.529l176.349,176.349 c39.252-11.774,76.236-33.154,107.244-64.162c20.583-20.583,36.917-43.804,49.026-68.568L425.188,307.593z" />
+          <GeometryDrawing Brush="#324A5E" Geometry="M350.813,233.219 L326.434,257.598 L359.19,290.354 L187.906,290.354 L187.906,136.926 L153.428,136.926 L153.428,324.832 L359.19,324.832 L326.432,357.588 L350.813,381.967 L425.188,307.593 Z" />
+          <GeometryDrawing Brush="#2B3B4E" Geometry="M350.813,233.219 L326.434,257.598 L359.19,290.354 L255.426,290.354 L255.426,324.832 L359.19,324.832 L326.432,357.588 L350.813,381.967 L425.188,307.593 Z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconBlankPage">
+      <DrawingImage.Drawing>
+        <GeometryDrawing Brush="#106EBE" Geometry="M421.286,121.468V60.734h-118.47L242.083,0H20.279v390.532h70.435v60.734h70.437V512h330.571V121.468H421.286z M250.992,51.925l8.809,8.809l24.253,24.253l14.871,14.871h-47.932V51.925z M50.696,360.115V30.417h169.879v99.859h99.857v229.839 H90.714H50.696z M121.131,420.849v-30.317h229.718V108.768l-17.617-17.617h57.635v30.317v299.381H161.151H121.131z M461.304,481.583H191.568v-30.317h229.719V151.885h40.018V481.583z" />
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconTach">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#0F766E" Geometry="M0,0v60h60V0H0z M58,58H2V2h56V58z" />
+          <GeometryDrawing Brush="#0F766E" Geometry="M9,29 h42 v2 h-42 z" />
+          <GeometryDrawing Brush="#0F766E" Geometry="M30,22c2.757,0,5-2.243,5-5s-2.243-5-5-5s-5,2.243-5,5S27.243,22,30,22z M30,14c1.654,0,3,1.346,3,3s-1.346,3-3,3 s-3-1.346-3-3S28.346,14,30,14z" />
+          <GeometryDrawing Brush="#0F766E" Geometry="M30,38c-2.757,0-5,2.243-5,5s2.243,5,5,5s5-2.243,5-5S32.757,38,30,38z M30,46c-1.654,0-3-1.346-3-3s1.346-3,3-3 s3,1.346,3,3S31.654,46,30,46z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconDownload">
+      <DrawingImage.Drawing>
+        <GeometryDrawing Brush="#0F766E" Geometry="M2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C22 4.92893 22 7.28595 22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12ZM12 6.25C12.4142 6.25 12.75 6.58579 12.75 7V12.1893L14.4697 10.4697C14.7626 10.1768 15.2374 10.1768 15.5303 10.4697C15.8232 10.7626 15.8232 11.2374 15.5303 11.5303L12.5303 14.5303C12.3897 14.671 12.1989 14.75 12 14.75C11.8011 14.75 11.6103 14.671 11.4697 14.5303L8.46967 11.5303C8.17678 11.2374 8.17678 10.7626 8.46967 10.4697C8.76256 10.1768 9.23744 10.1768 9.53033 10.4697L11.25 12.1893V7C11.25 6.58579 11.5858 6.25 12 6.25ZM8 16.25C7.58579 16.25 7.25 16.5858 7.25 17C7.25 17.4142 7.58579 17.75 8 17.75H16C16.4142 17.75 16.75 17.4142 16.75 17C16.75 16.5858 16.4142 16.25 16 16.25H8Z" />
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <DrawingImage x:Key="IconSnapshot">
+      <DrawingImage.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="#0F766E" Geometry="M9,2h6l2,3h4a2,2,0,0,1,2,2v12a2,2,0,0,1,-2,2H3a2,2,0,0,1,-2,-2V7a2,2,0,0,1,2,-2h4Z" />
+          <GeometryDrawing Brush="#FFFFFF" Geometry="M12,17 A5,5 0 1,1 12,7 A5,5 0 1,1 12,17 Z" />
+          <GeometryDrawing Brush="#E29C1D" Geometry="M12,15 A3,3 0 1,1 12,9 A3,3 0 1,1 12,15 Z" />
+        </DrawingGroup>
+      </DrawingImage.Drawing>
+    </DrawingImage>
+
     <!-- Style for TextBlock to toggle Foreground between Black (Light Mode) and White (Dark Mode) -->
     <Style x:Key="ThemeTextBlockStyle" TargetType="TextBlock">
       <Setter Property="Foreground" Value="#0F172A" />
@@ -63,11 +193,7 @@
     </fluent:Ribbon.Menu>
     <fluent:RibbonTabItem Header="Trang Chủ">
       <fluent:RibbonGroupBox Header="Thao Tác File">
-        <fluent:Button Header="Mở File" Margin="8,0,8,0" Click="OpenPdf_Click" ToolTip="Mở tệp tin PDF từ máy tính của bạn (Ctrl+O)">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Header="Mở File" LargeIcon="{StaticResource IconOpen}" Margin="8,0,8,0" Click="OpenPdf_Click" ToolTip="Mở tệp tin PDF từ máy tính của bạn (Ctrl+O)" />
         <fluent:Button Header="Lưu" Margin="8,0,8,0" Click="SavePdf_Click" ToolTip="Lưu tài liệu hiện tại (Ctrl+S)">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
@@ -78,11 +204,7 @@
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="In Ấn" Margin="8,0,8,0" Click="PrintPdf_Click" ToolTip="In tài liệu hiện tại (Ctrl+P)">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Header="In Ấn" LargeIcon="{StaticResource IconPrinter}" Margin="8,0,8,0" Click="PrintPdf_Click" ToolTip="In tài liệu hiện tại (Ctrl+P)" />
         <fluent:Button Name="BatchPrintBtn" Header="In Hàng Loạt" Margin="8,0,8,0" Click="BatchPrint_Click" ToolTip="In đồng thời hàng loạt nhiều tệp tin PDF">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#107C41" HorizontalAlignment="Center" />
@@ -90,16 +212,8 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Xem &amp; Điều Hướng">
-        <fluent:Button Header="Phóng To" Margin="8,0,8,0" Click="ZoomIn_Click" ToolTip="Phóng to trang tài liệu">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Header="Thu Nhỏ" Margin="8,0,8,0" Click="ZoomOut_Click" ToolTip="Thu nhỏ trang tài liệu">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Header="Phóng To" LargeIcon="{StaticResource IconZoomIn}" Margin="8,0,8,0" Click="ZoomIn_Click" ToolTip="Phóng to trang tài liệu" />
+        <fluent:Button Header="Thu Nhỏ" LargeIcon="{StaticResource IconZoomOut}" Margin="8,0,8,0" Click="ZoomOut_Click" ToolTip="Thu nhỏ trang tài liệu" />
         <fluent:Button Header="Độ Rộng" Margin="8,0,8,0" Click="FitWidth_Click" ToolTip="Tự động điều chỉnh kích thước trang vừa với độ rộng màn hình">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
@@ -123,6 +237,12 @@
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
       </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Biên Tập &amp; Snapshot">
+        <fluent:Button Header="Nhân Bản" LargeIcon="{StaticResource IconBlankPage}" Size="Large" Margin="4,0" Click="DuplicatePage_Click" ToolTip="Nhân bản trang hiện tại" />
+        <fluent:Button Name="SplitCurrentPageBtn" Header="Tách Trang" LargeIcon="{StaticResource IconTach}" Size="Large" Margin="4,0" Click="SplitCurrentPage_Click" ToolTip="Tách riêng trang hiện tại ra thành một tệp tin PDF độc lập" />
+        <fluent:Button Name="ExtractPagesBtn" Header="Trích Xuất" LargeIcon="{StaticResource IconDownload}" Size="Large" Margin="4,0" Click="ExtractPages_Click" ToolTip="Trích xuất trang chỉ định lưu thành tệp tin mới" />
+        <fluent:ToggleButton Name="SnapshotToolBtn" Header="Snapshot" LargeIcon="{StaticResource IconSnapshot}" Size="Large" Margin="4,0" Click="SnapshotTool_Click" ToolTip="Chụp một vùng ảnh trên tài liệu và lưu vào bộ nhớ tạm" />
+      </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Thiết Lập">
         <fluent:ToggleButton Name="ThemeToggleBtn" Header="Tối" Margin="8,0,8,0" IsChecked="True" Click="ThemeToggle_Click" ToolTip="Chuyển đổi chủ đề màu sắc giao diện sáng hoặc tối">
           <fluent:ToggleButton.LargeIcon>
@@ -137,26 +257,16 @@
             </Border>
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
-        <fluent:Button Header="Cài Đặt" Margin="8,0,8,0" Click="Settings_Click" ToolTip="Cài đặt cấu hình hệ thống">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Header="Cài Đặt" LargeIcon="{StaticResource IconSetting}" Margin="8,0,8,0" Click="Settings_Click" ToolTip="Cài đặt cấu hình hệ thống" />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Biên Tập Trang">
       <fluent:RibbonGroupBox Header="Xoay Trang">
-        <fluent:SplitButton Header="Xoay Trái 90°" Margin="8,0,8,0" Click="RotateLeft_Click" ToolTip="Xoay trang hiện tại hoặc tất cả các trang sang trái 90 độ">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
+        <fluent:SplitButton Header="Xoay Trái 90°" LargeIcon="{StaticResource IconTurnLeft}" Margin="8,0,8,0" Click="RotateLeft_Click" ToolTip="Xoay trang hiện tại hoặc tất cả các trang sang trái 90 độ">
           <fluent:MenuItem Header="Xoay trang hiện tại" Click="RotateLeft_Click" ToolTip="Chỉ xoay trang hiện tại đang hiển thị"/>
           <fluent:MenuItem Header="Xoay tất cả các trang" Click="RotateLeftAll_Click" ToolTip="Xoay toàn bộ các trang trong tài liệu"/>
         </fluent:SplitButton>
-        <fluent:SplitButton Header="Xoay Phải 90°" Margin="8,0,8,0" Click="RotateRight_Click" ToolTip="Xoay trang hiện tại hoặc tất cả các trang sang phải 90 độ">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
+        <fluent:SplitButton Header="Xoay Phải 90°" LargeIcon="{StaticResource IconTurnRight}" Margin="8,0,8,0" Click="RotateRight_Click" ToolTip="Xoay trang hiện tại hoặc tất cả các trang sang phải 90 độ">
           <fluent:MenuItem Header="Xoay trang hiện tại" Click="RotateRight_Click" ToolTip="Chỉ xoay trang hiện tại đang hiển thị"/>
           <fluent:MenuItem Header="Xoay tất cả các trang" Click="RotateRightAll_Click" ToolTip="Xoay toàn bộ các trang trong tài liệu"/>
         </fluent:SplitButton>
@@ -195,21 +305,6 @@
         <fluent:Button Name="InsertBlankPageBtn" Header="Chèn Trang Trống" Margin="8,0,8,0" Click="InsertBlankPage_Click" ToolTip="Chèn một trang mới chưa có nội dung vào sau trang hiện tại">
           <fluent:Button.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Header="Nhân Bản Trang" Margin="8,0,8,0" Click="DuplicatePage_Click" ToolTip="Sao chép nhân đôi trang hiện tại">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#106EBE" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="SplitCurrentPageBtn" Header="Tách Trang" Margin="8,0,8,0" Click="SplitCurrentPage_Click" ToolTip="Tách riêng trang hiện tại ra thành một tệp tin PDF độc lập">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ExtractPagesBtn" Header="Trích Xuất" Margin="8,0,8,0" Click="ExtractPages_Click" ToolTip="Trích xuất trang chỉ định lưu thành tệp tin mới">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
       </fluent:RibbonGroupBox>
@@ -318,11 +413,6 @@
         </fluent:ToggleButton>
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Chụp Ảnh &amp; AI">
-        <fluent:ToggleButton Name="SnapshotToolBtn" Header="Snapshot" Margin="8,0,8,0" Click="SnapshotTool_Click" ToolTip="Chụp một vùng ảnh trên tài liệu và lưu vào bộ nhớ tạm">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
         <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" Margin="8,0,8,0" Click="AiSnapshotTool_Click" ToolTip="Chụp một vùng trên tài liệu để gửi cho trợ lý AI phân tích, dịch thuật">
           <fluent:ToggleButton.LargeIcon>
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="32" Foreground="#0F766E" HorizontalAlignment="Center" />

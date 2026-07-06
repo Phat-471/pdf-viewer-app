@@ -320,23 +320,35 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			StartPageIndex = start - 1;
 			EndPageIndex = end - 1;
 		}
-		if (PaperSizeComboBox.SelectedItem is ComboBoxItem { Tag: string tag })
-		{
-			PaperSizeKey = tag;
-		}
-		if (OrientationComboBox.SelectedItem is ComboBoxItem { Tag: string tag2 })
-		{
-			OrientationKey = tag2;
-		}
+		// Đọc giá trị từ Combobox hoặc fallback về mặc định A3/Landscape
+		PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
+		OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Landscape";
+
 		if (QualityComboBox.SelectedItem is ComboBoxItem { Tag: string tag3 } && double.TryParse(tag3, out var result2))
 		{
 			PrintDpi = result2;
 		}
+		
 		SelectedPrintQueue = printQueue;
+		
+		// Đảm bảo SelectedPrintTicket được khởi tạo và ghi đè trực tiếp cấu hình giấy/hướng
 		if (SelectedPrintTicket == null)
 		{
-			PrintTicket printTicket = (SelectedPrintTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket));
+			SelectedPrintTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket) ?? new PrintTicket();
 		}
+		
+		PageMediaSize pageMediaSize = CreatePageMediaSize();
+		if (pageMediaSize != null)
+		{
+			SelectedPrintTicket.PageMediaSize = pageMediaSize;
+		}
+		PageOrientation? pageOrientation = CreatePageOrientation();
+		if (pageOrientation.HasValue)
+		{
+			SelectedPrintTicket.PageOrientation = pageOrientation;
+		}
+		SelectedPrintTicket.CopyCount = result;
+
 		Copies = result;
 		base.DialogResult = true;
 	}

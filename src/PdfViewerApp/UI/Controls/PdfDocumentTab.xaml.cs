@@ -58,6 +58,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private Rectangle? _tempRect;
 
+	// Giữ vùng snapshot cũ để người dùng biết vùng đã chụp
+	private Rectangle? _lastSnapshotOverlay;
+	private Canvas? _lastSnapshotCanvas;
+
 	private Line? _tempLine;
 
 	private Polyline? _tempPolyline;
@@ -1096,7 +1100,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					ActiveTool = "Select";
 				}
 				EndMouseInteraction(canvas);
-				PrintSnapshotSelection(canvas, tempRect, x2, y2, w2, h2, num);
+				// Xóa overlay cũ trước khi vẽ mới
+				ClearLastSnapshotOverlay();
+				// Giữ overlay mới trên canvas để người dùng biết vùng đã chụp
+				KeepSnapshotOverlay(canvas, tempRect, x2, y2, w2, h2);
+				PrintSnapshotSelection(canvas, null, x2, y2, w2, h2, num);
 			}
 			else if (ActiveTool == "AiSnapshot" && _tempRect != null)
 			{
@@ -1294,7 +1302,53 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
+
+	/// <summary>
+	/// Xóa vùng snapshot cũ khỏi canvas (gọi khi người dùng bắt đầu vẽ vùng mới).
+	/// </summary>
+	private void ClearLastSnapshotOverlay()
+	{
+		if (_lastSnapshotOverlay != null && _lastSnapshotCanvas != null)
+		{
+			_lastSnapshotCanvas.Children.Remove(_lastSnapshotOverlay);
+			_lastSnapshotOverlay = null;
+			_lastSnapshotCanvas = null;
+		}
+	}
+
+	/// <summary>
+	/// Giữ vùng snapshot hiển thị mờ trên canvas sau khi người dùng đã chụp,
+	/// để họ biết vùng nào vừa được xử lý.
+	/// </summary>
+	private void KeepSnapshotOverlay(Canvas canvas, Rectangle drawnRect, double x, double y, double w, double h)
+	{
+		// Tạo overlay mới kiểu dashed border màu teal mờ
+		var overlay = new Rectangle
+		{
+			Stroke = new SolidColorBrush(Color.FromArgb(180, 15, 118, 110)),
+			StrokeThickness = 2.0,
+			StrokeDashArray = new DoubleCollection { 6.0, 3.0 },
+			Fill = new SolidColorBrush(Color.FromArgb(20, 15, 118, 110)),
+			Width = w,
+			Height = h,
+			IsHitTestVisible = false
+		};
+		Canvas.SetLeft(overlay, x);
+		Canvas.SetTop(overlay, y);
+
+		// Nếu drawnRect vẫn còn trong canvas (chưa bị remove), đặt overlay thay thế
+		if (canvas.Children.Contains(drawnRect))
+		{
+			canvas.Children.Remove(drawnRect);
+		}
+		canvas.Children.Add(overlay);
+
+		_lastSnapshotOverlay = overlay;
+		_lastSnapshotCanvas = canvas;
+	}
+
 	private void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
+
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath))
 		{
