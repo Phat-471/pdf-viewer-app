@@ -128,7 +128,21 @@ public partial class PdfDocumentTab
 		if (SelectedAnnotation != null)
 		{
 			SaveUndoState();
-			Annotations.Remove(SelectedAnnotation);
+			string groupId = SelectedAnnotation.AnnotationGroupId;
+			if (!string.IsNullOrEmpty(groupId))
+			{
+				Annotations.RemoveAll(annotation => annotation.AnnotationGroupId == groupId);
+				_pendingTextEdits.RemoveAll(edit =>
+					edit.WhiteoutAnnotation.AnnotationGroupId == groupId ||
+					edit.TextAnnotation.AnnotationGroupId == groupId);
+			}
+			else
+			{
+				_pendingTextEdits.RemoveAll(edit =>
+					ReferenceEquals(edit.WhiteoutAnnotation, SelectedAnnotation) ||
+					ReferenceEquals(edit.TextAnnotation, SelectedAnnotation));
+				Annotations.Remove(SelectedAnnotation);
+			}
 			SelectedAnnotation = null;
 			RedrawAllPageAnnotations();
 		}
@@ -278,7 +292,7 @@ public partial class PdfDocumentTab
 					Width = num,
 					Height = num2,
 					BorderBrush = new SolidColorBrush(pdfTextBoxAnnotation.StrokeColor),
-					BorderThickness = new Thickness(1.5),
+					BorderThickness = string.IsNullOrEmpty(pdfTextBoxAnnotation.AnnotationGroupId) ? new Thickness(1.5) : new Thickness(0.0),
 					Background = ((pdfTextBoxAnnotation.BgColor == Colors.Transparent) ? Brushes.Transparent : new SolidColorBrush(pdfTextBoxAnnotation.BgColor)),
 					Opacity = pdfTextBoxAnnotation.Opacity,
 					Tag = pdfTextBoxAnnotation
@@ -291,9 +305,10 @@ public partial class PdfDocumentTab
 					FontWeight = (pdfTextBoxAnnotation.IsBold ? FontWeights.Bold : FontWeights.Normal),
 					FontStyle = (pdfTextBoxAnnotation.IsItalic ? FontStyles.Italic : FontStyles.Normal),
 					Foreground = new SolidColorBrush(pdfTextBoxAnnotation.StrokeColor),
-					TextWrapping = TextWrapping.Wrap,
-					Padding = new Thickness(4.0),
-					TextAlignment = pdfTextBoxAnnotation.TextAlignment
+					TextWrapping = string.IsNullOrEmpty(pdfTextBoxAnnotation.AnnotationGroupId) ? TextWrapping.Wrap : TextWrapping.NoWrap,
+					Padding = string.IsNullOrEmpty(pdfTextBoxAnnotation.AnnotationGroupId) ? new Thickness(4.0) : new Thickness(0.0),
+					TextAlignment = pdfTextBoxAnnotation.TextAlignment,
+					VerticalAlignment = string.IsNullOrEmpty(pdfTextBoxAnnotation.AnnotationGroupId) ? VerticalAlignment.Top : VerticalAlignment.Center
 				};
 				TextDecorationCollection decors = new TextDecorationCollection();
 				if (pdfTextBoxAnnotation.IsUnderline) decors.Add(TextDecorations.Underline[0]);

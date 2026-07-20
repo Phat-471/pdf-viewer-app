@@ -5,6 +5,8 @@ using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace PdfViewerApp;
 
@@ -17,6 +19,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	private int _previewPageNumber;
 	private readonly string? _pdfPath;
 	private bool _loadingPrinterDefaults;
+	private PdfSnapshotSelection? _snapshotSelection;
 
 	public int StartPageIndex { get; private set; }
 
@@ -80,7 +83,22 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 	}
 
-	internal PdfSnapshotSelection? SnapshotSelection { get; set; }
+	internal PdfSnapshotSelection? SnapshotSelection
+	{
+		get => _snapshotSelection;
+		set
+		{
+			_snapshotSelection = value;
+			if (value != null)
+			{
+				_previewPageNumber = Math.Clamp(value.PageIndex + 1, 1, _pageCount);
+			}
+			if (IsInitialized)
+			{
+				UpdatePreview();
+			}
+		}
+	}
 
 	public PrintOptionsDialog(int pageCount, int currentPageNumber)
 		: this(pageCount, currentPageNumber, null)
@@ -107,8 +125,11 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 	private void UpdatePreview()
 	{
-		PageCounterOverlayText.Text = $"{_previewPageNumber} / {_pageCount}";
-		PreviewInfoText.Text = $"Trang {_previewPageNumber} / {_pageCount}";
+		ReadPreviewSettingsFromUi();
+		PageCounterOverlayText.Text = SnapshotSelection == null ? $"{_previewPageNumber} / {_pageCount}" : "Snapshot";
+		PreviewInfoText.Text = SnapshotSelection == null
+			? $"Trang {_previewPageNumber} / {_pageCount}"
+			: $"Vung chon trang {SnapshotSelection.PageIndex + 1} - {PaperSizeKey}/{OrientationKey}";
 
 		if (string.IsNullOrEmpty(_pdfPath) || !System.IO.File.Exists(_pdfPath))
 		{
@@ -119,11 +140,13 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 		try
 		{
-			// Render snapshot of the cropped area if available, else render the entire page
 			var snapshot = SnapshotSelection ?? new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
-			var bitmap = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot, 600, 1000000); // Fast thumbnail size
+			var snapshotBitmap = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot, SnapshotSelection == null ? 600 : 900, 1600000);
+			var bitmap = SnapshotSelection == null ? snapshotBitmap : RenderSnapshotOnPreviewPaper(snapshotBitmap);
 			PreviewImage.Source = bitmap;
 			PreviewPlaceholderText.Visibility = Visibility.Collapsed;
+			PrevPageButton.IsEnabled = SnapshotSelection == null && _previewPageNumber > 1;
+			NextPageButton.IsEnabled = SnapshotSelection == null && _previewPageNumber < _pageCount;
 		}
 		catch (Exception ex)
 		{
@@ -132,6 +155,88 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			PreviewImage.Source = null;
 			System.Diagnostics.Debug.WriteLine($"Failed to render print preview: {ex}");
 		}
+	}
+
+	private void PrintPreviewSettings_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	{
+		if (!IsInitialized)
+		{
+			return;
+		}
+		UpdatePreview();
+	}
+
+	private void ReadPreviewSettingsFromUi()
+	{
+		if (PaperSizeComboBox != null)
+		{
+			PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
+		}
+		if (OrientationComboBox != null)
+		{
+			OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Landscape";
+		}
+	}
+
+	private BitmapSource RenderSnapshotOnPreviewPaper(BitmapSource snapshotBitmap)
+	{
+		(double paperWidth, double paperHeight) = GetPreviewPaperSize();
+		bool landscape = OrientationKey == "Landscape" || (OrientationKey == "Default" && paperWidth >= paperHeight);
+		if (landscape && paperHeight > paperWidth)
+		{
+			(paperWidth, paperHeight) = (paperHeight, paperWidth);
+		}
+		else if (!landscape && paperWidth > paperHeight)
+		{
+			(paperWidth, paperHeight) = (paperHeight, paperWidth);
+		}
+
+		const int longEdge = 1200;
+		double ratio = paperWidth / Math.Max(1.0, paperHeight);
+		int pixelWidth = ratio >= 1.0 ? longEdge : Math.Max(1, (int)Math.Round(longEdge * ratio));
+		int pixelHeight = ratio >= 1.0 ? Math.Max(1, (int)Math.Round(longEdge / ratio)) : longEdge;
+		double margin = Math.Max(18.0, Math.Min(pixelWidth, pixelHeight) * 0.055);
+		double safeWidth = Math.Max(1.0, pixelWidth - margin * 2.0);
+		double safeHeight = Math.Max(1.0, pixelHeight - margin * 2.0);
+		double imageScale = Math.Min(safeWidth / snapshotBitmap.PixelWidth, safeHeight / snapshotBitmap.PixelHeight);
+		double imageWidth = snapshotBitmap.PixelWidth * imageScale;
+		double imageHeight = snapshotBitmap.PixelHeight * imageScale;
+		double imageX = (pixelWidth - imageWidth) / 2.0;
+		double imageY = (pixelHeight - imageHeight) / 2.0;
+
+		DrawingVisual visual = new DrawingVisual();
+		using (DrawingContext dc = visual.RenderOpen())
+		{
+			dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, pixelWidth, pixelHeight));
+			dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(245, 248, 252)), null, new Rect(margin, margin, safeWidth, safeHeight));
+			dc.DrawImage(snapshotBitmap, new Rect(imageX, imageY, imageWidth, imageHeight));
+			Pen paperPen = new Pen(new SolidColorBrush(Color.FromRgb(31, 41, 55)), 2.0);
+			Pen safePen = new Pen(new SolidColorBrush(Color.FromRgb(20, 184, 166)), 2.0)
+			{
+				DashStyle = new DashStyle(new double[] { 6.0, 4.0 }, 0.0)
+			};
+			dc.DrawRectangle(null, paperPen, new Rect(1, 1, pixelWidth - 2, pixelHeight - 2));
+			dc.DrawRectangle(null, safePen, new Rect(margin, margin, safeWidth, safeHeight));
+		}
+
+		RenderTargetBitmap preview = new RenderTargetBitmap(pixelWidth, pixelHeight, 96, 96, PixelFormats.Pbgra32);
+		preview.Render(visual);
+		preview.Freeze();
+		return preview;
+	}
+
+	private (double Width, double Height) GetPreviewPaperSize()
+	{
+		return PaperSizeKey switch
+		{
+			"A4" => (210.0, 297.0),
+			"A3" => (297.0, 420.0),
+			"A2" => (420.0, 594.0),
+			"A1" => (594.0, 841.0),
+			"A0" => (841.0, 1189.0),
+			"Letter" => (8.5 * 25.4, 11.0 * 25.4),
+			_ => (297.0, 420.0),
+		};
 	}
 
 	private void PrevPage_Click(object sender, RoutedEventArgs e)

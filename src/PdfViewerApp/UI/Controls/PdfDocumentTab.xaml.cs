@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -44,6 +45,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private int _selectedEditCharIndex = -1;
 	private System.Windows.Controls.TextBox? _activeDirectEditTextBox = null;
 	private Action? _activeDirectEditCommitAction = null;
+	private bool _skipNextEditTextMouseUp;
 
 	private Point _drawStartPoint;
 
@@ -58,7 +60,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private Rectangle? _tempRect;
 
-	// Giữ vùng snapshot cũ để người dùng biết vùng đã chụp
+	// Gi盻ｯ vﾃｹng snapshot cﾅｩ ﾄ黛ｻ・ngﾆｰ盻拱 dﾃｹng bi蘯ｿt vﾃｹng ﾄ妥｣ ch盻･p
 	private Rectangle? _lastSnapshotOverlay;
 	private Canvas? _lastSnapshotCanvas;
 
@@ -262,13 +264,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return true;
 		}
-		return tool == "ShapeLine" || 
-		       tool == "ShapeRect" || 
-		       tool == "ShapeOval" || 
-		       tool == "MeasureDistance" || 
-		       tool == "MeasureArea" || 
-		       tool == "MeasurePerimeter" || 
-		       tool == "PlaceSignature" || 
+		return tool == "ShapeLine" ||
+		       tool == "ShapeRect" ||
+		       tool == "ShapeOval" ||
+		       tool == "MeasureDistance" ||
+		       tool == "MeasureArea" ||
+		       tool == "MeasurePerimeter" ||
+		       tool == "PlaceSignature" ||
 		       tool == "PlaceStamp" ||
 		       tool == "StickyNote" ||
 		       tool == "TextBox" ||
@@ -335,7 +337,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public double CurrentZoom { get; private set; } = 1.0;
 
-	public string LastStatusMessage { get; private set; } = "Sẵn sàng";
+	public string LastStatusMessage { get; private set; } = "S蘯ｵn sﾃng";
 
 	public event EventHandler? StatusChanged;
 
@@ -367,6 +369,28 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					return;
 				}
 				clickedObj = VisualTreeHelper.GetParent(clickedObj);
+			}
+		}
+		if (ActiveTool == "EditText")
+		{
+			FrameworkElement clickedElement = e.Source as FrameworkElement;
+			while (clickedElement != null && clickedElement != canvas && !(clickedElement.Tag is PdfAnnotation))
+			{
+				clickedElement = VisualTreeHelper.GetParent(clickedElement) as FrameworkElement;
+			}
+			if (clickedElement != null && clickedElement.Tag is PdfTextBoxAnnotation clickedTextAnnotation && !string.IsNullOrEmpty(clickedTextAnnotation.Text))
+			{
+				SelectedAnnotation = clickedTextAnnotation;
+				e.Handled = true;
+				if (e.ClickCount >= 2)
+				{
+					ShowEditTextBoxInput(canvas, clickedTextAnnotation, num);
+				}
+				else
+				{
+					RedrawPageAnnotations(canvas, num);
+				}
+				return;
 			}
 		}
 		if (ActiveTool != "EditText" && ActiveTool != "SelectText")
@@ -424,14 +448,24 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					if (ActiveTool == "EditText")
 					{
-						// [FIX CHỚP TẮT] Chặn luồng tại MouseDown để nhường việc mở TextBox 
-						// sang sự kiện MouseUp khi click chuột đã kết thúc hoàn toàn.
+						Point editClickPoint = e.GetPosition(canvas);
+						LogToDesktop($"[EDIT TEXT] MouseDown char hit: page={num}, charIndex={charIndexAtMousePos}, canvas=({editClickPoint.X:F1},{editClickPoint.Y:F1})");
+						if (canvas.IsMouseCaptured)
+						{
+							canvas.ReleaseMouseCapture();
+						}
+						_skipNextEditTextMouseUp = true;
+						Dispatcher.BeginInvoke(new Action(() =>
+						{
+							LogToDesktop($"[EDIT TEXT] Opening editor from MouseDown dispatcher: page={num}, charIndex={charIndexAtMousePos}");
+							ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num, editClickPoint);
+						}), DispatcherPriority.Input);
 						e.Handled = true;
 						return;
 					}
 					else if (e.ClickCount >= 2)
 					{
-						// Dành cho SelectText/Highlight nếu lỡ double click
+						// Dﾃnh cho SelectText/Highlight n蘯ｿu l盻｡ double click
 						e.Handled = true;
 						return;
 					}
@@ -440,7 +474,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					if (ActiveTool == "EditText" || ActiveTool == "SelectText" || ActiveTool == "Highlight")
 					{
-						LogStatus("Vùng này không có chữ (PDF dạng ảnh/scan). Hãy thử công cụ OCR để nhận diện chữ trước.");
+						LogStatus("Vﾃｹng nﾃy khﾃｴng cﾃｳ ch盻ｯ (PDF d蘯｡ng 蘯｣nh/scan). Hﾃ｣y th盻ｭ cﾃｴng c盻･ OCR ﾄ黛ｻ・nh蘯ｭn di盻㌻ ch盻ｯ trﾆｰ盻嫩.");
 					}
 
 					if (ActiveTool == "EditText")
@@ -455,7 +489,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 				}
 			}
-			
+
 			if (ActiveTool == "SelectText" || ActiveTool == "Highlight")
 			{
 				int charIndexAtMousePos2 = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
@@ -472,7 +506,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else
 				{
-					LogStatus("Vùng này không có văn bản có thể chọn (PDF dạng ảnh/scan).");
+					LogStatus("Vﾃｹng nﾃy khﾃｴng cﾃｳ vﾄハ b蘯｣n cﾃｳ th盻・ch盻肱 (PDF d蘯｡ng 蘯｣nh/scan).");
 				}
 				return;
 			}
@@ -656,7 +690,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				X = position.X / canvas.Width,
 				Y = position.Y / canvas.Height,
 				ColorHex = "#FCD34D",
-				NoteText = "Nhập ghi chú nhanh..."
+				NoteText = "Nh蘯ｭp ghi chﾃｺ nhanh..."
 			};
 			SaveUndoState();
 			Annotations.Add(pdfStickyNoteAnnotation);
@@ -753,7 +787,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				OriginalWidth = stampWidth,
 				OriginalHeight = stampHeight,
 				SignatureType = "Stamp",
-				StampText = _tempStampText ?? "ĐÃ DUYỆT",
+				StampText = _tempStampText ?? "ﾄ静・DUY盻・",
 				StrokeColor = ActiveStrokeColor,
 				Thickness = 3.0
 			};
@@ -857,7 +891,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				int charSpan = (endPg == startPg)
 					? Math.Abs(_selectionEndIndex - _selectionStartIndex) + 1
 					: 999;
-				LogStatus($"Đã chọn ~{charSpan} ký tự. Nhấn Ctrl+C để sao chép.");
+				LogStatus($"ﾄ静｣ ch盻肱 ~{charSpan} kﾃｽ t盻ｱ. Nh蘯･n Ctrl+C ﾄ黛ｻ・sao chﾃｩp.");
 			}
 		}
 		else if (_isDraggingArrowHandle && SelectedAnnotation is PdfCalloutAnnotation pdfCalloutAnnotation)
@@ -1010,24 +1044,24 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				if (ActiveTool == "Highlight")
 				{
 					HighlightSelectedText("#FFFF00");
-					LogStatus("Đã tô màu (Highlight) vùng chữ được chọn.");
+					LogStatus("ﾄ静｣ tﾃｴ mﾃu (Highlight) vﾃｹng ch盻ｯ ﾄ柁ｰ盻｣c ch盻肱.");
 				}
 				else
 				{
 					try
 					{
 						Clipboard.SetText(_selectedText);
-						LogStatus($"Đã sao chép {_selectedText.Length} ký tự vào Clipboard (Ctrl+V để dán).");
+						LogStatus($"ﾄ静｣ sao chﾃｩp {_selectedText.Length} kﾃｽ t盻ｱ vﾃo Clipboard (Ctrl+V ﾄ黛ｻ・dﾃ｡n).");
 					}
 					catch
 					{
-						LogStatus("Đã chọn văn bản. Nhấn Ctrl+C để sao chép.");
+						LogStatus("ﾄ静｣ ch盻肱 vﾄハ b蘯｣n. Nh蘯･n Ctrl+C ﾄ黛ｻ・sao chﾃｩp.");
 					}
 				}
 			}
 			else
 			{
-				LogStatus("Không lấy được văn bản. PDF này có thể là ảnh scan.");
+				LogStatus("Khﾃｴng l蘯･y ﾄ柁ｰ盻｣c vﾄハ b蘯｣n. PDF nﾃy cﾃｳ th盻・lﾃ 蘯｣nh scan.");
 			}
 			e.Handled = true;
 		}
@@ -1040,12 +1074,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			if (ActiveTool == "EditText")
 			{
-				LogToDesktop("[EDIT DEBUG] 1. MouseUp: Bắt đầu xử lý click EditText.");
-				
-				// [RẤT QUAN TRỌNG] Phải ép Canvas nhả chuột ra thì TextBox mới nhận được tiêu điểm
+				if (_skipNextEditTextMouseUp)
+				{
+					_skipNextEditTextMouseUp = false;
+					LogToDesktop("[EDIT TEXT] MouseUp skipped because editor was opened from MouseDown.");
+					e.Handled = true;
+					return;
+				}
+				LogToDesktop("[EDIT DEBUG] 1. MouseUp: B蘯ｯt ﾄ黛ｺｧu x盻ｭ lﾃｽ click EditText.");
+
+				// [R蘯､T QUAN TR盻君G] Ph蘯｣i ﾃｩp Canvas nh蘯｣ chu盻冲 ra thﾃｬ TextBox m盻嬖 nh蘯ｭn ﾄ柁ｰ盻｣c tiﾃｪu ﾄ訴盻ノ
 				if (canvas.IsMouseCaptured)
 				{
-					LogToDesktop("[EDIT DEBUG] 1.1 MouseUp: Đang ép Canvas ReleaseMouseCapture().");
+					LogToDesktop("[EDIT DEBUG] 1.1 MouseUp: ﾄ紳ng ﾃｩp Canvas ReleaseMouseCapture().");
 					canvas.ReleaseMouseCapture();
 				}
 
@@ -1054,14 +1095,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 				if (charIndexAtMousePos != -1)
 				{
-					ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num);
+					ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num, e.GetPosition(canvas));
 					e.Handled = true;
 					return;
 				}
 				else
 				{
-					LogToDesktop("[EDIT DEBUG] 2.1 MouseUp: Không tìm thấy ký tự, có thể là PDF ảnh.");
-					LogStatus("Vùng này không có chữ (PDF dạng ảnh/scan). Hãy thử công cụ OCR để nhận diện chữ trước.");
+					LogToDesktop("[EDIT DEBUG] 2.1 MouseUp: Khﾃｴng tﾃｬm th蘯･y kﾃｽ t盻ｱ, cﾃｳ th盻・lﾃ PDF 蘯｣nh.");
+					LogStatus("Vﾃｹng nﾃy khﾃｴng cﾃｳ ch盻ｯ (PDF d蘯｡ng 蘯｣nh/scan). Hﾃ｣y th盻ｭ cﾃｴng c盻･ OCR ﾄ黛ｻ・nh蘯ｭn di盻㌻ ch盻ｯ trﾆｰ盻嫩.");
 					e.Handled = true;
 					return;
 				}
@@ -1100,9 +1141,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					ActiveTool = "Select";
 				}
 				EndMouseInteraction(canvas);
-				// Xóa overlay cũ trước khi vẽ mới
+				// Xﾃｳa overlay cﾅｩ trﾆｰ盻嫩 khi v蘯ｽ m盻嬖
 				ClearLastSnapshotOverlay();
-				// Giữ overlay mới trên canvas để người dùng biết vùng đã chụp
+				// Gi盻ｯ overlay m盻嬖 trﾃｪn canvas ﾄ黛ｻ・ngﾆｰ盻拱 dﾃｹng bi蘯ｿt vﾃｹng ﾄ妥｣ ch盻･p
 				KeepSnapshotOverlay(canvas, tempRect, x2, y2, w2, h2);
 				PrintSnapshotSelection(canvas, null, x2, y2, w2, h2, num);
 			}
@@ -1258,7 +1299,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 				if (distPoints > 0)
 				{
-					string? input = InputDialog.Show("Hiệu chuẩn tỷ lệ", "Nhập khoảng cách thực tế đo được (mét):", "5.0");
+					string? input = InputDialog.Show("Hieu chuan ty le", "Nhap khoang cach thuc te do duoc (met):", "5.0");
 					if (input != null && double.TryParse(input, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double realMeters) && realMeters > 0)
 					{
 						double calculatedScale = (realMeters * 1000.0) / distMm;
@@ -1304,7 +1345,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 
 	/// <summary>
-	/// Xóa vùng snapshot cũ khỏi canvas (gọi khi người dùng bắt đầu vẽ vùng mới).
+	/// Xﾃｳa vﾃｹng snapshot cﾅｩ kh盻淑 canvas (g盻絞 khi ngﾆｰ盻拱 dﾃｹng b蘯ｯt ﾄ黛ｺｧu v蘯ｽ vﾃｹng m盻嬖).
 	/// </summary>
 	private void ClearLastSnapshotOverlay()
 	{
@@ -1317,12 +1358,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	}
 
 	/// <summary>
-	/// Giữ vùng snapshot hiển thị mờ trên canvas sau khi người dùng đã chụp,
-	/// để họ biết vùng nào vừa được xử lý.
+	/// Gi盻ｯ vﾃｹng snapshot hi盻ハ th盻・m盻・trﾃｪn canvas sau khi ngﾆｰ盻拱 dﾃｹng ﾄ妥｣ ch盻･p,
+	/// ﾄ黛ｻ・h盻・bi蘯ｿt vﾃｹng nﾃo v盻ｫa ﾄ柁ｰ盻｣c x盻ｭ lﾃｽ.
 	/// </summary>
 	private void KeepSnapshotOverlay(Canvas canvas, Rectangle drawnRect, double x, double y, double w, double h)
 	{
-		// Tạo overlay mới kiểu dashed border màu teal mờ
+		// T蘯｡o overlay m盻嬖 ki盻ブ dashed border mﾃu teal m盻・
 		var overlay = new Rectangle
 		{
 			Stroke = new SolidColorBrush(Color.FromArgb(180, 15, 118, 110)),
@@ -1336,7 +1377,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Canvas.SetLeft(overlay, x);
 		Canvas.SetTop(overlay, y);
 
-		// Nếu drawnRect vẫn còn trong canvas (chưa bị remove), đặt overlay thay thế
+		// N蘯ｿu drawnRect v蘯ｫn cﾃｲn trong canvas (chﾆｰa b盻・remove), ﾄ黛ｺｷt overlay thay th蘯ｿ
 		if (canvas.Children.Contains(drawnRect))
 		{
 			canvas.Children.Remove(drawnRect);
@@ -1526,7 +1567,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Width = w,
 			Height = h,
-			Text = "Nhập ghi chú...",
+			Text = "Nh蘯ｭp ghi chﾃｺ...",
 			FontFamily = new FontFamily(ActiveFontFamily),
 			FontSize = ActiveFontSize,
 			FontWeight = (ActiveIsBold ? FontWeights.Bold : FontWeights.Normal),
@@ -1546,7 +1587,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			string text = tbInput.Text.Trim();
 			canvas.Children.Remove(tbInput);
-			if (!string.IsNullOrEmpty(text) && text != "Nhập ghi chú...")
+			if (!string.IsNullOrEmpty(text) && text != "Nh蘯ｭp ghi chﾃｺ...")
 			{
 				PdfTextBoxAnnotation pdfTextBoxAnnotation = new PdfTextBoxAnnotation
 				{
@@ -1571,12 +1612,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
-					LogStatus("Đã tạo hộp văn bản. Công cụ đã quay về Select để kéo hoặc co giãn khung.");
+					LogStatus("ﾄ静｣ t蘯｡o h盻冪 vﾄハ b蘯｣n. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select ﾄ黛ｻ・kﾃｩo ho蘯ｷc co giﾃ｣n khung.");
 				}
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
+		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
@@ -1597,7 +1638,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Width = w,
 			Height = h,
-			Text = "Nhập ghi chú...",
+			Text = "Nh蘯ｭp ghi chﾃｺ...",
 			FontFamily = new FontFamily(ActiveFontFamily),
 			FontSize = ActiveFontSize,
 			FontWeight = (ActiveIsBold ? FontWeights.Bold : FontWeights.Normal),
@@ -1617,7 +1658,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			string text = tbInput.Text.Trim();
 			canvas.Children.Remove(tbInput);
-			if (!string.IsNullOrEmpty(text) && text != "Nhập ghi chú...")
+			if (!string.IsNullOrEmpty(text) && text != "Nh蘯ｭp ghi chﾃｺ...")
 			{
 				PdfCalloutAnnotation pdfCalloutAnnotation = new PdfCalloutAnnotation
 				{
@@ -1644,12 +1685,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
-					LogStatus("Đã tạo mũi tên chỉ dẫn. Công cụ đã quay về Select; muốn tạo mũi tên nữa hãy chọn lại.");
+					LogStatus("ﾄ静｣ t蘯｡o mﾅｩi tﾃｪn ch盻・d蘯ｫn. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select; mu盻創 t蘯｡o mﾅｩi tﾃｪn n盻ｯa hﾃ｣y ch盻肱 l蘯｡i.");
 				}
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
+		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
@@ -1777,7 +1818,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		editorBorder.Child = stackPanel;
 		TextBlock element = new TextBlock
 		{
-			Text = "Ghi chú nhanh",
+			Text = "Ghi chﾃｺ nhanh",
 			FontWeight = FontWeights.Bold,
 			FontSize = 11.0,
 			Foreground = (Brush)new BrushConverter().ConvertFromString("#B45309"),
@@ -1788,7 +1829,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Width = num - 12.0,
 			Height = num2 - 32.0,
-			Text = ((sticky.NoteText == "Nhập ghi chú nhanh...") ? "" : sticky.NoteText),
+			Text = ((sticky.NoteText == "Nh蘯ｭp ghi chﾃｺ nhanh...") ? "" : sticky.NoteText),
 			FontFamily = new FontFamily("Segoe UI"),
 			FontSize = 12.0,
 			TextWrapping = TextWrapping.Wrap,
@@ -1815,7 +1856,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
+		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Escape)
 			{
@@ -1858,7 +1899,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			canvas.Children.Remove(tbInput);
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
+		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
@@ -1877,7 +1918,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (SelectedAnnotation != null)
 		{
 			_copiedAnnotation = CloneAnnotation(SelectedAnnotation);
-			LogStatus("Đã sao chép chú thích");
+			LogStatus("ﾄ静｣ sao chﾃｩp chﾃｺ thﾃｭch");
 		}
 	}
 
@@ -1885,7 +1926,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		if (_copiedAnnotation == null)
 		{
-			LogStatus("Không có chú thích nào để dán");
+			LogStatus("Khﾃｴng cﾃｳ chﾃｺ thﾃｭch nﾃo ﾄ黛ｻ・dﾃ｡n");
 			return;
 		}
 		PdfAnnotation pdfAnnotation = CloneAnnotation(_copiedAnnotation);
@@ -1908,7 +1949,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Annotations.Add(pdfAnnotation);
 		SelectedAnnotation = pdfAnnotation;
 		RedrawAllPageAnnotations();
-		LogStatus(inPlace ? "Đã dán chú thích tại chỗ" : "Đã dán chú thích");
+		LogStatus(inPlace ? "Da dan chu thich tai cho" : "Da dan chu thich");
 	}
 
 	private PdfAnnotation? CloneAnnotation(PdfAnnotation source)
@@ -1969,6 +2010,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		pdfAnnotation.X = source.X;
 		pdfAnnotation.Y = source.Y;
 		pdfAnnotation.PageIndex = source.PageIndex;
+		pdfAnnotation.AnnotationGroupId = source.AnnotationGroupId;
 		pdfAnnotation.StrokeColor = source.StrokeColor;
 		pdfAnnotation.FontFamily = source.FontFamily;
 		pdfAnnotation.FontSize = source.FontSize;
@@ -2009,7 +2051,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public void ContextReadMode_Click(object sender, RoutedEventArgs e)
 	{
 		_isReadMode = !_isReadMode;
-		LogStatus(_isReadMode ? "Đã bật chế độ đọc" : "Đã tắt chế độ đọc");
+		LogStatus(_isReadMode ? "ﾄ静｣ b蘯ｭt ch蘯ｿ ﾄ黛ｻ・ﾄ黛ｻ皇" : "ﾄ静｣ t蘯ｯt ch蘯ｿ ﾄ黛ｻ・ﾄ黛ｻ皇");
 		if (Window.GetWindow(this) is MainWindow mainWindow)
 		{
 			UIElement uIElement = (mainWindow.FindName("RibbonBar") as UIElement) ?? (mainWindow.Template.FindName("RibbonBar", mainWindow) as UIElement);
@@ -2059,7 +2101,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				window.WindowState = WindowState.Maximized;
 			}
 		}
-		LogStatus(_isFullScreen ? "Đã mở toàn màn hình" : "Đã thoát toàn màn hình");
+		LogStatus(_isFullScreen ? "ﾄ静｣ m盻・toﾃn mﾃn hﾃｬnh" : "ﾄ静｣ thoﾃ｡t toﾃn mﾃn hﾃｬnh");
 	}
 
 	private void ContextZoomIn_Click(object sender, RoutedEventArgs e)
@@ -2093,7 +2135,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			_resetScrollAfterRender = true;
 			ReportZoomChanged();
 			RenderPdfPages();
-			LogStatus("Vừa khít trang");
+			LogStatus("V盻ｫa khﾃｭt trang");
 		}
 	}
 
@@ -2147,12 +2189,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			SolidColorBrush background = new SolidColorBrush(Color.FromRgb(24, 24, 24));
 			PagesHost.Background = background;
-			LogStatus("Bật xem đảo ngược");
+			LogStatus("B蘯ｭt xem ﾄ黛ｺ｣o ngﾆｰ盻｣c");
 		}
 		else
 		{
 			PagesHost.Background = Brushes.Transparent;
-			LogStatus("Tắt xem đảo ngược");
+			LogStatus("T蘯ｯt xem ﾄ黛ｺ｣o ngﾆｰ盻｣c");
 		}
 		ForceRedrawAllPages();
 	}
@@ -2165,7 +2207,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public void ContextRulers_Click(object sender, RoutedEventArgs e)
 	{
 		_isRulersEnabled = !_isRulersEnabled;
-		LogStatus(_isRulersEnabled ? "Hiện thước đo" : "Ẩn thước đo");
+		LogStatus(_isRulersEnabled ? "Hi盻㌻ thﾆｰ盻嫩 ﾄ双" : "蘯ｨn thﾆｰ盻嫩 ﾄ双");
 
 		Visibility visibility = _isRulersEnabled ? Visibility.Visible : Visibility.Collapsed;
 		if (HorizontalRulerBorder != null) HorizontalRulerBorder.Visibility = visibility;
@@ -2210,7 +2252,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public void ContextGuides_Click(object sender, RoutedEventArgs e)
 	{
 		_isGuidesEnabled = !_isGuidesEnabled;
-		LogStatus(_isGuidesEnabled ? "Hiện đường gióng" : "Ẩn đường gióng");
+		LogStatus(_isGuidesEnabled ? "Hi盻㌻ ﾄ柁ｰ盻拵g giﾃｳng" : "蘯ｨn ﾄ柁ｰ盻拵g giﾃｳng");
 	}
 
 	private void ContextHideNavigation_Click(object sender, RoutedEventArgs e)
@@ -2252,7 +2294,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			var selectedQueue = optionsDialog.SelectedPrintQueue;
 			if (selectedQueue == null)
 			{
-				throw new InvalidOperationException("Vui lòng chọn máy in hợp lệ.");
+				throw new InvalidOperationException("Vui lﾃｲng ch盻肱 mﾃ｡y in h盻｣p l盻・");
 			}
 
 			// Capture options from UI thread
@@ -2280,10 +2322,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			var cancellationToken = progressDialog.CancellationToken;
 
 			// Get Capabilities on UI thread to avoid invalid printer name exceptions for network/shared printers on the background thread
-			printProgress.Report(new PrintProgressInfo("Đang truy vấn cấu hình máy in...", 0, 0, IsIndeterminate: true));
+			printProgress.Report(new PrintProgressInfo("ﾄ紳ng truy v蘯･n c蘯･u hﾃｬnh mﾃ｡y in...", 0, 0, IsIndeterminate: true));
 			PrintCapabilities printCapabilities = selectedQueue.GetPrintCapabilities(baseTicket);
 
-			// 1. Cấu hình PrintTicket trên UI thread để tránh Thread Affinity exceptions
+			// 1. C蘯･u hﾃｬnh PrintTicket trﾃｪn UI thread ﾄ黛ｻ・trﾃ｡nh Thread Affinity exceptions
 			PrintTicket printTicket = baseTicket.Clone();
 			printTicket.CopyCount = copies;
 			if (pageMediaSize != null)
@@ -2340,23 +2382,23 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 			await Task.Run(async delegate
 			{
-				printProgress.Report(new PrintProgressInfo("Đang cấu hình máy in...", 0, 0, IsIndeterminate: true));
+				printProgress.Report(new PrintProgressInfo("ﾄ紳ng c蘯･u hﾃｬnh mﾃ｡y in...", 0, 0, IsIndeterminate: true));
 
 				LogToDesktop("Profile: " + printerProfile.Name);
 
-				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" || 
+				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" ||
 					(!(printOffsetMode == "Physical") && printerProfile.DriverAlreadyOffsetsPrintableArea);
 
-				LogToDesktop("\n=================== BẮT ĐẦU CHẨN ĐOÁN LỆNH IN ===================");
-				LogToDesktop("Tệp đang in: " + CurrentPdfPath);
-				LogToDesktop("Máy in mục tiêu: " + printerName);
-				LogToDesktop($"Số bản in (Copies): {copies}");
-				LogToDesktop($"Trang bắt đầu: {startPageIndex + 1}, Trang kết thúc: {endPageIndex + 1}");
-				LogToDesktop($"Tự động căn giữa (AutoCenter): {autoCenter}, Khớp khổ giấy (FitToPrintableArea): {fitToPrintableArea}");
-				LogToDesktop($"Hướng xoay giấy: {pageOrientation}");
-				LogToDesktop($"Khổ giấy đã chọn: {pageMediaSizeName} (Rộng: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
-				LogToDesktop($"DPI in đã chọn: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
-				LogToDesktop("Chế độ in đã chọn: " + printEngineMode);
+				LogToDesktop("\n=================== B蘯ｮT ﾄ雪ｺｦU CH蘯ｨN ﾄ唇ﾃ¨ L盻・H IN ===================");
+				LogToDesktop("T盻㎝ ﾄ疎ng in: " + CurrentPdfPath);
+				LogToDesktop("Mﾃ｡y in m盻･c tiﾃｪu: " + printerName);
+				LogToDesktop($"S盻・b蘯｣n in (Copies): {copies}");
+				LogToDesktop($"Trang b蘯ｯt ﾄ黛ｺｧu: {startPageIndex + 1}, Trang k蘯ｿt thﾃｺc: {endPageIndex + 1}");
+				LogToDesktop($"T盻ｱ ﾄ黛ｻ冢g cﾄハ gi盻ｯa (AutoCenter): {autoCenter}, Kh盻孅 kh盻・gi蘯･y (FitToPrintableArea): {fitToPrintableArea}");
+				LogToDesktop($"Hﾆｰ盻嬾g xoay gi蘯･y: {pageOrientation}");
+				LogToDesktop($"Kh盻・gi蘯･y ﾄ妥｣ ch盻肱: {pageMediaSizeName} (R盻冢g: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
+				LogToDesktop($"DPI in ﾄ妥｣ ch盻肱: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
+				LogToDesktop("Ch蘯ｿ ﾄ黛ｻ・in ﾄ妥｣ ch盻肱: " + printEngineMode);
 				LogToDesktop($"Native separate page jobs: {separatePageJobs}");
 				LogToDesktop($"Reverse page order: {reversePageOrder}");
 
@@ -2431,7 +2473,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						}
 
 						paginator.PageSize = new Size(Math.Max(1.0, orientedWidth), Math.Max(1.0, orientedHeight));
-						LogToDesktop($"Kích thước trang đích (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
+						LogToDesktop($"Kﾃｭch thﾆｰ盻嫩 trang ﾄ妥ｭch (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
 
 						if (printCapabilities.PageImageableArea != null)
 						{
@@ -2440,15 +2482,15 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 							double value = Math.Max(0.0, orientedWidth - originWidth - printCapabilities.PageImageableArea.ExtentWidth);
 							double value2 = Math.Max(0.0, orientedHeight - originHeight - printCapabilities.PageImageableArea.ExtentHeight);
 							paginator.ImageableArea = new Rect(originWidth, originHeight, printCapabilities.PageImageableArea.ExtentWidth, printCapabilities.PageImageableArea.ExtentHeight);
-							LogToDesktop($"Vùng in được của máy in (Raw PageImageableArea): Gốc=({originWidth}, {originHeight}) Kích thước=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
-							LogToDesktop($"Khoảng lề biên kéo giấy tính toán: Phải={value}, Dưới={value2}");
-							LogToDesktop($"Tọa độ vùng in truyền cho Paginator (ImageableArea): Gốc=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kích thước=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
+							LogToDesktop($"Vﾃｹng in ﾄ柁ｰ盻｣c c盻ｧa mﾃ｡y in (Raw PageImageableArea): G盻祖=({originWidth}, {originHeight}) Kﾃｭch thﾆｰ盻嫩=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
+							LogToDesktop($"Kho蘯｣ng l盻・biﾃｪn kﾃｩo gi蘯･y tﾃｭnh toﾃ｡n: Ph蘯｣i={value}, Dﾆｰ盻嬖={value2}");
+							LogToDesktop($"T盻溝 ﾄ黛ｻ・vﾃｹng in truy盻］ cho Paginator (ImageableArea): G盻祖=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kﾃｭch thﾆｰ盻嫩=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
 						}
 
 						LogToDesktop("Using WPF Bitmap print pipeline.");
 						Stopwatch printSubmitSw = Stopwatch.StartNew();
 						printProgress.Report(new PrintProgressInfo("Dang gui lenh in WPF Bitmap...", 0, Math.Max(1, paginator.PageCount), IsIndeterminate: true));
-						
+
 						PrintDialog printDialog = new PrintDialog();
 						printDialog.PrintQueue = selectedQueue;
 						printDialog.PrintTicket = printTicket;
@@ -2506,13 +2548,16 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private int GetCharIndexAtMousePos(Canvas canvas, Point mousePos, int pageNumber)
 	{
+		LogToDesktop($"[EDIT TEXT] Hit-test start: page={pageNumber}, mouse=({mousePos.X:F1},{mousePos.Y:F1}), canvas={canvas.Width:F1}x{canvas.Height:F1}, zoom={CurrentZoom:F3}");
 		nint textPage = GetTextPage(pageNumber);
 		if (textPage == IntPtr.Zero)
 		{
+			LogToDesktop("[EDIT TEXT] Hit-test failed: text page is null.");
 			return -1;
 		}
 		if (!TryCanvasToPdfPoint(canvas, mousePos, pageNumber, out var pdfPoint))
 		{
+			LogToDesktop("[EDIT TEXT] Hit-test failed: canvas point could not be converted to PDF point.");
 			return -1;
 		}
 		// Increased tolerance from 10.0 to 20.0 for much more reliable character click detection
@@ -2520,7 +2565,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		double yTolerance = Math.Max(2.0, 20.0 * _pageDimensions[pageNumber - 1].Height / Math.Max(1.0, canvas.Height));
 		lock (PdfiumEngine.SyncRoot)
 		{
-			return PdfiumEngine.FPDFText_GetCharIndexAtPos(textPage, pdfPoint.X, pdfPoint.Y, xTolerance, yTolerance);
+			int index = PdfiumEngine.FPDFText_GetCharIndexAtPos(textPage, pdfPoint.X, pdfPoint.Y, xTolerance, yTolerance);
+			LogToDesktop($"[EDIT TEXT] Hit-test result: pdf=({pdfPoint.X:F2},{pdfPoint.Y:F2}), tolerance=({xTolerance:F2},{yTolerance:F2}), charIndex={index}");
+			return index;
 		}
 	}
 
@@ -2576,7 +2623,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			originalClean = pdfFontName.Substring(plusIndex + 1);
 		}
-		
+
 		string[] suffixes = new[] { "-Bold", "-Italic", "-BoldItalic", "-Regular", "Bold", "Italic", "MT", "PS", "Regular", "Oblique" };
 		foreach (var suffix in suffixes)
 		{
@@ -2603,6 +2650,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		pdfPoint = default;
 		if (!TryGetPageSize(pageNumber, out Size pageSize) || canvas.Width <= 0.0 || canvas.Height <= 0.0)
 		{
+			LogToDesktop($"[EDIT TEXT] TryCanvasToPdfPoint failed: pageSize/canvas invalid. page={pageNumber}, canvas={canvas.Width:F1}x{canvas.Height:F1}");
 			return false;
 		}
 
@@ -2615,7 +2663,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			rotation = _inherentPageRotations[index];
 		}
-		
+
 		rotation = ((rotation % 360) + 360) % 360;
 
 		double x_p, y_p;
@@ -2640,7 +2688,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			x_p = (1 - ny) * W_pdf;
 			y_p = nx * H_pdf;
 		}
-		else // 0 hoặc góc xoay khác
+		else // 0 ho蘯ｷc gﾃｳc xoay khﾃ｡c
 		{
 			double W_pdf = pageSize.Width;
 			double H_pdf = pageSize.Height;
@@ -2649,6 +2697,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 
 		pdfPoint = new Point(x_p, y_p);
+		LogToDesktop($"[EDIT TEXT] Canvas->PDF: rotation={rotation}, canvas=({canvasPoint.X:F1},{canvasPoint.Y:F1}), normalized=({nx:F4},{ny:F4}), pdf=({pdfPoint.X:F2},{pdfPoint.Y:F2}), pageSize={pageSize.Width:F2}x{pageSize.Height:F2}");
 		return true;
 	}
 
@@ -2666,7 +2715,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			rotation = _inherentPageRotations[index];
 		}
-		
+
 		rotation = ((rotation % 360) + 360) % 360;
 
 		double nx1, ny1, nx2, ny2;
@@ -2697,7 +2746,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			nx2 = top / H_pdf;
 			ny2 = 1 - (right / W_pdf);
 		}
-		else // 0 hoặc khác
+		else // 0 ho蘯ｷc khﾃ｡c
 		{
 			double W_pdf = pageSize.Width;
 			double H_pdf = pageSize.Height;
@@ -2736,7 +2785,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void DrawTextSelectionHighlights(Canvas canvas, int pageNumber)
 	{
-		// 1. VẼ CÁC KHỐI HIGHLIGHT MÀU VÀNG ĐÃ LƯU LÊN MÀN HÌNH
+		// 1. V蘯ｼ Cﾃ， KH盻蝕 HIGHLIGHT MﾃU VﾃNG ﾄ静・LﾆｯU Lﾃ劾 MﾃN Hﾃ君H
 		foreach (var ann in Annotations)
 		{
 			if (ann is PdfHighlightAnnotation hl && hl.PageIndex == pageNumber - 1)
@@ -2753,20 +2802,20 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				{
 					Width = Math.Max(1.0, canvasW),
 					Height = Math.Max(1.0, canvasH),
-					Fill = new SolidColorBrush(Color.FromArgb(100, hlColor.R, hlColor.G, hlColor.B)), // Vàng trong suốt để không che chữ
-					IsHitTestVisible = false // Bỏ qua bắt chuột
+					Fill = new SolidColorBrush(Color.FromArgb(100, hlColor.R, hlColor.G, hlColor.B)), // Vﾃng trong su盻奏 ﾄ黛ｻ・khﾃｴng che ch盻ｯ
+					IsHitTestVisible = false // B盻・qua b蘯ｯt chu盻冲
 				};
-				
+
 				Canvas.SetLeft(rect, canvasX);
 				Canvas.SetTop(rect, canvasY);
-				
-				// Đẩy lớp màu vàng xuống dưới cùng để nét chữ nổi lên trên
+
+				// ﾄ雪ｺｩy l盻孅 mﾃu vﾃng xu盻創g dﾆｰ盻嬖 cﾃｹng ﾄ黛ｻ・nﾃｩt ch盻ｯ n盻品 lﾃｪn trﾃｪn
 				if (canvas.Children.Count > 0) canvas.Children.Insert(0, rect);
 				else canvas.Children.Add(rect);
 			}
 		}
 
-		// 2. VẼ KHỐI MÀU XANH TẠM THỜI KHI ĐANG GIỮ CHUỘT KÉO BÔI ĐEN
+		// 2. V蘯ｼ KH盻蝕 MﾃU XANH T蘯M TH盻廬 KHI ﾄ植NG GI盻ｮ CHU盻狼 Kﾃ碓 Bﾃ祢 ﾄ職N
 		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1) return;
 
 		int num = pageNumber - 1;
@@ -3002,11 +3051,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			try
 			{
 				Clipboard.SetText(_selectedText);
-				LogStatus("Đã sao chép văn bản vào Clipboard");
+				LogStatus("ﾄ静｣ sao chﾃｩp vﾄハ b蘯｣n vﾃo Clipboard");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("Lỗi sao chép: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				MessageBox.Show("L盻擁 sao chﾃｩp: " + ex.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
 			}
 		}
 	}
@@ -3035,7 +3084,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			rawName = rawName.Substring(0, commaIdx);
 		}
-		
+
 		int hyphenIdx = rawName.IndexOf('-');
 		if (hyphenIdx >= 0)
 		{
@@ -3049,13 +3098,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 		}
 
-		if (rawName.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) || 
+		if (rawName.Equals("Helvetica", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.Equals("ArialMT", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.StartsWith("Arial", StringComparison.OrdinalIgnoreCase))
 		{
 			return "Arial";
 		}
-		if (rawName.Equals("Times", StringComparison.OrdinalIgnoreCase) || 
+		if (rawName.Equals("Times", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.Equals("TimesNewRomanPSMT", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.StartsWith("TimesNewRoman", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.Equals("TimesNewRomanPS-BoldMT", StringComparison.OrdinalIgnoreCase) ||
@@ -3064,7 +3113,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return "Times New Roman";
 		}
-		if (rawName.Equals("Courier", StringComparison.OrdinalIgnoreCase) || 
+		if (rawName.Equals("Courier", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.Equals("CourierNewPSMT", StringComparison.OrdinalIgnoreCase) ||
 		    rawName.StartsWith("Courier", StringComparison.OrdinalIgnoreCase))
 		{
@@ -3074,17 +3123,149 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		return rawName;
 	}
 
-	private void ShowDirectTextEditOverlay(Canvas canvas, int charIndex, int pageNumber)
+	private static bool LooksLikeBrokenExtractedText(string text)
 	{
-		LogToDesktop($"[EDIT DEBUG] 3. Khởi chạy ShowDirectTextEditOverlay (CharIndex: {charIndex}, Page: {pageNumber})");
-		
-		// [QUAN TRỌNG] Nếu đang có TextBox biên tập khác, commit và đóng nó trước
+		if (string.IsNullOrWhiteSpace(text)) return false;
+		const string commonPunctuation = ".,;:!?'\"()[]{}-/\\&%@#*+=<>|~`^_$";
+		int lettersOrDigits = 0;
+		int suspicious = 0;
+		int total = 0;
+		foreach (char c in text)
+		{
+			if (char.IsWhiteSpace(c)) continue;
+			total++;
+			if (char.IsControl(c) || (c >= '\uFF00' && c <= '\uFFEF'))
+			{
+				suspicious++;
+				continue;
+			}
+			if (char.IsLetterOrDigit(c)) { lettersOrDigits++; continue; }
+			if (commonPunctuation.IndexOf(c) >= 0) continue;
+			if (c == '\uFFFD' || c >= '\uE000' || c > '\uF000' || c == '\u00A4')
+			{
+				suspicious++;
+			}
+		}
+
+		if (total == 0) return false;
+		return suspicious > 0 || (double)lettersOrDigits / total < 0.35;
+	}
+
+	private static Color SamplePdfPageBackgroundColor(Canvas canvas, Rect canvasRect)
+	{
+		try
+		{
+			Image? pageImage = null;
+			if (canvas.Parent is Grid grid)
+			{
+				pageImage = grid.Children.OfType<Image>().FirstOrDefault();
+			}
+
+			if (pageImage?.Source is not BitmapSource bitmap)
+			{
+				return Colors.White;
+			}
+
+			double canvasWidth = canvas.ActualWidth > 1.0 ? canvas.ActualWidth : canvas.Width;
+			double canvasHeight = canvas.ActualHeight > 1.0 ? canvas.ActualHeight : canvas.Height;
+			if (canvasWidth <= 1.0 || canvasHeight <= 1.0 || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+			{
+				return Colors.White;
+			}
+
+			BitmapSource source = bitmap.Format == PixelFormats.Bgra32 || bitmap.Format == PixelFormats.Pbgra32
+				? bitmap
+				: new FormatConvertedBitmap(bitmap, PixelFormats.Bgra32, null, 0.0);
+
+			double scaleX = source.PixelWidth / canvasWidth;
+			double scaleY = source.PixelHeight / canvasHeight;
+			Rect clipped = Rect.Intersect(new Rect(0.0, 0.0, canvasWidth, canvasHeight), canvasRect);
+			if (clipped.IsEmpty)
+			{
+				return Colors.White;
+			}
+
+			int x0 = Math.Clamp((int)Math.Floor(clipped.Left * scaleX), 0, source.PixelWidth - 1);
+			int y0 = Math.Clamp((int)Math.Floor(clipped.Top * scaleY), 0, source.PixelHeight - 1);
+			int x1 = Math.Clamp((int)Math.Ceiling(clipped.Right * scaleX), x0 + 1, source.PixelWidth);
+			int y1 = Math.Clamp((int)Math.Ceiling(clipped.Bottom * scaleY), y0 + 1, source.PixelHeight);
+			int width = x1 - x0;
+			int height = y1 - y0;
+			int stride = width * 4;
+			byte[] pixels = new byte[stride * height];
+			source.CopyPixels(new Int32Rect(x0, y0, width, height), pixels, stride, 0);
+
+			double r = 0.0, g = 0.0, b = 0.0;
+			int samples = 0;
+			int stepX = Math.Max(1, width / 80);
+			int stepY = Math.Max(1, height / 18);
+			for (int y = 0; y < height; y += stepY)
+			{
+				for (int x = 0; x < width; x += stepX)
+				{
+					int offset = y * stride + x * 4;
+					byte blue = pixels[offset];
+					byte green = pixels[offset + 1];
+					byte red = pixels[offset + 2];
+					byte alpha = pixels[offset + 3];
+					if (alpha < 10) continue;
+					double luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+					if (luminance < 170.0) continue;
+					r += red;
+					g += green;
+					b += blue;
+					samples++;
+				}
+			}
+
+			if (samples < 8)
+			{
+				r = g = b = 0.0;
+				samples = 0;
+				for (int y = 0; y < height; y += stepY)
+				{
+					for (int x = 0; x < width; x += stepX)
+					{
+						int offset = y * stride + x * 4;
+						byte blue = pixels[offset];
+						byte green = pixels[offset + 1];
+						byte red = pixels[offset + 2];
+						byte alpha = pixels[offset + 3];
+						if (alpha < 10) continue;
+						r += red;
+						g += green;
+						b += blue;
+						samples++;
+					}
+				}
+			}
+
+			if (samples == 0)
+			{
+				return Colors.White;
+			}
+
+			return Color.FromRgb((byte)Math.Clamp((int)Math.Round(r / samples), 0, 255),
+				(byte)Math.Clamp((int)Math.Round(g / samples), 0, 255),
+				(byte)Math.Clamp((int)Math.Round(b / samples), 0, 255));
+		}
+		catch
+		{
+			return Colors.White;
+		}
+	}
+
+	private void ShowDirectTextEditOverlay(Canvas canvas, int charIndex, int pageNumber, Point? clickPoint = null)
+	{
+		LogToDesktop($"[EDIT DEBUG] 3. Kh盻殃 ch蘯｡y ShowDirectTextEditOverlay (CharIndex: {charIndex}, Page: {pageNumber})");
+
+		// [QUAN TR盻君G] N蘯ｿu ﾄ疎ng cﾃｳ TextBox biﾃｪn t蘯ｭp khﾃ｡c, commit vﾃ ﾄ妥ｳng nﾃｳ trﾆｰ盻嫩
 		if (_activeDirectEditCommitAction != null)
 		{
 			try
 			{
 				var tempAction = _activeDirectEditCommitAction;
-				_activeDirectEditTextBox = null; // Đánh dấu để bypass guard < 500ms
+				_activeDirectEditTextBox = null; // ﾄ静｡nh d蘯･u ﾄ黛ｻ・bypass guard < 500ms
 				_activeDirectEditCommitAction = null;
 				tempAction();
 			}
@@ -3095,25 +3276,41 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 
 		nint textPage = GetTextPage(pageNumber);
-		if (textPage == IntPtr.Zero) return;
-		
+		if (textPage == IntPtr.Zero)
+		{
+			LogToDesktop("[EDIT TEXT] Open editor aborted: text page is null.");
+			return;
+		}
+
 		int num = 0;
 		lock (PdfiumEngine.SyncRoot) { num = PdfiumEngine.FPDFText_CountChars(textPage); }
-		if (num <= 0) return;
+		if (num <= 0)
+		{
+			LogToDesktop("[EDIT TEXT] Open editor aborted: page has no text chars.");
+			return;
+		}
 
-		// 1. Tính toán layout và lấy font details
+		// 1. Tﾃｭnh toﾃ｡n layout vﾃ l蘯･y font details
 		double estFontSize = 12.0;
-		double initTop = 0;
+		double initCenterY = 0.0;
+		double initLeft = 0.0;
+		double initRight = 0.0;
+		double initBottom = 0.0;
+		double initTop = 0.0;
 		lock (PdfiumEngine.SyncRoot)
 		{
 			if (PdfiumEngine.FPDFText_GetCharBox(textPage, charIndex, out double cL, out double cR, out double cB, out double cT))
 			{
 				estFontSize = cT - cB;
+				initCenterY = (cB + cT) / 2.0;
+				initLeft = cL;
+				initRight = cR;
+				initBottom = cB;
 				initTop = cT;
 			}
-			
+
 			double fs = PdfiumEngine.FPDFText_GetFontSize(textPage, charIndex);
-			if (fs > 0)
+			if (fs > 2.0 && fs < estFontSize * 1.8)
 			{
 				estFontSize = fs;
 			}
@@ -3124,7 +3321,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		string pdfFontName = ActiveFontFamily;
 		int fontFlags = 0;
 		string rawFontName = "";
-		
+
 		lock (PdfiumEngine.SyncRoot)
 		{
 			rawFontName = PdfiumEngine.FPDFText_GetFontName(textPage, charIndex, out fontFlags);
@@ -3134,42 +3331,47 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				isBold = true;
 			}
 		}
-		
+
 		if (!string.IsNullOrEmpty(rawFontName))
 		{
 			pdfFontName = CleanPdfFontName(rawFontName);
 		}
-		
+
 		if ((fontFlags & 64) != 0)
 		{
 			isItalic = true;
 		}
+		LogToDesktop($"[EDIT TEXT] Font probe: raw='{rawFontName}', mapped='{pdfFontName}', flags={fontFlags}, bold={isBold}, italic={isItalic}, fontSizePt={estFontSize:F2}");
 
 		int num2;
-		double lastTop = initTop;
+		double lineThreshold = Math.Max(4.0, estFontSize * 0.85);
+		double overlapSlop = Math.Max(1.5, estFontSize * 0.20);
 		for (num2 = charIndex; num2 > 0; num2--)
 		{
 			lock (PdfiumEngine.SyncRoot)
 			{
 				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num2 - 1, out double l, out double r, out double b, out double t))
 				{
-					if (Math.Abs(lastTop - t) > estFontSize * 1.8) break;
-					lastTop = t;
+					double centerY = (b + t) / 2.0;
+					bool sameLine = Math.Abs(initCenterY - centerY) <= lineThreshold ||
+						(b <= initTop + overlapSlop && t >= initBottom - overlapSlop);
+					if (!sameLine) break;
 				}
 				else break;
 			}
 		}
 
 		int num3;
-		lastTop = initTop;
 		for (num3 = charIndex; num3 < num - 1; num3++)
 		{
 			lock (PdfiumEngine.SyncRoot)
 			{
 				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num3 + 1, out double l, out double r, out double b, out double t))
 				{
-					if (Math.Abs(lastTop - t) > estFontSize * 1.8) break;
-					lastTop = t;
+					double centerY = (b + t) / 2.0;
+					bool sameLine = Math.Abs(initCenterY - centerY) <= lineThreshold ||
+						(b <= initTop + overlapSlop && t >= initBottom - overlapSlop);
+					if (!sameLine) break;
 				}
 				else break;
 			}
@@ -3190,7 +3392,27 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 		}
 
-		if (!flag || !TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect)) return;
+		if (!flag)
+		{
+			LogToDesktop("[EDIT TEXT] Open editor aborted: could not collect char boxes for line.");
+			return;
+		}
+		if (!TryGetPageSize(pageNumber, out Size pageSize))
+		{
+			LogToDesktop("[EDIT TEXT] Open editor aborted: page size unavailable.");
+			return;
+		}
+		if (!TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect))
+		{
+			LogToDesktop($"[EDIT TEXT] Open editor aborted: PDF rect could not convert. rect=({minLeft:F2},{minBottom:F2},{maxRight:F2},{maxTop:F2})");
+			return;
+		}
+
+		double lineHeightPoints = Math.Max(1.0, maxTop - minBottom);
+		double replacementFontSize = Math.Max(estFontSize, lineHeightPoints * 0.82);
+		replacementFontSize = Math.Min(replacementFontSize, lineHeightPoints * 1.15);
+		Color sampledBackground = SamplePdfPageBackgroundColor(canvas, editRect);
+		LogToDesktop($"[EDIT TEXT] Visual match: lineHeightPt={lineHeightPoints:F2}, originalFontPt={estFontSize:F2}, replacementFontPt={replacementFontSize:F2}, sampledBg=#{sampledBackground.R:X2}{sampledBackground.G:X2}{sampledBackground.B:X2}");
 
 		int num9 = num3 - num2 + 1;
 		string existingText = "";
@@ -3199,56 +3421,95 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			StringBuilder stringBuilder = new StringBuilder(num9 + 2);
 			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, num9, stringBuilder) > 0) existingText = stringBuilder.ToString(); }
 		}
+		bool extractedTextBroken = LooksLikeBrokenExtractedText(existingText);
+		if (extractedTextBroken)
+		{
+			LogToDesktop($"[EDIT TEXT] Extracted text looks broken, opening empty editor. raw='{existingText}'");
+			existingText = string.Empty;
+		}
+		LogToDesktop($"[EDIT TEXT] Line selected: start={num2}, end={num3}, length={num9}, text='{existingText}', pdfRect=({minLeft:F2},{minBottom:F2},{maxRight:F2},{maxTop:F2}), canvasRect=({editRect.X:F1},{editRect.Y:F1},{editRect.Width:F1},{editRect.Height:F1})");
 
-		// 2. Tạo UI TextBox
+		// 2. T蘯｡o UI TextBox
+		Popup editPopup = new Popup
+		{
+			PlacementTarget = canvas,
+			Placement = PlacementMode.Relative,
+			HorizontalOffset = editRect.X - 1.0,
+			VerticalOffset = editRect.Y - 2.0,
+			AllowsTransparency = true,
+			StaysOpen = true,
+			Focusable = false
+		};
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
-			Width = Math.Max(50.0, editRect.Width + 12.0),
-			Height = Math.Max(20.0, editRect.Height + 6.0),
+			Width = Math.Max(50.0, editRect.Width + 8.0),
+			Height = Math.Max(20.0, editRect.Height + 4.0),
 			Text = existingText,
 			FontFamily = new FontFamily(pdfFontName),
-			FontSize = Math.Max(8.0, estFontSize * canvas.Height / pageSize.Height),
+			FontSize = Math.Max(8.0, replacementFontSize * canvas.Height / pageSize.Height),
 			FontWeight = isBold ? FontWeights.Bold : FontWeights.Normal,
 			FontStyle = isItalic ? FontStyles.Italic : FontStyles.Normal,
 			Foreground = Brushes.Black,
-			TextWrapping = TextWrapping.Wrap,
-			AcceptsReturn = true,
-			BorderBrush = new SolidColorBrush(Color.FromRgb(153, 193, 241)),
-			BorderThickness = new Thickness(1.0),
-			Background = Brushes.White,
-			Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
+			TextWrapping = TextWrapping.NoWrap,
+			AcceptsReturn = false,
+			BorderBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
+			BorderThickness = new Thickness(2.0),
+			Background = new SolidColorBrush(sampledBackground),
+			Padding = new Thickness(3.0, 1.0, 3.0, 1.0),
+			Focusable = true,
+			IsHitTestVisible = true,
+			Cursor = Cursors.IBeam
 		};
-		
-		Canvas.SetLeft(tbInput, editRect.X - 2.0);
-		Canvas.SetTop(tbInput, editRect.Y - 3.0);
-		canvas.Children.Add(tbInput);
+
+		editPopup.Child = tbInput;
+		editPopup.IsOpen = true;
 		_activeDirectEditTextBox = tbInput;
 
-		// 3. Tính CaretIndex và xử lý Focus an toàn
+		// 3. Tﾃｭnh CaretIndex vﾃ x盻ｭ lﾃｽ Focus an toﾃn
 		int countBefore = charIndex - num2;
+		if (clickPoint.HasValue && TryCanvasToPdfPoint(canvas, clickPoint.Value, pageNumber, out Point clickedPdfPoint))
+		{
+			double clickedCharMiddle = (initLeft + initRight) / 2.0;
+			if (clickedPdfPoint.X > clickedCharMiddle)
+			{
+				countBefore++;
+			}
+		}
 		int caretPos = 0;
 		if (countBefore > 0)
 		{
 			StringBuilder sbBefore = new StringBuilder(countBefore + 2);
 			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, countBefore, sbBefore) > 0) caretPos = sbBefore.ToString().Length; }
 		}
+		LogToDesktop($"[EDIT TEXT] Popup TextBox created: size={tbInput.Width:F1}x{tbInput.Height:F1}, offset=({editPopup.HorizontalOffset:F1},{editPopup.VerticalOffset:F1}), font='{pdfFontName}', fontSizePx={tbInput.FontSize:F1}, caret={caretPos}");
 
-		// VÁ LỖI MẤT CON TRỎ: Gán Loaded để chắc chắn textbox được focus và set cursor index đúng
+		// Vﾃ・L盻蜂 M蘯､T CON TR盻・ Gﾃ｡n Loaded ﾄ黛ｻ・ch蘯ｯc ch蘯ｯn textbox ﾄ柁ｰ盻｣c focus vﾃ set cursor index ﾄ妥ｺng
 		tbInput.Loaded += (s, ev) =>
 		{
 			tbInput.Focus();
 			Keyboard.Focus(tbInput);
-			if (caretPos >= 0 && caretPos <= tbInput.Text.Length)
+			if (extractedTextBroken || string.IsNullOrEmpty(tbInput.Text))
+			{
+				tbInput.SelectAll();
+				tbInput.CaretIndex = tbInput.Text.Length;
+			}
+			else if (caretPos >= 0 && caretPos <= tbInput.Text.Length)
 			{
 				tbInput.CaretIndex = caretPos;
 			}
 		};
 
-		// Gọi Focus trực tiếp thông qua Dispatcher thay vì chờ Loaded (để chạy song song/sớm)
+		// G盻絞 Focus tr盻ｱc ti蘯ｿp thﾃｴng qua Dispatcher thay vﾃｬ ch盻・Loaded (ﾄ黛ｻ・ch蘯｡y song song/s盻嬶)
 		Dispatcher.BeginInvoke(new Action(() => {
 			tbInput.Focus();
 			Keyboard.Focus(tbInput);
-			if (caretPos >= 0 && caretPos <= tbInput.Text.Length) tbInput.CaretIndex = caretPos;
+			if (extractedTextBroken || string.IsNullOrEmpty(tbInput.Text))
+			{
+				tbInput.SelectAll();
+				tbInput.CaretIndex = tbInput.Text.Length;
+			}
+			else if (caretPos >= 0 && caretPos <= tbInput.Text.Length) tbInput.CaretIndex = caretPos;
+			LogToDesktop($"[EDIT TEXT] Popup TextBox focused: popupOpen={editPopup.IsOpen}, focused={tbInput.IsFocused}, keyboardWithin={tbInput.IsKeyboardFocusWithin}, children={canvas.Children.Count}");
 		}), System.Windows.Threading.DispatcherPriority.Input);
 
 		long creationTime = Environment.TickCount;
@@ -3256,11 +3517,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Action commitEdit = delegate
 		{
 			if (editCommitted) return;
-			
-			// [QUAN TRỌNG] Chỉ chặn LostFocus nếu là do sự kiện trôi tiêu điểm tự động của TextBox hiện tại
+
+			// [QUAN TR盻君G] Ch盻・ch蘯ｷn LostFocus n蘯ｿu lﾃ do s盻ｱ ki盻㌻ trﾃｴi tiﾃｪu ﾄ訴盻ノ t盻ｱ ﾄ黛ｻ冢g c盻ｧa TextBox hi盻㌻ t蘯｡i
 			if (Environment.TickCount - creationTime < 500 && _activeDirectEditTextBox == tbInput)
 			{
-				LogToDesktop("[DEBUG] Bỏ qua LostFocus do thời gian sống quá ngắn (tránh trôi focus sau click). Refocus TextBox.");
+				LogToDesktop("[DEBUG] B盻・qua LostFocus do th盻拱 gian s盻創g quﾃ｡ ng蘯ｯn (trﾃ｡nh trﾃｴi focus sau click). Refocus TextBox.");
 				Dispatcher.BeginInvoke(new Action(() => {
 					if (_activeDirectEditTextBox == tbInput)
 					{
@@ -3277,42 +3538,61 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_activeDirectEditTextBox = null;
 				_activeDirectEditCommitAction = null;
 			}
-			
-			string text = tbInput.Text;
-			if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
+
+			string text = tbInput.Text.TrimEnd('\r', '\n');
+			editPopup.IsOpen = false;
+			editPopup.Child = null;
 
 			if (text != existingText)
 			{
-				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = Colors.White, StrokeColor = Colors.Transparent, Opacity = 1.0 };
-				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation 
-				{ 
-					PageIndex = pageNumber - 1, 
-					X = minLeft / pageSize.Width, 
-					Y = (pageSize.Height - maxTop) / pageSize.Height, 
-					Width = (maxRight - minLeft) / pageSize.Width, 
-					Height = (maxTop - minBottom) / pageSize.Height, 
-					Text = text, 
-					BgColor = Colors.Transparent, 
-					StrokeColor = Colors.Black, 
-					FontFamily = pdfFontName, 
-					FontSize = estFontSize, 
+				LogToDesktop($"[EDIT TEXT] Commit changed text: old='{existingText}', new='{text}'");
+				string editGroupId = Guid.NewGuid().ToString("N");
+				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, AnnotationGroupId = editGroupId, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = sampledBackground, StrokeColor = Colors.Transparent, Opacity = 1.0 };
+				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
+				{
+					PageIndex = pageNumber - 1,
+					AnnotationGroupId = editGroupId,
+					X = minLeft / pageSize.Width,
+					Y = (pageSize.Height - maxTop) / pageSize.Height,
+					Width = (maxRight - minLeft) / pageSize.Width,
+					Height = (maxTop - minBottom) / pageSize.Height,
+					Text = text,
+					BgColor = Colors.Transparent,
+					StrokeColor = Colors.Black,
+					FontFamily = pdfFontName,
+					FontSize = replacementFontSize,
 					IsBold = isBold,
 					IsItalic = isItalic,
-					Opacity = 1.0 
+					Opacity = 1.0
 				};
-				
+
 				try { SaveUndoState(); } catch {}
-				Annotations.Add(whiteout); Annotations.Add(replacement); 
+				Annotations.Add(whiteout); Annotations.Add(replacement);
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
 				RedrawPageAnnotations(canvas, pageNumber);
+			}
+			else
+			{
+				LogToDesktop("[EDIT TEXT] Commit skipped: text unchanged.");
 			}
 		};
 		_activeDirectEditCommitAction = commitEdit;
 
+		tbInput.PreviewMouseDown += (s, ev) =>
+		{
+			if (!tbInput.IsKeyboardFocusWithin)
+			{
+				ev.Handled = true;
+				tbInput.Focus();
+				Keyboard.Focus(tbInput);
+			}
+			LogToDesktop("[EDIT TEXT] TextBox received mouse down.");
+		};
+
 		tbInput.LostFocus += (s, ev) =>
 		{
-			// [QUAN TRỌNG] Trì hoãn việc kiểm tra Focus bằng Dispatcher.
-			// Nếu TextBox thực sự mất focus (click ra ngoài), nó mới gọi commitEdit().
+			// [QUAN TR盻君G] Trﾃｬ hoﾃ｣n vi盻㌘ ki盻ノ tra Focus b蘯ｱng Dispatcher.
+			// N蘯ｿu TextBox th盻ｱc s盻ｱ m蘯･t focus (click ra ngoﾃi), nﾃｳ m盻嬖 g盻絞 commitEdit().
 			Dispatcher.BeginInvoke(new Action(() =>
 			{
 				if (!tbInput.IsFocused && !tbInput.IsKeyboardFocusWithin)
@@ -3322,7 +3602,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}), System.Windows.Threading.DispatcherPriority.Input);
 		};
 
-		tbInput.KeyDown += delegate(object s, KeyEventArgs ev)
+		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
@@ -3336,7 +3616,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					_activeDirectEditTextBox = null;
 					_activeDirectEditCommitAction = null;
 				}
-				if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
+				editPopup.IsOpen = false;
+				editPopup.Child = null;
 				ev.Handled = true;
 			}
 		};
@@ -3347,6 +3628,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 		double fontSizePoints = maxTop - minBottom;
 		if (fontSizePoints <= 0.0) fontSizePoints = 12.0;
+		double replacementFontSize = Math.Min(fontSizePoints * 1.15, Math.Max(fontSizePoints, fontSizePoints * 0.82));
+		Color sampledBackground = SamplePdfPageBackgroundColor(canvas, editRect);
 
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
@@ -3354,21 +3637,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			Height = Math.Max(20.0, editRect.Height + 6.0),
 			Text = existingText,
 			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = Math.Max(8.0, fontSizePoints * canvas.Height / pageSize.Height),
+			FontSize = Math.Max(8.0, replacementFontSize * canvas.Height / pageSize.Height),
 			Foreground = Brushes.Black,
 			TextWrapping = TextWrapping.NoWrap,
 			AcceptsReturn = false,
 			BorderBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
 			BorderThickness = new Thickness(1.5),
-			Background = Brushes.White,
+			Background = new SolidColorBrush(sampledBackground),
 			Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
 		};
-		
+
 		Canvas.SetLeft(tbInput, editRect.X - 2.0);
 		Canvas.SetTop(tbInput, editRect.Y - 3.0);
 		canvas.Children.Add(tbInput);
 
-		// VÁ LỖI MẤT CON TRỎ:
+		// Vﾃ・L盻蜂 M蘯､T CON TR盻・
 		tbInput.Loaded += (s, e) =>
 		{
 			tbInput.Focus();
@@ -3376,43 +3659,46 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			tbInput.SelectAll();
 			tbInput.CaretIndex = tbInput.Text.Length;
 		};
-		long creationTime = Environment.TickCount; 
+		long creationTime = Environment.TickCount;
 
 		bool editCommitted = false;
 		Action commitEdit = delegate
 		{
-			if (editCommitted) return;		
+			if (editCommitted) return;
 			if (tbInput.IsFocused)
 			{
-				LogToDesktop("[DEBUG] Bỏ qua LostFocus vì TextBox vẫn đang được Focus (Focus giả).");
+				LogToDesktop("[DEBUG] B盻・qua LostFocus vﾃｬ TextBox v蘯ｫn ﾄ疎ng ﾄ柁ｰ盻｣c Focus (Focus gi蘯｣).");
 				return;
 			}
 
 			long aliveTime = Environment.TickCount - creationTime;
-			LogToDesktop($"[DEBUG] Đóng TextBox thật sự. Thời gian sống: {aliveTime}ms");
+			LogToDesktop($"[DEBUG] ﾄ静ｳng TextBox th蘯ｭt s盻ｱ. Th盻拱 gian s盻創g: {aliveTime}ms");
 
 			editCommitted = true;
-			
-			string text = tbInput.Text;
+
+			string text = tbInput.Text.TrimEnd('\r', '\n');
 			if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
 
 			if (text != existingText)
 			{
+				string editGroupId = Guid.NewGuid().ToString("N");
 				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation
 				{
 					PageIndex = pageNumber - 1,
+					AnnotationGroupId = editGroupId,
 					X = minLeft / pageSize.Width,
 					Y = (pageSize.Height - maxTop) / pageSize.Height,
 					Width = (maxRight - minLeft) / pageSize.Width,
 					Height = (maxTop - minBottom) / pageSize.Height,
 					Text = "",
-					BgColor = Colors.White,
+					BgColor = sampledBackground,
 					StrokeColor = Colors.Transparent,
 					Opacity = 1.0
 				};
 				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
 				{
 					PageIndex = pageNumber - 1,
+					AnnotationGroupId = editGroupId,
 					X = minLeft / pageSize.Width,
 					Y = (pageSize.Height - maxTop) / pageSize.Height,
 					Width = (maxRight - minLeft) / pageSize.Width,
@@ -3421,32 +3707,32 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					BgColor = Colors.Transparent,
 					StrokeColor = Colors.Black,
 					FontFamily = ActiveFontFamily,
-					FontSize = fontSizePoints,
+					FontSize = replacementFontSize,
 					Opacity = 1.0
 				};
-				
+
 				try { SaveUndoState(); } catch {}
-				Annotations.Add(whiteout);     
-				Annotations.Add(replacement); 
+				Annotations.Add(whiteout);
+				Annotations.Add(replacement);
 				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
 				RedrawPageAnnotations(canvas, pageNumber);
 				LogStatus("Staged text replacement. Save the PDF to apply the actual content change.");
 			}
 		};
 
-		tbInput.PreviewLostKeyboardFocus += (s, ev) => 
-		{ 
-			// Nếu người dùng click vào một cái gì đó hợp lệ (như thanh Ribbon), 
-			// thì mới cho đóng TextBox. Nếu click vào canvas, vẫn giữ TextBox.
-			if (Keyboard.FocusedElement is DependencyObject focused && 
+		tbInput.PreviewLostKeyboardFocus += (s, ev) =>
+		{
+			// N蘯ｿu ngﾆｰ盻拱 dﾃｹng click vﾃo m盻冲 cﾃ｡i gﾃｬ ﾄ妥ｳ h盻｣p l盻・(nhﾆｰ thanh Ribbon),
+			// thﾃｬ m盻嬖 cho ﾄ妥ｳng TextBox. N蘯ｿu click vﾃo canvas, v蘯ｫn gi盻ｯ TextBox.
+			if (Keyboard.FocusedElement is DependencyObject focused &&
 			   (focused is Fluent.Button || focused is Fluent.MenuItem))
 			{
 				commitEdit();
 			}
 			else if (Keyboard.FocusedElement == null)
 			{
-				// Click vào vùng trống, chặn đóng
-				ev.Handled = true; 
+				// Click vﾃo vﾃｹng tr盻創g, ch蘯ｷn ﾄ妥ｳng
+				ev.Handled = true;
 			}
 		};
 	}
@@ -3455,12 +3741,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		double dpi = 192.0;
 		int pixelWidth = Math.Max(1, (int)Math.Ceiling(pendingTextEdit.Width * dpi / 72.0));
 		int pixelHeight = Math.Max(1, (int)Math.Ceiling(pendingTextEdit.Height * dpi / 72.0));
-		double padding = Math.Max(2.0, dpi / 36.0);
+		double padding = string.IsNullOrEmpty(pendingTextEdit.TextAnnotation.AnnotationGroupId) ? Math.Max(2.0, dpi / 36.0) : 0.0;
 		Border border = new Border
 		{
 			Width = pixelWidth,
 			Height = pixelHeight,
-			Background = Brushes.White
+			Background = new SolidColorBrush(pendingTextEdit.WhiteoutAnnotation.BgColor)
 		};
 		TextBlock textBlock = new TextBlock
 		{
@@ -3471,9 +3757,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			FontStyle = (pendingTextEdit.TextAnnotation.IsItalic ? FontStyles.Italic : FontStyles.Normal),
 			TextDecorations = (pendingTextEdit.TextAnnotation.IsUnderline ? TextDecorations.Underline : null),
 			Foreground = new SolidColorBrush(pendingTextEdit.TextAnnotation.StrokeColor),
-			TextWrapping = TextWrapping.Wrap,
+			TextWrapping = string.IsNullOrEmpty(pendingTextEdit.TextAnnotation.AnnotationGroupId) ? TextWrapping.Wrap : TextWrapping.NoWrap,
 			Padding = new Thickness(padding),
-			Background = Brushes.White
+			Background = Brushes.Transparent,
+			VerticalAlignment = VerticalAlignment.Center
 		};
 		border.Child = textBlock;
 		border.Measure(new Size(pixelWidth, pixelHeight));
@@ -3895,14 +4182,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			break;
 		}
-		LogStatus($"Đã xoay trang {pageNumber} trên màn hình ({num}°).");
+		LogStatus($"ﾄ静｣ xoay trang {pageNumber} trﾃｪn mﾃn hﾃｬnh ({num}ﾂｰ).");
 	}
 
 	public async Task<bool> SaveDocumentAsync(string? outputPath = null)
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
 		{
-			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Vui lﾃｲng m盻・m盻冲 file PDF trﾆｰ盻嫩.", "Thﾃｴng bﾃ｡o", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return false;
 		}
 		bool isOverwrite = string.IsNullOrEmpty(outputPath);
@@ -3937,22 +4224,22 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			if (isOverwrite)
 			{
-				MessageBox.Show("Không có thay đổi nào để lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				MessageBox.Show("Khﾃｴng cﾃｳ thay ﾄ黛ｻ品 nﾃo ﾄ黛ｻ・lﾆｰu.", "Thﾃｴng bﾃ｡o", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 				return true;
 			}
 			try
 			{
 				File.Copy(CurrentPdfPath, targetPath, overwrite: true);
-				MessageBox.Show("Lưu file thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				MessageBox.Show("Lﾆｰu file thﾃnh cﾃｴng.", "Thﾃnh cﾃｴng", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 				return true;
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("Lỗi khi sao chép file: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				MessageBox.Show("L盻擁 khi sao chﾃｩp file: " + ex.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
 				return false;
 			}
 		}
-		LogStatus("Đang lưu các thay đổi...");
+		LogStatus("ﾄ紳ng lﾆｰu cﾃ｡c thay ﾄ黛ｻ品...");
 		string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
 		List<(PendingTextEdit Edit, string ImagePath)> pendingTextEditImages = new List<(PendingTextEdit Edit, string ImagePath)>();
 		try
@@ -4081,8 +4368,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				return true;
 			})))
 			{
-				MessageBox.Show("Không thể áp dụng các thay đổi vào file PDF.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-				LogStatus("Lưu thất bại");
+				MessageBox.Show("Khﾃｴng th盻・ﾃ｡p d盻･ng cﾃ｡c thay ﾄ黛ｻ品 vﾃo file PDF.", "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
+				LogStatus("Lﾆｰu th蘯･t b蘯｡i");
 				return false;
 			}
 			if (isOverwrite)
@@ -4095,8 +4382,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			catch (Exception ex2)
 			{
-				MessageBox.Show("Không thể ghi file đầu ra: " + ex2.Message + ". Có thể file đang mở bởi ứng dụng khác.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-				LogStatus("Lưu thất bại");
+				MessageBox.Show("Khﾃｴng th盻・ghi file ﾄ黛ｺｧu ra: " + ex2.Message + ". Cﾃｳ th盻・file ﾄ疎ng m盻・b盻殃 盻ｩng d盻･ng khﾃ｡c.", "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
+				LogStatus("Lﾆｰu th蘯･t b蘯｡i");
 				if (isOverwrite)
 				{
 					LoadDocument(CurrentPdfPath, clearPendingTextEdits: false);
@@ -4135,14 +4422,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			LoadDocument(targetPath);
 			_pageRotations.Clear();
 			RenderPdfPages();
-			MessageBox.Show("Lưu file thành công.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Asterisk);
-			LogStatus("Đã lưu: " + System.IO.Path.GetFileName(targetPath));
+			MessageBox.Show("Lﾆｰu file thﾃnh cﾃｴng.", "Thﾃnh cﾃｴng", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			LogStatus("ﾄ静｣ lﾆｰu: " + System.IO.Path.GetFileName(targetPath));
 			return true;
 		}
 		catch (Exception ex3)
 		{
-			MessageBox.Show("Đã xảy ra lỗi khi lưu: " + ex3.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Lưu thất bại");
+			MessageBox.Show("ﾄ静｣ x蘯｣y ra l盻擁 khi lﾆｰu: " + ex3.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
+			LogStatus("Lﾆｰu th蘯･t b蘯｡i");
 			return false;
 		}
 	}
@@ -4301,7 +4588,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
 		{
-			MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+			MessageBox.Show("Vui lﾃｲng m盻・m盻冲 file PDF trﾆｰ盻嫩.", "Thﾃｴng bﾃ｡o", MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
 
@@ -4315,11 +4602,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				CloseActiveDocument();
 				File.Copy(organizer.SavedPdfPath, originalPath, true);
 				LoadDocument(originalPath);
-				LogStatus("Đã cập nhật cấu trúc trang tài liệu.");
+				LogStatus("ﾄ静｣ c蘯ｭp nh蘯ｭt c蘯･u trﾃｺc trang tﾃi li盻㎡.");
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("Không thể lưu thay đổi vào file gốc: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+				MessageBox.Show("Khﾃｴng th盻・lﾆｰu thay ﾄ黛ｻ品 vﾃo file g盻祖: " + ex.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Error);
 			}
 		}
 	}
@@ -4341,7 +4628,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
-		string value = (optDialog.InsertBefore ? "trước" : "sau");
+		string value = (optDialog.InsertBefore ? "trﾆｰ盻嫩" : "sau");
 		string outputPath = PromptForOutputPath(System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath) + "_with_blank_page.pdf");
 		if (outputPath == null)
 		{
@@ -4687,6 +4974,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			string logMessage = $"{DateTime.Now:HH:mm:ss.fff} - {message}{Environment.NewLine}";
 			File.AppendAllText(logPath, logMessage);
 		}
-		catch { /* Bỏ qua lỗi ghi log để không ảnh hưởng app */ }
+		catch { /* B盻・qua l盻擁 ghi log ﾄ黛ｻ・khﾃｴng 蘯｣nh hﾆｰ盻殤g app */ }
 	}
 }

@@ -1,5 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="PdfViewerApp.PrintOptionsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="In tài liệu" Width="980" Height="650" MinWidth="900" MinHeight="560" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma, Helvetica" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="PdfViewerApp.PrintOptionsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="In tài liệu" Width="1120" Height="670" MinWidth="1040" MinHeight="580" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma, Helvetica" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
   <Window.Resources>
     <ResourceDictionary>
       <!-- Premium button style -->
@@ -246,7 +246,7 @@
     <!-- Middle Area: Preview and Options -->
     <Grid Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="300" />
+        <ColumnDefinition Width="390" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="250" />
       </Grid.ColumnDefinitions>
@@ -262,9 +262,9 @@
           <TextBlock Text="Xem trước" FontWeight="SemiBold" FontSize="14" Foreground="#F8FAFC" Margin="0,0,0,8" />
           <Border Grid.Row="1" Background="#0A0F1D" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
             <Grid>
-              <Image Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10" />
+              <Image Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6" />
               <TextBlock Name="PreviewPlaceholderText" Text="PDF" FontSize="34" FontWeight="Bold" Foreground="#1E293B" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-              
+
               <!-- Navigation Overlay -->
               <Grid VerticalAlignment="Bottom" Background="#D0000000" Height="40">
                 <Grid.ColumnDefinitions>
@@ -272,9 +272,9 @@
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button Name="PrevPageButton" Grid.Column="0" Content="◀" Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontFamily="Segoe UI Symbol" FontSize="14" Click="PrevPage_Click" Focusable="False" Height="40" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" />
+                <Button Name="PrevPageButton" Grid.Column="0" Content="‹" Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontFamily="Segoe UI Symbol" FontSize="14" Click="PrevPage_Click" Focusable="False" Height="40" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" />
                 <TextBlock Name="PageCounterOverlayText" Grid.Column="1" Text="1 / 1" Foreground="#F8FAFC" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="15,0" />
-                <Button Name="NextPageButton" Grid.Column="2" Content="▶" Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontFamily="Segoe UI Symbol" FontSize="14" Click="NextPage_Click" Focusable="False" Height="40" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" />
+                <Button Name="NextPageButton" Grid.Column="2" Content="›" Background="Transparent" Foreground="#F8FAFC" BorderThickness="0" FontFamily="Segoe UI Symbol" FontSize="14" Click="NextPage_Click" Focusable="False" Height="40" VerticalAlignment="Center" HorizontalAlignment="Stretch" Cursor="Hand" />
               </Grid>
             </Grid>
           </Border>
@@ -288,7 +288,7 @@
           <StackPanel>
             <TextBlock Text="Phạm vi in" FontWeight="SemiBold" FontSize="14" Foreground="#F8FAFC" Margin="0,0,0,8" />
             <RadioButton Name="CurrentViewRadio" Content="Vùng đang xem" Margin="0,0,0,7" />
-            <RadioButton Name="CurrentPageRadio" Margin="0,0,0,7" />
+            <RadioButton Name="CurrentPageRadio" Content="Trang hiện tại" Margin="0,0,0,7" />
             <RadioButton Name="AllPagesRadio" Content="Tất cả trang" IsChecked="True" Margin="0,0,0,7" />
             <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
@@ -318,21 +318,21 @@
                           Margin="8,0,0,0"/>
             </Grid>
             <TextBlock Text="Ví dụ: 1, 5-12" Foreground="#64748B" Margin="22,-8,0,14" />
-            
+
             <Separator Height="1" Background="#1E293B" Margin="0,4,0,12" />
-            
+
             <TextBlock Text="Xử lý trang" FontWeight="SemiBold" FontSize="14" Foreground="#F8FAFC" Margin="0,0,0,8" />
             <RadioButton Name="FitMarginsRadio" Content="Vừa vùng in của máy" IsChecked="True" Margin="0,0,0,7" />
             <RadioButton Name="ActualSizeRadio" Content="Giữ kích thước thật" IsEnabled="True" Margin="0,0,0,7" />
             <CheckBox Name="AutoCenterCheckBox" Content="Tự căn giữa" IsChecked="True" Margin="0,0,0,12" />
-            
+
             <Separator Height="1" Background="#1E293B" Margin="0,4,0,12" />
-            
+
             <TextBlock Text="Chế độ bù tọa độ in (Offset)" FontWeight="SemiBold" FontSize="14" Foreground="#F8FAFC" Margin="0,0,0,8" />
             <ComboBox Name="PrintOffsetModeComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0" Margin="0,0,0,6">
               <ComboBoxItem Content="Tự động nhận diện (Auto)" Tag="Auto" />
               <ComboBoxItem Content="Bù tọa độ WPF (WPF Offset)" Tag="WpfOffset" />
-              <ComboBoxItem Content="Gốc tọa độ vật lý (Physical)" Tag="Physical" />
+              <ComboBoxItem Content="Giữ tọa độ vật lý (Physical)" Tag="Physical" />
             </ComboBox>
             <CheckBox Name="TestFrameCheckBox" Content="In trang test viền" IsChecked="False" Margin="0,6,0,0" />
             <TextBlock Text="Bỏ nội dung PDF, in khung viền để kiểm tra mép bị cắt." Foreground="#64748B" FontSize="11" TextWrapping="Wrap" Margin="22,2,0,0" />
@@ -348,7 +348,7 @@
               <ComboBox Name="PrintEngineComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0">
                <ComboBoxItem Content="Native PDFium (Tốc độ cao, siêu nét)" Tag="NativePdfium_Optimized" />
                <ComboBoxItem Content="WPF Bitmap (Tương thích cao)" Tag="WpfBitmap" />
-               <ComboBoxItem Content="In trực tiếp PDF (Siêu nhanh - Cần máy hỗ trợ)" Tag="PdfDirect_Optimized" />
+               <ComboBoxItem Content="In trực tiếp PDF (Siêu nhanh - cần máy hỗ trợ)" Tag="PdfDirect_Optimized" />
              </ComboBox>
             <CheckBox Name="NativeSeparateJobsCheckBox" Content="Native: gửi từng trang" IsChecked="False" Margin="0,8,0,0" />
             <CheckBox Name="OptimizeCadCheckBox" Content="Tối ưu bản vẽ CAD/Revit" IsChecked="False" Margin="0,8,0,0" />
@@ -367,7 +367,7 @@
         <Border Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
             <TextBlock Text="Khổ giấy" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8" />
-            <ComboBox Name="PaperSizeComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2">
+            <ComboBox Name="PaperSizeComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2" SelectionChanged="PrintPreviewSettings_SelectionChanged">
               <ComboBoxItem Content="Theo máy in" Tag="Default" />
               <ComboBoxItem Content="A4" Tag="A4" />
               <ComboBoxItem Content="A3" Tag="A3" />
@@ -381,7 +381,7 @@
         <Border Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
             <TextBlock Text="Hướng giấy" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8" />
-            <ComboBox Name="OrientationComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2">
+            <ComboBox Name="OrientationComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2" SelectionChanged="PrintPreviewSettings_SelectionChanged">
               <ComboBoxItem Content="Theo máy in" Tag="Default" />
               <ComboBoxItem Content="Dọc" Tag="Portrait" />
               <ComboBoxItem Content="Ngang" Tag="Landscape" />

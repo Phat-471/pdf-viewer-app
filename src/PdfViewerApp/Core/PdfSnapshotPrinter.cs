@@ -32,6 +32,10 @@ internal static class PdfSnapshotPrinter
 
 	private const int WHITENESS = 16711778;
 
+	private const int PHYSICALOFFSETX = 112;
+
+	private const int PHYSICALOFFSETY = 113;
+
 	public static void PrintSnapshot(PdfSnapshotSelection snapshot, PrintQueue printQueue, PrintTicket printTicket, double rightSafetyPaddingDips, double bottomSafetyPaddingDips)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
@@ -53,19 +57,17 @@ internal static class PdfSnapshotPrinter
 				{
 					throw new InvalidOperationException("Cannot create printer DC for " + printQueue.FullName + ".");
 				}
-				int rawWidth  = Math.Max(1, GetDeviceCaps(num2, 8));  // HORZRES
-				int rawHeight = Math.Max(1, GetDeviceCaps(num2, 10)); // VERTRES
-				int num5 = Math.Max(72, GetDeviceCaps(num2, 88));     // LOGPIXELSX
-				int num6 = Math.Max(72, GetDeviceCaps(num2, 90));     // LOGPIXELSY
-
-				// ─── FIX: Nếu user chọn Landscape, hoán đổi chiều rộng/cao ───
-				bool isLandscape = (printTicket.PageOrientation == PageOrientation.Landscape);
-				int num3 = isLandscape ? Math.Max(rawWidth, rawHeight) : Math.Min(rawWidth, rawHeight);  // printable width
-				int num4 = isLandscape ? Math.Min(rawWidth, rawHeight) : Math.Max(rawWidth, rawHeight);  // printable height
+				int num3 = Math.Max(1, GetDeviceCaps(num2, HORZRES));
+				int num4 = Math.Max(1, GetDeviceCaps(num2, VERTRES));
+				int num5 = Math.Max(72, GetDeviceCaps(num2, LOGPIXELSX));
+				int num6 = Math.Max(72, GetDeviceCaps(num2, LOGPIXELSY));
+				int offsetX = Math.Max(0, GetDeviceCaps(num2, PHYSICALOFFSETX));
+				int offsetY = Math.Max(0, GetDeviceCaps(num2, PHYSICALOFFSETY));
+				bool isLandscape = num3 > num4;
 
 				int num7 = Math.Max(1, num3 - DipsToDevicePixels(rightSafetyPaddingDips, num5));
 				int num8 = Math.Max(1, num4 - DipsToDevicePixels(bottomSafetyPaddingDips, num6));
-				PdfPerfLogger.Log($"Snapshot printer DC: printable={num3}x{num4} (landscape={isLandscape}), dpi={num5}x{num6}, safe={num7}x{num8}");
+				PdfPerfLogger.Log($"Snapshot printer DC: printable={num3}x{num4} (landscape={isLandscape}), dpi={num5}x{num6}, offset={offsetX}x{offsetY}, safe={num7}x{num8}");
 				PdfPerfLogger.Log($"Snapshot source: page={snapshot.PageIndex + 1}, rect=({snapshot.X},{snapshot.Y},{snapshot.Width},{snapshot.Height})");
 				nint num9 = PdfiumEngine.FPDF_LoadPage(num, snapshot.PageIndex);
 				if (num9 == IntPtr.Zero)
@@ -125,7 +127,7 @@ internal static class PdfSnapshotPrinter
 						{
 							throw new InvalidOperationException("Snapshot StartPage failed: " + GetLastErrorMessage());
 						}
-						PatBlt(num2, 0, 0, num3, num4, 16711778);
+						PatBlt(num2, 0, 0, num3, num4, WHITENESS);
 						
 						int stride = tileWidth * 4;
 						byte[] array = new byte[stride * tileHeight];

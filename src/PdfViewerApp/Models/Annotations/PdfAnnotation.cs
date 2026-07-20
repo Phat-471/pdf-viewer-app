@@ -7,6 +7,8 @@ public abstract class PdfAnnotation
 {
 	public Guid Id { get; set; } = Guid.NewGuid();
 
+	public string AnnotationGroupId { get; set; } = string.Empty;
+
 	public int PageIndex { get; set; }
 
 	public double X { get; set; }
