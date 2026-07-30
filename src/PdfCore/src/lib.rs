@@ -426,6 +426,545 @@ pub extern "C" fn replace_pdf_text(
     doc.save(output_str).is_ok()
 }
 
+/// Lấy danh sách các content stream (đã decompress) của một trang.
+/// Hỗ trợ cả Contents là Reference (1 stream) và Array (nhiều stream).
+fn get_page_content_streams(
+    doc: &Document,
+    page_id: lopdf::ObjectId,
+) -> Option<Vec<Vec<u8>>> {
+    let page = doc.get_object(page_id).ok()?;
+    let page_dict = page.as_dict().ok()?;
+    let contents = page_dict.get(b"Contents").ok()?;
+
+    let mut streams: Vec<Vec<u8>> = Vec::new();
+    match contents {
+        Object::Reference(id) => {
+            if let Ok(Object::Stream(stream)) = doc.get_object(*id) {
+                streams.push(decompress_stream(doc, stream));
+            }
+        }
+        Object::Array(arr) => {
+            for item in arr {
+                if let Ok(id) = item.as_reference() {
+                    if let Ok(Object::Stream(stream)) = doc.get_object(id) {
+                        streams.push(decompress_stream(doc, stream));
+                    }
+                }
+            }
+        }
+        Object::Stream(stream) => {
+            streams.push(decompress_stream(doc, stream));
+        }
+        _ => {}
+    }
+    if streams.is_empty() {
+        None
+    } else {
+        Some(streams)
+    }
+}
+
+/// Decompress một stream (FlateDecode / raw deflate), fallback giữ raw bytes.
+fn decompress_stream(_doc: &Document, stream: &lopdf::Stream) -> Vec<u8> {
+    if let Ok(dec) = stream.decompressed_content() {
+        if !dec.is_empty() {
+            return dec;
+        }
+    }
+    manual_decompress_flate(&stream.content).unwrap_or_else(|| stream.content.clone())
+}
+
+/// Ghi lại các content stream đã sửa vào trang (compress lại).
+/// Hỗ trợ cả Contents là Reference, Array, hay Stream inline.
+fn set_page_content_streams(
+    doc: &mut Document,
+    page_id: lopdf::ObjectId,
+    streams: Vec<Vec<u8>>,
+) -> bool {
+    // Luôn tạo stream object MỚI (đã nén) và gán vào page dict.
+    let mut new_refs: Vec<Object> = Vec::with_capacity(streams.len());
+    for data in streams {
+        let mut sd = Dictionary::new();
+        sd.set("Filter", Object::Name(b"FlateDecode".to_vec()));
+        let mut s = lopdf::Stream::new(sd, data);
+        let _ = s.compress();
+        let id = doc.add_object(Object::Stream(s));
+        new_refs.push(Object::Reference(id));
+    }
+
+    if let Ok(Object::Dictionary(ref mut pd)) = doc.get_object_mut(page_id) {
+        if new_refs.len() == 1 {
+            pd.set("Contents", new_refs.into_iter().next().unwrap());
+        } else {
+            pd.set("Contents", Object::Array(new_refs));
+        }
+        true
+    } else {
+        false
+    }
+}
+
+/// Escape chuỗi hiển thị PDF: \(( \) \\.
+fn escape_pdf_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '(' => out.push_str("\\("),
+            ')' => out.push_str("\\)"),
+            '\\' => out.push_str("\\\\"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Encode một chuỗi Unicode thành chuỗi hex CID (mỗi codepoint 4 chữ số hex).
+/// Dùng cho font CID (Identity-H) khi CID == Unicode codepoint.
+fn encode_cid_hex(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 4 + 2);
+    out.push('<');
+    for c in s.chars() {
+        out.push_str(&format!("{:04X}", c as u32));
+    }
+    out.push('>');
+    out
+}
+
+/// Decode một chuỗi hex CID thành Unicode (mỗi 4 hex = 1 codepoint).
+fn decode_cid_hex(hex: &str) -> String {
+    let h: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+    let h = h.trim_start_matches('<').trim_end_matches('>');
+    let mut out = String::new();
+    let mut i = 0;
+    let chars: Vec<char> = h.chars().collect();
+    while i + 4 <= chars.len() {
+        let s: String = chars[i..i + 4].iter().collect();
+        if let Ok(cp) = u32::from_str_radix(&s, 16) {
+            if let Some(ch) = char::from_u32(cp) {
+                out.push(ch);
+            }
+        }
+        i += 4;
+    }
+    out
+}
+
+/// Tạo payload text thay thế GIỮ NGUYÊN kiểu encoding của gốc.
+/// - is_hex = true  -> font CID (Identity-H): mã hóa thành chuỗi hex CID <...>
+///   (mỗi codepoint Unicode == CID, đúng với Identity-H).
+/// - is_hex = false -> literal string (...): escape (, ), \ theo PDF.
+/// TUYỆT ĐỐI không đổi kiểu: hex không bao giờ thành literal và ngược lại,
+/// vì đổi kiểu = đổi font/size/encoding -> người dùng phát hiện ra.
+fn build_payload(replacement: &str, is_hex: bool) -> String {
+    if is_hex {
+        encode_cid_hex(replacement)
+    } else {
+        // Literal string: KEEP WinAnsi encoding of the original font.
+        // Encode each Unicode char back to its WinAnsi byte, then escape PDF specials.
+        // This is critical for Vietnamese: writing UTF-8 bytes would corrupt the font.
+        let mut body = String::new();
+        for c in replacement.chars() {
+            match unicode_to_winansi_byte(c) {
+                Some(b) => {
+                    let ch = b as char;
+                    match ch {
+                        '(' => body.push_str("\\("),
+                        ')' => body.push_str("\\)"),
+                        '\\' => body.push_str("\\\\"),
+                        _ => body.push(ch),
+                    }
+                }
+                None => {
+                    // Ký tự không có trong WinAnsi: giữ nguyên escaped (fallback an toàn)
+                    body.push_str(&escape_pdf_string(&c.to_string()));
+                }
+            }
+        }
+        let mut s = String::from("(");
+        s.push_str(&body);
+        s.push(')');
+        s
+    }
+}
+
+/// Decode 1 byte WinAnsi (PDF WinAnsiEncoding, tương đương CP1252 mở rộng)
+/// thành 1 codepoint Unicode. Dùng để so khớp text tiếng Việt với chuỗi
+/// literal (...) trong content stream (mà Pdfium trả về dạng Unicode).
+fn winansi_byte_to_unicode(b: u8) -> char {
+    // CP1252: 0x80-0x9F là các ký tự điều khiển đặc biệt, 0xA0-0xFF map trực tiếp.
+    const CP1252: &[u16] = &[
+        0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+        0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
+    ];
+    if b < 0x80 {
+        b as char
+    } else if b >= 0x80 && b <= 0x9F {
+        let cp = CP1252[(b - 0x80) as usize];
+        if cp == 0x0081 || cp == 0x008D || cp == 0x008F || cp == 0x0090 || cp == 0x009D {
+            // undefined control -> fallback giữ nguyên byte dưới dạng char an toàn
+            b as char
+        } else {
+            char::from_u32(cp as u32).unwrap_or(b as char)
+        }
+    } else {
+        b as char
+    }
+}
+
+/// Encode 1 codepoint Unicode thành byte WinAnsi (nếu có thể).
+/// Trả về None nếu ký tự không nằm trong WinAnsi (phải báo lỗi / không thay).
+fn unicode_to_winansi_byte(c: char) -> Option<u8> {
+    let cp = c as u32;
+    if cp < 0x80 {
+        return Some(cp as u8);
+    }
+    if cp >= 0xA0 && cp <= 0xFF {
+        return Some(cp as u8);
+    }
+    const CP1252: &[u16] = &[
+        0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+        0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
+    ];
+    for (i, &v) in CP1252.iter().enumerate() {
+        if v == cp as u16 {
+            return Some((0x80 + i) as u8);
+        }
+    }
+    None
+}
+
+/// Thay thế chuỗi văn bản trong các toán tử show-text (Tj / TJ) của một content stream,
+/// GIỮ NGUYÊN mọi toán tử định dạng (Tf, Tm, Td, T*, màu sắc...).
+///
+/// Hỗ trợ:
+/// - Literal string `(...)` (WinAnsi/Latin1) trong Tj / TJ.
+/// - Hex string `<...>` (CID, thường == Unicode với Identity-H) trong Tj / TJ.
+/// - TJ array `[ (a) off (b) ]` / `[ <aa> off <bb> ]`: gom các phần tử string thành
+///   một chuỗi Unicode để so khớp, khi thay sẽ gộp thành một payload đơn giữ nguyên font.
+///
+/// Font và kích thước KHÔNG BAO GIỜ bị động vào.
+fn replace_text_in_content(content: &[u8], original: &str, replacement: &str) -> Option<Vec<u8>> {
+    let text = String::from_utf8_lossy(content);
+    let mut result = String::new();
+    let mut changed = false;
+    let mut i = 0;
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+
+    // Đọc một literal string (...) bắt đầu tại index `start` (start ở '(').
+    // Trả về (decoded_unicode, raw_buf_bao_gồm_cả_dấu_ngoặc, end_index_sau_')').
+    fn read_literal(chars: &[char], start: usize, len: usize) -> (String, String, usize) {
+        let mut depth = 1usize;
+        let mut j = start + 1;
+        let mut raw = String::from("(");
+        let mut buf = String::new();
+        while j < len {
+            let cc = chars[j];
+            if cc == '\\' && j + 1 < len {
+                // Giữ nguyên escaped trong raw; decode sang unicode cho so khớp
+                raw.push('\\');
+                raw.push(chars[j + 1]);
+                match chars[j + 1] {
+                    '(' => buf.push('('),
+                    ')' => buf.push(')'),
+                    '\\' => buf.push('\\'),
+                    'n' => buf.push('\n'),
+                    'r' => buf.push('\r'),
+                    't' => buf.push('\t'),
+                    o => buf.push(o),
+                }
+                j += 2;
+                continue;
+            }
+            if cc == '(' {
+                depth += 1;
+                raw.push(cc);
+                buf.push(winansi_byte_to_unicode(cc as u8));
+            } else if cc == ')' {
+                depth -= 1;
+                raw.push(cc);
+                if depth == 0 {
+                    break;
+                }
+            } else {
+                raw.push(cc);
+                buf.push(winansi_byte_to_unicode(cc as u8));
+            }
+            j += 1;
+        }
+        (buf, raw, j + 1)
+    }
+
+    // Đọc một hex string <...> bắt đầu tại index `start` (start ở '<').
+    fn read_hex(chars: &[char], start: usize, len: usize) -> (String, String, usize) {
+        let mut j = start + 1;
+        let mut raw = String::from("<");
+        while j < len {
+            let cc = chars[j];
+            if cc == '>' {
+                raw.push('>');
+                break;
+            }
+            raw.push(cc);
+            j += 1;
+        }
+        let decoded = decode_cid_hex(&raw);
+        (decoded, raw, j + 1)
+    }
+
+    while i < len {
+        let c = chars[i];
+        if c == '(' {
+            let (decoded, raw, next) = read_literal(&chars, i, len);
+            let token_after = peek_token(&chars, next);
+            if token_after == "Tj" {
+                // Giữ nguyên kiểu encoding của gốc: literal -> literal, hex CID -> hex CID.
+                if decoded == original {
+                    result.push_str(&build_payload(replacement, false));
+                    changed = true;
+                } else {
+                    result.push_str(&raw);
+                }
+            } else {
+                result.push_str(&raw);
+            }
+            i = next;
+        } else if c == '<' {
+            // Có thể là hex string <...> (text CID) hoặc dict << >>.
+            // Nếu ký tự tiếp theo cũng '<' -> dict, bỏ qua.
+            if i + 1 < len && chars[i + 1] == '<' {
+                result.push(c);
+                i += 1;
+                continue;
+            }
+            let (decoded, raw, next) = read_hex(&chars, i, len);
+            let token_after = peek_token(&chars, next);
+            if token_after == "Tj" {
+                if decoded == original {
+                    // Giữ nguyên kiểu encoding: gốc là hex CID -> thay bằng hex CID.
+                    result.push_str(&build_payload(replacement, true));
+                    changed = true;
+                } else {
+                    result.push_str(&raw);
+                }
+            } else {
+                result.push_str(&raw);
+            }
+            i = next;
+        } else if c == '[' {
+            // Có thể là TJ array: quét nội dung, gom các string thành 1 chuỗi unicode.
+            let mut depth = 1;
+            let mut j = i + 1;
+            let mut buf = String::new();          // raw array content (giữ nguyên)
+            let mut collected: Vec<(String, usize, usize)> = Vec::new(); // (decoded, start_in_buf, end_in_buf)
+            while j < len {
+                let cc = chars[j];
+                if cc == '\\' && j + 1 < len {
+                    buf.push('\\');
+                    buf.push(chars[j + 1]);
+                    j += 2;
+                    continue;
+                }
+                if cc == '(' {
+                    let (decoded, raw, next) = read_literal(&chars, j, len);
+                    let start = buf.len();
+                    buf.push_str(&raw);
+                    collected.push((decoded, start, buf.len()));
+                    j = next;
+                } else if cc == '<' && !(j + 1 < len && chars[j + 1] == '<') {
+                    let (decoded, raw, next) = read_hex(&chars, j, len);
+                    let start = buf.len();
+                    buf.push_str(&raw);
+                    collected.push((decoded, start, buf.len()));
+                    j = next;
+                } else if cc == '[' {
+                    depth += 1;
+                    buf.push(cc);
+                    j += 1;
+                } else if cc == ']' {
+                    depth -= 1;
+                    buf.push(cc);
+                    if depth == 0 {
+                        break;
+                    }
+                    j += 1;
+                } else {
+                    buf.push(cc);
+                    j += 1;
+                }
+            }
+            let is_tj = peek_token(&chars, j + 1) == "TJ";
+            if is_tj {
+                // QUY TẮC GIỮ NGUYÊN CẤU TRÚC:
+                // Không bao giờ gộp các phần tử thành 1 payload, không động vào
+                // các offset (số nguyên) giữa các phần tử, không đổi kiểu encoding.
+                // Chỉ thay nội dung text tại chỗ, giữ nguyên font/size/vị trí gốc.
+
+                // Xác định phần tử (literal hay hex) khớp với original.
+                // Ưu tiên: khớp toàn bộ mảng, nếu không thì khớp 1 phần tử đơn lẻ.
+                let mut merged = String::new();
+                for (decoded, _, _) in &collected {
+                    merged.push_str(decoded);
+                }
+
+                if merged == original && !collected.is_empty() {
+                    // Ghi text mới vào phần tử ĐẦU, xóa nội dung các phần tử SAU
+                    // (để rỗng) để giữ nguyên số phần tử & offset → vị trí đầu không đổi.
+                    let first_is_hex = collected[0].1 < buf.len()
+                        && buf[collected[0].1..].starts_with('<')
+                        && !buf[collected[0].1..].starts_with("<<");
+                    let repl_payload = build_payload(replacement, first_is_hex);
+                    // Thay phần tử đầu
+                    let (_, s0, e0) = collected[0];
+                    buf.replace_range(s0..e0, &repl_payload);
+                    // Xóa nội dung các phần tử còn lại (giữ lại offset số nguyên)
+                    for k in 1..collected.len() {
+                        let (_, sk, ek) = &collected[k];
+                        buf.replace_range(*sk..*ek, "");
+                    }
+                    changed = true;
+                    result.push('[');
+                    result.push_str(&buf);
+                } else {
+                    // Không khớp toàn bộ: thay từng phần tử đơn lẻ == original,
+                    // giữ nguyên offset và kiểu encoding của chính phần tử đó.
+                    let mut replaced_any = false;
+                    for (decoded, start, end) in collected.iter().rev() {
+                        if *decoded == original {
+                            let is_hex = *start < buf.len()
+                                && buf[*start..].starts_with('<')
+                                && !buf[*start..].starts_with("<<");
+                            let repl = build_payload(replacement, is_hex);
+                            buf.replace_range(*start..*end, &repl);
+                            changed = true;
+                            replaced_any = true;
+                            break;
+                        }
+                    }
+                    let _ = replaced_any;
+                    result.push('[');
+                    result.push_str(&buf);
+                }
+            } else {
+                result.push('[');
+                result.push_str(&buf);
+            }
+            i = j + 1;
+        } else {
+            result.push(c);
+            i += 1;
+        }
+    }
+
+    if changed {
+        Some(result.into_bytes())
+    } else {
+        None
+    }
+}
+
+fn peek_token(chars: &[char], start: usize) -> String {
+    let mut k = start;
+    while k < chars.len() && chars[k].is_whitespace() {
+        k += 1;
+    }
+    let mut tok = String::new();
+    while k < chars.len() && !chars[k].is_whitespace() {
+        tok.push(chars[k]);
+        k += 1;
+    }
+    tok
+}
+
+/// Hàm FFI: thay thế văn bản trên một trang, GIỮ NGUYÊN font và kích thước.
+///
+/// Hoạt động bằng cách parse content stream, chỉ thay chuỗi literal trong
+/// toán tử Tj / TJ, không động đến Tf (font+size), Tm/Td (vị trí) hay màu.
+#[no_mangle]
+pub extern "C" fn replace_text_in_page(
+    pdf_path: *const c_char,
+    page_number: i32,
+    original_text: *const c_char,
+    replacement_text: *const c_char,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) {
+        Some(s) => s,
+        None => return false,
+    };
+    let original_str = match to_str(original_text) {
+        Some(s) => s,
+        None => return false,
+    };
+    let replacement_str = match to_str(replacement_text) {
+        Some(s) => s,
+        None => return false,
+    };
+    let output_str = match to_str(output_path) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    if page_number <= 0 {
+        return false;
+    }
+
+    let mut doc = match load_pdf_document(pdf_str) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+
+    // Decompress mọi stream object (bao gồm object streams của PDF 1.5+).
+    // Bắt buộc để các thay đổi lên content stream được ghi đúng khi save
+    // (ngược lại lopdf có thể giữ nguyên object stream cũ và bỏ qua sửa đổi).
+    let _ = doc.decompress();
+
+    let pages = doc.get_pages();
+    let page_id = match pages.get(&(page_number as u32)) {
+        Some(&id) => id,
+        None => return false,
+    };
+
+    let streams = match get_page_content_streams(&doc, page_id) {
+        Some(s) => s,
+        None => return false,
+    };
+
+    let mut any_changed = false;
+    let mut new_streams: Vec<Vec<u8>> = Vec::with_capacity(streams.len());
+    for stream in &streams {
+        match replace_text_in_content(stream, original_str, replacement_str) {
+            Some(modified) => {
+                any_changed = true;
+                new_streams.push(modified);
+            }
+            None => new_streams.push(stream.clone()),
+        }
+    }
+
+    eprintln!("[REPLACE DEBUG] streams.len={} any_changed={}", streams.len(), any_changed);
+    if any_changed {
+        let concat: Vec<u8> = new_streams.iter().flatten().copied().collect();
+        let s = String::from_utf8_lossy(&concat);
+        eprintln!("[REPLACE DEBUG] KILOMET in new_streams={} TAKAMI in new_streams={}", s.contains("KILOMET"), s.contains("TAKAMI"));
+    }
+
+    if !any_changed {
+        // Không tìm thấy chuỗi cần thay -> coi như thất bại (để UI báo)
+        return false;
+    }
+
+    if !set_page_content_streams(&mut doc, page_id, new_streams) {
+        return false;
+    }
+
+    doc.save(output_str).is_ok()
+}
+
 #[no_mangle]
 pub extern "C" fn overlay_pdf_image(
     pdf_path: *const c_char,
@@ -1879,6 +2418,7 @@ mod tests {
     static LOGGER: SimpleLogger = SimpleLogger;
 
     #[test]
+    #[ignore = "requires a hardcoded user desktop path; not run in CI"]
     fn test_inspect_user_pdf() {
         let _ = log::set_logger(&LOGGER);
         log::set_max_level(log::LevelFilter::Debug);
@@ -1908,7 +2448,66 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn replace_text_keeps_font_and_size() {
+        let original = b"BT\n/F1 14 Tf\n1 0 0 1 50 700 Tm\n(Hello World) Tj\nET\n";
+        let out = replace_text_in_content(original, "Hello World", "Xin chao Viet Nam")
+            .expect("should find and replace");
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("/F1 14 Tf"), "font và size phải giữ nguyên: {}", s);
+        assert!(s.contains("1 0 0 1 50 700 Tm"), "ma trận vị trí phải giữ nguyên");
+        assert!(s.contains("Xin chao Viet Nam"), "chuỗi mới phải xuất hiện");
+        assert!(!s.contains("Hello World"), "chuỗi cũ phải biến mất");
+    }
+
+    #[test]
+    fn replace_text_no_match_returns_none() {
+        let original = b"BT\n/F1 14 Tf\n(Old text) Tj\nET\n";
+        let out = replace_text_in_content(original, "Not present", "New");
+        assert!(out.is_none(), "không tìm thấy thì trả None");
+    }
+
+    #[test]
+    fn replace_text_in_tj_array() {
+        // Parser mới gộp các phần tử thành 1 payload đơn, giữ nguyên font/size.
+        let original = b"BT\n/F2 10 Tf\n[ (Hello) -10 (World) ] TJ\nET\n";
+        let out = replace_text_in_content(original, "HelloWorld", "XinChao").expect("replace");
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("/F2 10 Tf"), "font/size trong TJ array phải giữ nguyên");
+        assert!(s.contains("XinChao"), "toàn bộ TJ phải đổi thành chuỗi mới");
+        assert!(!s.contains("(Hello)"), "chuỗi cũ trong TJ phải biến mất");
+    }
+
+    #[test]
+    fn replace_text_hex_cid_keeps_font() {
+        // Trường hợp font subset CID (Identity-H): text lưu dạng <hex>.
+        let original = b"BT\n/C2_1 1 Tf\n95 0 0 95 50 684 Tm\n<004B0041> Tj\nET\n";
+        // 004B='K', 0041='A' -> "KA"
+        let out = replace_text_in_content(original, "KA", "OK").expect("replace hex");
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("/C2_1 1 Tf"), "font subset phải giữ nguyên");
+        assert!(s.contains("95 0 0 95 50 684 Tm"), "ma trận vị trí phải giữ nguyên");
+        // OK = 004F 004B
+        assert!(s.contains("<004F004B>"), "phải sinh hex CID của chữ mới: {}", s);
+        assert!(!s.contains("<004B0041>"), "hex cũ phải biến mất");
+    }
+
+    #[test]
+    fn replace_text_tj_split_hex_like_real_file() {
+        // Giống TAKAMI CATALOG: [(T)74.3 (AKAMI)]TJ -> "TAKAMI"
+        let original = b"BT\n/TT0 1 Tf\n[(T)74.3 (AKAMI)]TJ\nET\n";
+        let out = replace_text_in_content(original, "TAKAMI", "KILOMET").expect("replace split");
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("/TT0 1 Tf"), "font phải giữ nguyên");
+        assert!(s.contains("KILOMET"), "phải thay thành chữ mới: {}", s);
+        assert!(!s.contains("TAKAMI"), "chữ cũ phải biến mất");
+    }
+
 }
+
+
+
 
 fn find_last_startxref(data: &[u8]) -> Option<usize> {
     let pattern = b"startxref";
@@ -2050,6 +2649,488 @@ pub fn fix_pdf_offsets(data: &mut [u8]) {
     }
 }
 
+// ===========================================================================
+// EDIT TEXT WITH REFLOW (giữ font/size/màu, dãn cách trên 1 dòng)
+// ===========================================================================
 
+/// Trích font dictionary của một trang (từ Resources/Font).
+fn get_page_font_dict<'a>(doc: &'a Document, page_id: lopdf::ObjectId, font_res_name: &[u8]) -> Option<&'a Dictionary> {
+    let page = doc.get_object(page_id).ok()?;
+    let page_dict = page.as_dict().ok()?;
+    let resources = page_dict.get(b"Resources").ok()?;
+    let resources = resolve_object(doc, resources).as_dict().ok()?;
+    let fonts = resources.get(b"Font").ok()?;
+    let fonts = resolve_object(doc, fonts).as_dict().ok()?;
+    let font_obj = fonts.get(font_res_name).ok()?;
+    let font_obj = resolve_object(doc, font_obj);
+    font_obj.as_dict().ok()
+}
 
+/// Đọc mảng Widths (per-code width) của font. Trả về (first_char, widths[]).
+/// Nếu không có Widths, trả về None để caller dùng fallback.
+fn read_font_widths(font_dict: &Dictionary) -> Option<(i64, Vec<f64>)> {
+    let first_char = font_dict.get(b"FirstChar").ok().and_then(get_integer)?;
+    let widths_obj = font_dict.get(b"Widths").ok()?;
+    let widths_arr = widths_obj.as_array().ok()?;
+    let mut widths = Vec::with_capacity(widths_arr.len());
+    for w in widths_arr {
+        match w {
+            Object::Integer(i) => widths.push(*i as f64),
+            Object::Real(r) => widths.push(*r as f64),
+            _ => widths.push(0.0),
+        }
+    }
+    if widths.is_empty() {
+        None
+    } else {
+        Some((first_char, widths))
+    }
+}
+
+/// Tính độ rộng (đơn vị text space, chưa nhân font size) của một chuỗi.
+/// `is_cid`: nếu true, mỗi 2 hex char = 1 code; ngược lại WinAnsi 1 byte = 1 code.
+/// `font_size`: kích thước font hiện tại (từ Tf) để quy ra user space.
+/// `metrics`: (first_char, widths) nếu có, None = fallback 0.5/char.
+fn text_width(
+    text: &str,
+    font_size: f64,
+    metrics: &Option<(i64, Vec<f64>)>,
+) -> f64 {
+    let avg: f64 = 0.5; // fallback width cho font không có Widths
+    let mut total = 0.0;
+    for ch in text.chars() {
+        let w = match metrics {
+            Some((first, widths)) => {
+                let code = ch as i64;
+                let idx = (code - *first) as usize;
+                if idx < widths.len() {
+                    widths[idx]
+                } else {
+                    avg * 1000.0
+                }
+            }
+            None => avg * 1000.0,
+        };
+        total += w;
+    }
+    // Widths trong font thường theo đơn vị 1/1000 em -> nhân font_size/1000.
+    total * font_size / 1000.0
+}
+
+/// Tính toán khoảng trễ (TJ adjustment) cần phân bổ để dãn/thu đoạn text
+/// trên cùng 1 dòng. Trả về danh sách các khoảng trễ (negative = dãn ra,
+/// positive = thu lại) chèn giữa các glyph của `new_text`.
+/// `delta`: chênh lệch độ rộng (new - old) tính theo user space.
+fn build_reflow_gaps(new_text: &str, delta: f64) -> Vec<f64> {
+    let chars: Vec<char> = new_text.chars().collect();
+    let n_gaps = chars.len().saturating_sub(1);
+    if n_gaps == 0 {
+        return Vec::new();
+    }
+    // Chia đều delta cho các khoảng giữa glyph.
+    // Trong PDF, TJ negative = tiến tới (dãn ra), positive = lùi (thu lại).
+    let per = delta / n_gaps as f64;
+    let mut gaps = Vec::with_capacity(n_gaps);
+    for _ in 0..n_gaps {
+        gaps.push(per);
+    }
+    gaps
+}
+
+/// Thay thế text trong 1 content stream, GIỮ NGUYÊN font/size/màu,
+/// và TỰ ĐỘNG DÃN CÁCH trên cùng 1 dòng (reflow) khi chữ mới dài/ngắn hơn.
+///
+/// `font_res_name`: tên resource font đang dùng (vd b"F1"). Nếu None, đoán F1.
+/// `font_size`: kích thước font hiện tại (lấy từ Tf gần nhất).
+/// `metrics`: font Widths nếu có.
+fn replace_text_reflow(
+    content: &[u8],
+    original: &str,
+    replacement: &str,
+    font_size: f64,
+    metrics: &Option<(i64, Vec<f64>)>,
+) -> Option<Vec<u8>> {
+    let text = String::from_utf8_lossy(content);
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut result = String::new();
+    let mut changed = false;
+    let mut i = 0;
+    // reused readers
+    fn read_literal(chars: &[char], start: usize, len: usize) -> (String, String, usize) {
+        let mut depth = 1usize;
+        let mut j = start + 1;
+        let mut raw = String::from("(");
+        let mut buf = String::new();
+        while j < len {
+            let cc = chars[j];
+            if cc == '\\' && j + 1 < len {
+                raw.push('\\');
+                raw.push(chars[j + 1]);
+                match chars[j + 1] {
+                    '(' => buf.push('('),
+                    ')' => buf.push(')'),
+                    '\\' => buf.push('\\'),
+                    'n' => buf.push('\n'),
+                    'r' => buf.push('\r'),
+                    't' => buf.push('\t'),
+                    o => buf.push(o),
+                }
+                j += 2;
+                continue;
+            }
+            if cc == '(' {
+                depth += 1; raw.push(cc); buf.push(cc);
+            } else if cc == ')' {
+                depth -= 1; raw.push(cc);
+                if depth == 0 { break; }
+            } else {
+                raw.push(cc); buf.push(cc);
+            }
+            j += 1;
+        }
+        (buf, raw, j + 1)
+    }
+    fn read_hex(chars: &[char], start: usize, len: usize) -> (String, String, usize) {
+        let mut j = start + 1;
+        let mut raw = String::from("<");
+        while j < len {
+            let cc = chars[j];
+            if cc == '>' { raw.push('>'); break; }
+            raw.push(cc); j += 1;
+        }
+        let decoded = decode_cid_hex(&raw);
+        (decoded, raw, j + 1)
+    }
+    fn peek_token(chars: &[char], start: usize) -> String {
+        let mut k = start;
+        while k < chars.len() && chars[k].is_whitespace() { k += 1; }
+        let mut tok = String::new();
+        while k < chars.len() && !chars[k].is_whitespace() { tok.push(chars[k]); k += 1; }
+        tok
+    }
+    fn skip_token(chars: &[char], start: usize) -> usize {
+        let mut k = start;
+        while k < chars.len() && chars[k].is_whitespace() { k += 1; }
+        while k < chars.len() && !chars[k].is_whitespace() { k += 1; }
+        k
+    }
+
+    while i < len {
+        let c = chars[i];
+        if c == '(' {
+            let (decoded, raw, next) = read_literal(&chars, i, len);
+            let token_after = peek_token(&chars, next);
+            if token_after == "Tj" {
+                if decoded == original {
+                    let w_old = text_width(&decoded, font_size, metrics);
+                    let w_new = text_width(replacement, font_size, metrics);
+                    let delta = w_new - w_old;
+                    let gaps = build_reflow_gaps(replacement, delta);
+                    // Build TJ array: [gap0, (seg0), gap1, (seg1), ...]
+                    let mut tj = String::from("[");
+                    let mut gi = 0;
+                    for (idx, rc) in replacement.chars().enumerate() {
+                        if idx > 0 && gi < gaps.len() {
+                            tj.push_str(&format!(" {:.3} ", gaps[gi]));
+                            gi += 1;
+                        }
+                        tj.push('(');
+                        tj.push_str(&escape_pdf_string(&rc.to_string()));
+                        tj.push(')');
+                    }
+                    if replacement.is_empty() && !gaps.is_empty() {
+                        tj.push_str(&format!(" {:.3} ", gaps[0]));
+                    }
+                    tj.push(']');
+                    result.push_str(&tj);
+                    result.push_str(" TJ");
+                    changed = true;
+                    i = skip_token(&chars, next);
+                } else {
+                    result.push_str(&raw);
+                    i = next;
+                }
+            } else {
+                result.push_str(&raw);
+                i = next;
+            }
+        } else if c == '<' {
+            if i + 1 < len && chars[i + 1] == '<' {
+                result.push(c); i += 1; continue;
+            }
+            let (decoded, raw, next) = read_hex(&chars, i, len);
+            let token_after = peek_token(&chars, next);
+            if token_after == "Tj" {
+                if decoded == original {
+                    let w_old = text_width(&decoded, font_size, metrics);
+                    let w_new = text_width(replacement, font_size, metrics);
+                    let delta = w_new - w_old;
+                    let gaps = build_reflow_gaps(replacement, delta);
+                    let mut tj = String::from("[");
+                    let mut gi = 0;
+                    for (idx, rc) in replacement.chars().enumerate() {
+                        if idx > 0 && gi < gaps.len() {
+                            tj.push_str(&format!(" {:.3} ", gaps[gi]));
+                            gi += 1;
+                        }
+                        // mỗi glyph riêng lẻ thành hex 4 hexits
+                        tj.push_str(&format!("<{:04X}>", rc as u32));
+                    }
+                    if replacement.is_empty() && !gaps.is_empty() {
+                        tj.push_str(&format!(" {:.3} ", gaps[0]));
+                    }
+                    tj.push(']');
+                    result.push_str(&tj);
+                    result.push_str(" TJ");
+                    changed = true;
+                    i = skip_token(&chars, next);
+                } else {
+                    result.push_str(&raw);
+                    i = next;
+                }
+            } else {
+                result.push_str(&raw);
+                i = next;
+            }
+        } else if c == '[' {
+            let mut depth = 1;
+            let mut j = i + 1;
+            let mut buf = String::new();
+            let mut collected: Vec<(String, usize, usize)> = Vec::new();
+            while j < len {
+                let cc = chars[j];
+                if cc == '\\' && j + 1 < len {
+                    buf.push('\\'); buf.push(chars[j + 1]); j += 2; continue;
+                }
+                if cc == '(' {
+                    let (decoded, raw, next) = read_literal(&chars, j, len);
+                    let start = buf.len();
+                    buf.push_str(&raw);
+                    collected.push((decoded, start, buf.len()));
+                    j = next;
+                } else if cc == '<' && !(j + 1 < len && chars[j + 1] == '<') {
+                    let (decoded, raw, next) = read_hex(&chars, j, len);
+                    let start = buf.len();
+                    buf.push_str(&raw);
+                    collected.push((decoded, start, buf.len()));
+                    j = next;
+                } else if cc == '[' { depth += 1; buf.push(cc); j += 1; }
+                else if cc == ']' {
+                    depth -= 1; buf.push(cc);
+                    if depth == 0 { break; }
+                    j += 1;
+                } else { buf.push(cc); j += 1; }
+            }
+            let is_tj = peek_token(&chars, j + 1) == "TJ";
+            if is_tj {
+                let mut merged = String::new();
+                for (decoded, _, _) in &collected { merged.push_str(decoded); }
+                if merged == original {
+                    let w_old = text_width(&merged, font_size, metrics);
+                    let w_new = text_width(replacement, font_size, metrics);
+                    let delta = w_new - w_old;
+                    let gaps = build_reflow_gaps(replacement, delta);
+                    let mut tj = String::from("[");
+                    let mut gi = 0;
+                    for (idx, rc) in replacement.chars().enumerate() {
+                        if idx > 0 && gi < gaps.len() {
+                            tj.push_str(&format!(" {:.3} ", gaps[gi]));
+                            gi += 1;
+                        }
+                        tj.push('(');
+                        tj.push_str(&escape_pdf_string(&rc.to_string()));
+                        tj.push(')');
+                    }
+                    if replacement.is_empty() && !gaps.is_empty() {
+                        tj.push_str(&format!(" {:.3} ", gaps[0]));
+                    }
+                    tj.push(']');
+                    result.push_str(&tj);
+                    result.push_str(" TJ");
+                    changed = true;
+                    i = skip_token(&chars, j + 1);
+                } else {
+                    let mut replaced = false;
+                    for (decoded, start, end) in collected.iter().rev() {
+                        if *decoded == original {
+                            let repl = format!("({})", escape_pdf_string(replacement));
+                            buf.replace_range(*start..*end, &repl);
+                            changed = true; replaced = true; break;
+                        }
+                    }
+                    let _ = replaced;
+                    result.push('[');
+                    result.push_str(&buf);
+                }
+            } else {
+                result.push('[');
+                result.push_str(&buf);
+            }
+            i = j + 1;
+        } else {
+            result.push(c);
+            i += 1;
+        }
+    }
+
+    if changed { Some(result.into_bytes()) } else { None }
+}
+
+/// FFI: thay thế text TRÊN TOÀN BỘ FILE, giữ font/size/màu, tự động dãn cách.
+///
+/// Quét mọi trang, với mỗi trang lấy font resource (F1) và kích thước font
+/// gần nhất trước đoạn text để tính reflow.
+#[no_mangle]
+pub extern "C" fn replace_text_full(
+    pdf_path: *const c_char,
+    original_text: *const c_char,
+    replacement_text: *const c_char,
+    output_path: *const c_char,
+) -> bool {
+    let pdf_str = match to_str(pdf_path) { Some(s) => s, None => return false };
+    let original_str = match to_str(original_text) { Some(s) => s, None => return false };
+    let replacement_str = match to_str(replacement_text) { Some(s) => s, None => return false };
+    let output_str = match to_str(output_path) { Some(s) => s, None => return false };
+
+    let mut doc = match load_pdf_document(pdf_str) { Ok(d) => d, Err(_) => return false };
+    let _ = doc.decompress();
+
+    let pages = doc.get_pages();
+    if pages.is_empty() { return false; }
+
+    let mut any_changed = false;
+
+    for (_pageno, &page_id) in &pages {
+        // Lấy font metrics (thử F1..F9)
+        let mut metrics: Option<(i64, Vec<f64>)> = None;
+        for fidx in 1..=9u8 {
+            let fname = format!("F{}", fidx);
+            if let Some(fd) = get_page_font_dict(&doc, page_id, fname.as_bytes()) {
+                if let Some(m) = read_font_widths(fd) {
+                    metrics = Some(m);
+                    break;
+                }
+            }
+        }
+
+        let streams = match get_page_content_streams(&doc, page_id) {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let mut page_changed = false;
+        let mut new_streams: Vec<Vec<u8>> = Vec::with_capacity(streams.len());
+        for stream in &streams {
+            // Quét content stream để tìm font size gần nhất (Tf) cho mỗi đoạn.
+            // Đơn giản: lấy font_size đầu tiên gặp, nếu không có dùng 12.
+            let font_size = extract_last_font_size(stream).unwrap_or(12.0);
+            match replace_text_reflow(stream, original_str, replacement_str, font_size, &metrics) {
+                Some(modified) => {
+                    page_changed = true;
+                    new_streams.push(modified);
+                }
+                None => new_streams.push(stream.clone()),
+            }
+        }
+
+        if page_changed {
+            if set_page_content_streams(&mut doc, page_id, new_streams) {
+                any_changed = true;
+            }
+        }
+    }
+
+    if !any_changed { return false; }
+    doc.save(output_str).is_ok()
+}
+
+/// Tìm kích thước font (Tf) cuối cùng/đầu tiên trong content stream.
+/// Toán tử: `<size> <font> Tf`. Trả về size đầu tiên gặp.
+fn extract_last_font_size(content: &[u8]) -> Option<f64> {
+    let text = String::from_utf8_lossy(content);
+    let chars: Vec<char> = text.chars().collect();
+    let mut found: Option<f64> = None;
+    let mut i = 0;
+    while i < chars.len() {
+        // Tìm token "Tf"
+        if chars[i] == 'T' && i + 1 < chars.len() && chars[i + 1] == 'f' {
+            // lùi lại tìm số size (token trước Tf)
+            let mut k = i;
+            while k > 0 && chars[k].is_whitespace() { k -= 1; }
+            // k ở cuối token size
+            let end = k + 1;
+            let mut start = k;
+            while start > 0 && !chars[start - 1].is_whitespace() { start -= 1; }
+            let tok: String = chars[start..end].iter().collect();
+            if let Ok(v) = tok.parse::<f64>() {
+                found = Some(v);
+            }
+        }
+        i += 1;
+    }
+    found
+}
+
+#[cfg(test)]
+mod edit_text_tests {
+    use super::*;
+
+    #[test]
+    fn reflow_keeps_font_size_and_color() {
+        // Content: set font F1 size 12, fill color rg, show "Hello"
+        let original = "BT /F1 12 Tf 0.2 0.4 0.8 rg (Hello) Tj ET";
+        let out = replace_text_reflow(
+            original.as_bytes(),
+            "Hello",
+            "Hello World",
+            12.0,
+            &None,
+        ).expect("should replace");
+        let s = String::from_utf8_lossy(&out);
+        // Font + size + color must be untouched
+        assert!(s.contains("/F1 12 Tf"), "font/size must be kept: {}", s);
+        assert!(s.contains("0.2 0.4 0.8 rg"), "color must be kept: {}", s);
+        // Replacement glyphs must appear inside a TJ array (reflow uses TJ)
+        assert!(s.contains("(H)") && s.contains("(W)") && s.contains("(d)"), "replacement glyphs must appear: {}", s);
+        assert!(s.contains("TJ"), "reflow should use TJ array: {}", s);
+        // No leftover old Tj operator
+        assert!(!s.contains("Tj ET"), "old Tj must be converted: {}", s);
+        assert!(!s.contains("(Hello)"), "old literal removed: {}", s);
+    }
+
+    #[test]
+    fn reflow_shorter_text_still_reflows() {
+        let original = "BT /F2 10 Tf (LongTextHere) Tj ET";
+        let out = replace_text_reflow(
+            original.as_bytes(),
+            "LongTextHere",
+            "Hi",
+            10.0,
+            &None,
+        ).expect("should replace");
+        let s = String::from_utf8_lossy(&out);
+        assert!(s.contains("/F2 10 Tf"), "font/size kept: {}", s);
+        assert!(s.contains("(H)") && s.contains("(i)"), "new text present: {}", s);
+        assert!(s.contains("TJ"), "uses TJ: {}", s);
+        assert!(!s.contains("Tj ET"), "old Tj converted: {}", s);
+    }
+
+    #[test]
+    fn reflow_no_match_returns_none() {
+        let original = "BT /F1 12 Tf (Nothing) Tj ET";
+        let out = replace_text_reflow(original.as_bytes(), "Missing", "X", 12.0, &None);
+        assert!(out.is_none(), "no match -> None");
+    }
+
+    #[test]
+    fn reflow_empty_replacement_deletes_text() {
+        let original = "BT /F1 12 Tf (DeleteMe) Tj ET";
+        let out = replace_text_reflow(original.as_bytes(), "DeleteMe", "", 12.0, &None)
+            .expect("should replace");
+        let s = String::from_utf8_lossy(&out);
+        assert!(!s.contains("DeleteMe"), "text removed: {}", s);
+        assert!(s.contains("/F1 12 Tf"), "font kept: {}", s);
+    }
+}
 

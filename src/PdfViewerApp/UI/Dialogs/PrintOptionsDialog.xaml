@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Window x:Class="PdfViewerApp.PrintOptionsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="In tài liệu" Width="1120" Height="670" MinWidth="1040" MinHeight="580" ResizeMode="CanResizeWithGrip" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma, Helvetica" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
   <Window.Resources>
     <ResourceDictionary>
@@ -367,7 +367,7 @@
         <Border Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
             <TextBlock Text="Khổ giấy" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8" />
-            <ComboBox Name="PaperSizeComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2" SelectionChanged="PrintPreviewSettings_SelectionChanged">
+            <ComboBox Name="PaperSizeComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0" SelectionChanged="PrintPreviewSettings_SelectionChanged">
               <ComboBoxItem Content="Theo máy in" Tag="Default" />
               <ComboBoxItem Content="A4" Tag="A4" />
               <ComboBoxItem Content="A3" Tag="A3" />
@@ -381,7 +381,7 @@
         <Border Background="#111827" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
           <StackPanel>
             <TextBlock Text="Hướng giấy" FontWeight="SemiBold" Foreground="#F8FAFC" Margin="0,0,0,8" />
-            <ComboBox Name="OrientationComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="2" SelectionChanged="PrintPreviewSettings_SelectionChanged">
+            <ComboBox Name="OrientationComboBox" Style="{StaticResource ModernComboBox}" SelectedIndex="0" SelectionChanged="PrintPreviewSettings_SelectionChanged">
               <ComboBoxItem Content="Theo máy in" Tag="Default" />
               <ComboBoxItem Content="Dọc" Tag="Portrait" />
               <ComboBoxItem Content="Ngang" Tag="Landscape" />

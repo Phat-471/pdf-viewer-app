@@ -670,11 +670,12 @@ exit 0
 		if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None && ActiveTool != "Select")
 		{
 			ActiveTool = "Select";
-			PdfDocumentTab activeTab = GetActiveTab();
-			if (activeTab != null)
-			{
-				activeTab.ActiveTool = "Select";
-			}
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Select";
+			activeTab.RedrawAllPageAnnotations();
+		}
 			LogStatus("Đã hủy chế độ vẽ/chú thích");
 			e.Handled = true;
 		}
@@ -2751,8 +2752,48 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		if (activeTab != null)
 		{
 			activeTab.ActiveTool = "EditText";
+			activeTab.RedrawAllPageAnnotations();
 		}
-		LogStatus("Đã chuyển sang công cụ sửa chữ trực tiếp. Nhấp đúp vào dòng chữ bất kỳ để sửa.");
+
+		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath) || !System.IO.File.Exists(activeTab.CurrentPdfPath))
+		{
+			LogStatus("Vui lòng mở một file PDF trước khi sửa chữ.");
+			return;
+		}
+
+		var dlg = new EditTextDialog
+		{
+			Owner = this,
+			PdfPath = activeTab.CurrentPdfPath
+		};
+
+		if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ResultPath))
+		{
+			try
+			{
+				activeTab.LoadDocument(dlg.ResultPath, clearPendingTextEdits: true);
+				LogStatus("Đã thay thế chữ thành công. Font, cỡ chữ và màu được giữ nguyên; khoảng cách tự động dãn lại.");
+			}
+			catch (Exception ex)
+			{
+				LogStatus("Lỗi khi tải lại file sau khi sửa: " + ex.Message);
+			}
+		}
+	}
+
+	private void EditOriginalFont_Click(object sender, RoutedEventArgs e)
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null)
+		{
+			return;
+		}
+		activeTab.EditOriginalFontMode = !activeTab.EditOriginalFontMode;
+		_mainRibbon?.SetEditOriginalFontState(activeTab.EditOriginalFontMode);
+		activeTab.RedrawAllPageAnnotations();
+		LogStatus(activeTab.EditOriginalFontMode
+			? "Chế độ sửa gốc (giữ font) ĐÃ BẬT: sửa text sẽ giữ nguyên font/kích thước gốc."
+			: "Chế độ sửa gốc (giữ font) ĐÃ TẮT: sửa text sẽ đè lớp mới như trước.");
 	}
 
 	private void TextBoxTool_Click(object sender, RoutedEventArgs e)
@@ -3243,6 +3284,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.FitWidthRequested += FitWidth_Click;
 		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
 		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
+		_mainRibbon.EditOriginalFontRequested += EditOriginalFont_Click;
 		_mainRibbon.ExportOcrTextRequested += ExportOcrText_Click;
 		_mainRibbon.ExportSearchablePdfRequested += ExportSearchablePdf_Click;
 		_mainRibbon.ToggleSidebarRequested += ToggleSidebar_Click;

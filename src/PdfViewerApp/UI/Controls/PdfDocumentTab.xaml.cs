@@ -47,6 +47,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private Action? _activeDirectEditCommitAction = null;
 	private bool _skipNextEditTextMouseUp;
 
+	// Chế độ "Sửa gốc (giữ font)": sửa text trong content stream, giữ nguyên Tf (font/kích thước).
+	// Khi bật, edit text sẽ ghi vào _pendingOriginalTextEdits thay vì overlay whiteout+image.
+	private bool _editOriginalFontMode;
+	public bool EditOriginalFontMode
+	{
+		get => _editOriginalFontMode;
+		set
+		{
+			_editOriginalFontMode = value;
+			LogStatus(value ? "Đã bật chế độ sửa gốc (giữ nguyên font/kích thước)." : "Đã tắt chế độ sửa gốc.");
+		}
+	}
+	private readonly List<(int PageNumber, string OriginalText, string ReplacementText)> _pendingOriginalTextEdits = new List<(int, string, string)>();
+	public bool HasOriginalFontEdits => _pendingOriginalTextEdits.Count > 0;
+
 	private Point _drawStartPoint;
 
 	private List<List<Point>>? _tempSignatureStrokes;
@@ -2961,6 +2976,76 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
+	/// Vẽ khung bao (bounding box) quanh TẤT CẢ các dòng text có thể sửa được trên trang,
+	/// giống Foxit: khi vào chế độ Edit Text, người dùng thấy ngay vùng nào sửa được.
+	private void DrawAllEditTextBounds(Canvas canvas, int pageNumber)
+	{
+		nint textPage = GetTextPage(pageNumber);
+		if (textPage == IntPtr.Zero) return;
+
+		int charCount;
+		lock (PdfiumEngine.SyncRoot) { charCount = PdfiumEngine.FPDFText_CountChars(textPage); }
+		if (charCount <= 0) return;
+
+		var mergedRects = new List<Rect>();
+		lock (PdfiumEngine.SyncRoot)
+		{
+			Rect currentRect = Rect.Empty;
+			for (int i = 0; i < charCount; i++)
+			{
+				if (PdfiumEngine.FPDFText_GetCharBox(textPage, i, out var left, out var right, out var bottom, out var top))
+				{
+					if (!TryPdfRectToCanvasRect(canvas, pageNumber, left, right, bottom, top, out Rect canvasRect)) continue;
+					if (canvasRect.Width <= 0.0) canvasRect.Width = 6.0;
+					if (canvasRect.Height <= 0.0) canvasRect.Height = 12.0;
+
+					if (currentRect.IsEmpty)
+					{
+						currentRect = canvasRect;
+					}
+					else
+					{
+						double verticalDistance = Math.Abs(canvasRect.Y - currentRect.Y);
+						double heightDifference = Math.Abs(canvasRect.Height - currentRect.Height);
+						double horizontalGap = canvasRect.X - (currentRect.X + currentRect.Width);
+						double heightThreshold = Math.Max(currentRect.Height, canvasRect.Height);
+						if (verticalDistance < heightThreshold * 0.4 && heightDifference < heightThreshold * 0.4 && horizontalGap >= -2.0 && horizontalGap < heightThreshold * 3.0)
+						{
+							double minX = Math.Min(currentRect.X, canvasRect.X);
+							double maxX = Math.Max(currentRect.X + currentRect.Width, canvasRect.X + canvasRect.Width);
+							double minY = Math.Min(currentRect.Y, canvasRect.Y);
+							double maxY = Math.Max(currentRect.Y + currentRect.Height, canvasRect.Y + canvasRect.Height);
+							currentRect = new Rect(minX, minY, maxX - minX, maxY - minY);
+						}
+						else
+						{
+							mergedRects.Add(currentRect);
+							currentRect = canvasRect;
+						}
+					}
+				}
+			}
+			if (!currentRect.IsEmpty) mergedRects.Add(currentRect);
+		}
+
+		foreach (var rect in mergedRects)
+		{
+			System.Windows.Shapes.Rectangle border = new System.Windows.Shapes.Rectangle
+			{
+				Width = Math.Max(0.5, rect.Width + 2.0),
+				Height = Math.Max(0.5, rect.Height + 2.0),
+				Stroke = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
+				StrokeThickness = 1.0,
+				StrokeDashArray = new DoubleCollection(new double[] { 3, 3 }),
+				Fill = new SolidColorBrush(Color.FromArgb(24, 37, 99, 235)),
+				IsHitTestVisible = false
+			};
+			Canvas.SetLeft(border, rect.X - 1.0);
+			Canvas.SetTop(border, rect.Y - 1.0);
+			canvas.Children.Add(border);
+		}
+	}
+
 	public string GetSelectedTextString()
 	{
 		if (_selectionStartPageIndex == -1 || _selectionEndPageIndex == -1)
@@ -3546,30 +3631,40 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			if (text != existingText)
 			{
 				LogToDesktop($"[EDIT TEXT] Commit changed text: old='{existingText}', new='{text}'");
-				string editGroupId = Guid.NewGuid().ToString("N");
-				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, AnnotationGroupId = editGroupId, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = sampledBackground, StrokeColor = Colors.Transparent, Opacity = 1.0 };
-				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
+				if (_editOriginalFontMode)
 				{
-					PageIndex = pageNumber - 1,
-					AnnotationGroupId = editGroupId,
-					X = minLeft / pageSize.Width,
-					Y = (pageSize.Height - maxTop) / pageSize.Height,
-					Width = (maxRight - minLeft) / pageSize.Width,
-					Height = (maxTop - minBottom) / pageSize.Height,
-					Text = text,
-					BgColor = Colors.Transparent,
-					StrokeColor = Colors.Black,
-					FontFamily = pdfFontName,
-					FontSize = replacementFontSize,
-					IsBold = isBold,
-					IsItalic = isItalic,
-					Opacity = 1.0
-				};
+					// Chế độ sửa gốc: ghi vào danh sách áp dụng qua replace_text_in_page (giữ font/size).
+					try { SaveUndoState(); } catch {}
+					_pendingOriginalTextEdits.Add((pageNumber, existingText, text));
+					RedrawPageAnnotations(canvas, pageNumber);
+				}
+				else
+				{
+					string editGroupId = Guid.NewGuid().ToString("N");
+					PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, AnnotationGroupId = editGroupId, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = sampledBackground, StrokeColor = Colors.Transparent, Opacity = 1.0 };
+					PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
+					{
+						PageIndex = pageNumber - 1,
+						AnnotationGroupId = editGroupId,
+						X = minLeft / pageSize.Width,
+						Y = (pageSize.Height - maxTop) / pageSize.Height,
+						Width = (maxRight - minLeft) / pageSize.Width,
+						Height = (maxTop - minBottom) / pageSize.Height,
+						Text = text,
+						BgColor = Colors.Transparent,
+						StrokeColor = Colors.Black,
+						FontFamily = pdfFontName,
+						FontSize = replacementFontSize,
+						IsBold = isBold,
+						IsItalic = isItalic,
+						Opacity = 1.0
+					};
 
-				try { SaveUndoState(); } catch {}
-				Annotations.Add(whiteout); Annotations.Add(replacement);
-				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
-				RedrawPageAnnotations(canvas, pageNumber);
+					try { SaveUndoState(); } catch {}
+					Annotations.Add(whiteout); Annotations.Add(replacement);
+					_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
+					RedrawPageAnnotations(canvas, pageNumber);
+				}
 			}
 			else
 			{
@@ -3889,6 +3984,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (clearPendingTextEdits)
 		{
 			_pendingTextEdits.Clear();
+			_pendingOriginalTextEdits.Clear();
 		}
 		_pendingZoomContentPoint = null;
 		_pendingZoomHostPoint = null;
@@ -4219,7 +4315,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 		}
 		List<KeyValuePair<int, int>> activeRotations = _pageRotations.Where((KeyValuePair<int, int> r) => r.Value != 0).ToList();
-		bool hasPendingTextEdits = _pendingTextEdits.Count > 0;
+		bool hasPendingTextEdits = _pendingTextEdits.Count > 0 || _pendingOriginalTextEdits.Count > 0;
 		if (activeRotations.Count == 0 && !isOrderChanged && !hasPendingTextEdits && imageSigsData.Count == 0)
 		{
 			if (isOverwrite)
@@ -4347,6 +4443,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 					tempFile = text;
 				}
+				if (_pendingOriginalTextEdits.Count > 0)
+				{
+					foreach (var origEdit in _pendingOriginalTextEdits)
+					{
+						string text = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
+						bool flag = PdfInterop.PdfCore.replace_text_in_page(tempFile, origEdit.PageNumber, origEdit.OriginalText, origEdit.ReplacementText, text);
+						try { File.Delete(tempFile); } catch { }
+						if (!flag)
+						{
+							try { File.Delete(text); } catch { }
+							return false;
+						}
+						tempFile = text;
+					}
+				}
 				if (isOrderChanged)
 				{
 					string text2 = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
@@ -4417,7 +4528,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					Annotations.Remove(pendingTextEdit.WhiteoutAnnotation);
 					Annotations.Remove(pendingTextEdit.TextAnnotation);
 				}
-				_pendingTextEdits.Clear();
+			_pendingTextEdits.Clear();
+			_pendingOriginalTextEdits.Clear();
 			}
 			LoadDocument(targetPath);
 			_pageRotations.Clear();

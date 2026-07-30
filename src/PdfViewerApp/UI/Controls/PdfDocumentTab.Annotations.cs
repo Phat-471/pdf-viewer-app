@@ -255,7 +255,7 @@ public partial class PdfDocumentTab
 		}
 	}
 
-	private void RedrawAllPageAnnotations()
+	public void RedrawAllPageAnnotations()
 	{
 		if (PagesHost.Children.Count == 0 || !(PagesHost.Children[0] is StackPanel stackPanel))
 		{
@@ -277,6 +277,10 @@ public partial class PdfDocumentTab
 	private void RedrawPageAnnotations(Canvas canvas, int pageNumber)
 	{
 		canvas.Children.Clear();
+		if (ActiveTool == "EditText")
+		{
+			DrawAllEditTextBounds(canvas, pageNumber);
+		}
 		int actualPageIndex = pageNumber - 1;
 		foreach (PdfAnnotation item in Annotations.Where((PdfAnnotation a) => a.PageIndex == actualPageIndex).ToList())
 		{

@@ -135,6 +135,15 @@ public static class PdfInterop
             [MarshalAs(UnmanagedType.LPUTF8Str)] string replacementText, 
             [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
 
+        // Thay thế văn bản giữ nguyên font/kích thước (parse content stream, chỉ đổi chuỗi Tj/TJ).
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool replace_text_in_page(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, 
+            int pageNumber, 
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string originalText, 
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string replacementText, 
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
         [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool overlay_pdf_image(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, 

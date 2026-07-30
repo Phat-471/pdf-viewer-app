@@ -1,3 +1,4 @@
+- Thêm tính năng Sửa chữ toàn file (Tìm & Thay thế) qua engine Rust: thay nội dung, giữ nguyên font, cỡ chữ, màu nền, tự động dãn cách trên cùng dòng.
 - Sửa lỗi click không chọn được chữ khi dùng công cụ Sửa văn bản trực tiếp.
 - Cải thiện lớp phủ sửa chữ: lấy màu nền theo vùng PDF gốc, giữ font và cỡ chữ sát dòng gốc hơn.
 - Sửa preview in vùng Snapshot để đổi theo khổ giấy và hướng giấy, giúp bản xem trước khớp bản in.

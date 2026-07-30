@@ -58,6 +58,9 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? EditTextToolRequested;
 
+	public event RoutedEventHandler? EditOriginalFontRequested;
+
+	private Fluent.ToggleButton? _editOriginalFontButton;
 	public event RoutedEventHandler? OcrTextRequested;
 
 	public event RoutedEventHandler? ExportOcrTextRequested;
@@ -644,6 +647,16 @@ public partial class MainRibbon : UserControl
 
 	private void EditTextTool_Click(object sender, RoutedEventArgs e) => EditTextToolRequested?.Invoke(this, e);
 
+	private void EditOriginalFont_Click(object sender, RoutedEventArgs e) => EditOriginalFontRequested?.Invoke(this, e);
+
+	public void SetEditOriginalFontState(bool enabled)
+	{
+		if (_editOriginalFontButton != null)
+		{
+			_editOriginalFontButton.IsChecked = enabled;
+		}
+	}
+
 	private void OcrText_Click(object sender, RoutedEventArgs e) => OcrTextRequested?.Invoke(this, e);
 
 	private void ExportOcrText_Click(object sender, RoutedEventArgs e) => ExportOcrTextRequested?.Invoke(this, e);
@@ -973,6 +986,14 @@ public partial class MainRibbon : UserControl
 		};
 		group.Items.Add(CreateEditTextButton("Select Text", "T", SelectTextTool_Click, "#106EBE"));
 		group.Items.Add(CreateEditTextButton("Edit Text", "E", EditTextTool_Click, "#0F766E"));
+		Fluent.ToggleButton keepFontBtn = new Fluent.ToggleButton
+		{
+			Header = "Sửa gốc (giữ font)",
+			Margin = new Thickness(8.0, 0.0, 8.0, 0.0)
+		};
+		keepFontBtn.Click += EditOriginalFont_Click;
+		_editOriginalFontButton = keepFontBtn;
+		group.Items.Add(keepFontBtn);
 		group.Items.Add(CreateEditTextButton("OCR", "OCR", OcrText_Click, "#D13438"));
 		group.Items.Add(CreateEditTextButton("Xuất văn bản OCR", "TXT", ExportOcrText_Click, "#D13438"));
 		group.Items.Add(CreateEditTextButton("Tạo Searchable PDF", "PDF", ExportSearchablePdf_Click, "#38BDF8"));

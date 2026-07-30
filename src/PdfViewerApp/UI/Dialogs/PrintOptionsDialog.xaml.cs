@@ -142,7 +142,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		{
 			var snapshot = SnapshotSelection ?? new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
 			var snapshotBitmap = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot, SnapshotSelection == null ? 600 : 900, 1600000);
-			var bitmap = SnapshotSelection == null ? snapshotBitmap : RenderSnapshotOnPreviewPaper(snapshotBitmap);
+			var bitmap = RenderSnapshotOnPreviewPaper(snapshotBitmap);
 			PreviewImage.Source = bitmap;
 			PreviewPlaceholderText.Visibility = Visibility.Collapsed;
 			PrevPageButton.IsEnabled = SnapshotSelection == null && _previewPageNumber > 1;
@@ -170,18 +170,39 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	{
 		if (PaperSizeComboBox != null)
 		{
-			PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
+			PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Default";
 		}
 		if (OrientationComboBox != null)
 		{
-			OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Landscape";
+			OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Default";
 		}
 	}
 
 	private BitmapSource RenderSnapshotOnPreviewPaper(BitmapSource snapshotBitmap)
 	{
 		(double paperWidth, double paperHeight) = GetPreviewPaperSize();
-		bool landscape = OrientationKey == "Landscape" || (OrientationKey == "Default" && paperWidth >= paperHeight);
+		
+		bool landscape = false;
+		if (OrientationKey == "Landscape")
+		{
+			landscape = true;
+		}
+		else if (OrientationKey == "Portrait")
+		{
+			landscape = false;
+		}
+		else // Default - dùng theo máy in hoặc căn theo tỷ lệ khổ giấy
+		{
+			if (SelectedPrintTicket?.PageOrientation.HasValue == true)
+			{
+				landscape = SelectedPrintTicket.PageOrientation.Value == PageOrientation.Landscape;
+			}
+			else
+			{
+				landscape = paperWidth >= paperHeight;
+			}
+		}
+
 		if (landscape && paperHeight > paperWidth)
 		{
 			(paperWidth, paperHeight) = (paperHeight, paperWidth);
@@ -227,7 +248,13 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 	private (double Width, double Height) GetPreviewPaperSize()
 	{
-		return PaperSizeKey switch
+		string key = PaperSizeKey;
+		if (key == "Default" && SelectedPrintTicket?.PageMediaSize?.PageMediaSizeName.HasValue == true)
+		{
+			key = GetPaperKey(SelectedPrintTicket.PageMediaSize.PageMediaSizeName);
+		}
+
+		return key switch
 		{
 			"A4" => (210.0, 297.0),
 			"A3" => (297.0, 420.0),
@@ -237,24 +264,6 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			"Letter" => (8.5 * 25.4, 11.0 * 25.4),
 			_ => (297.0, 420.0),
 		};
-	}
-
-	private void PrevPage_Click(object sender, RoutedEventArgs e)
-	{
-		if (_previewPageNumber > 1)
-		{
-			_previewPageNumber--;
-			UpdatePreview();
-		}
-	}
-
-	private void NextPage_Click(object sender, RoutedEventArgs e)
-	{
-		if (_previewPageNumber < _pageCount)
-		{
-			_previewPageNumber++;
-			UpdatePreview();
-		}
 	}
 
 	public PageMediaSize? CreatePageMediaSize()
@@ -274,15 +283,33 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	public PageOrientation? CreatePageOrientation()
 	{
 		string orientationKey = OrientationKey;
-		if (!(orientationKey == "Portrait"))
+		if (orientationKey == "Portrait")
 		{
-			if (orientationKey == "Landscape")
-			{
-				return PageOrientation.Landscape;
-			}
-			return null;
+			return PageOrientation.Portrait;
 		}
-		return PageOrientation.Portrait;
+		if (orientationKey == "Landscape")
+		{
+			return PageOrientation.Landscape;
+		}
+		return null;
+	}
+
+	private void PrevPage_Click(object sender, RoutedEventArgs e)
+	{
+		if (_previewPageNumber > 1)
+		{
+			_previewPageNumber--;
+			UpdatePreview();
+		}
+	}
+
+	private void NextPage_Click(object sender, RoutedEventArgs e)
+	{
+		if (_previewPageNumber < _pageCount)
+		{
+			_previewPageNumber++;
+			UpdatePreview();
+		}
 	}
 
 	private void LoadPrinters()
@@ -483,6 +510,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			IL_0129:
 			string value3 = (string)obj;
 			PrinterDefaultText.Text = $"Mặc định máy in: khổ {value}, hướng {value2}, {value3}.";
+			UpdatePreview();
 		}
 		finally
 		{
