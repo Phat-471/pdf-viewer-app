@@ -295,54 +295,9 @@ namespace PdfViewerApp
 			}
 		}
 
-		private async void TryShowOcrTextEditOverlayAsync(Canvas canvas, Point clickPoint, int pageNumber)
+		private void TryShowOcrTextEditOverlayAsync(Canvas canvas, Point clickPoint, int pageNumber)
 		{
-			if (!OperatingSystem.IsWindows() || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
-			{
-				return;
-			}
-
-			if (!TryCanvasToPdfPoint(canvas, clickPoint, pageNumber, out Point pdfPoint))
-			{
-				return;
-			}
-			List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNumber);
-			if (regions == null || regions.Count == 0)
-			{
-				LogStatus("OCR could not detect editable text on this page.");
-				return;
-			}
-			OcrTextRegion? match = null;
-			foreach (OcrTextRegion region in regions)
-			{
-				if (pdfPoint.X >= region.Left && pdfPoint.X <= region.Left + region.Width && pdfPoint.Y >= region.Bottom && pdfPoint.Y <= region.Bottom + region.Height)
-				{
-					match = region;
-					break;
-				}
-			}
-			if (match == null)
-			{
-				OcrTextRegion best = regions[0];
-				double bestDistance = double.MaxValue;
-				foreach (OcrTextRegion region in regions)
-				{
-					double centerX = region.Left + region.Width / 2.0;
-					double centerY = region.Bottom + region.Height / 2.0;
-					double distance = Math.Abs(centerX - pdfPoint.X) + Math.Abs(centerY - pdfPoint.Y);
-					if (distance < bestDistance)
-					{
-						bestDistance = distance;
-						best = region;
-					}
-				}
-				match = best;
-			}
-			if (match != null && !string.IsNullOrWhiteSpace(match.Value.Text))
-			{
-				ShowDirectTextEditOverlayFromBounds(canvas, pageNumber, match.Value.Left, match.Value.Bottom, match.Value.Left + match.Value.Width, match.Value.Bottom + match.Value.Height, match.Value.Text);
-				LogStatus($"OCR edit ready on page {pageNumber}.");
-			}
+			// Đã gỡ bỏ overlay cũ
 		}
 
 		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
@@ -509,26 +464,18 @@ namespace PdfViewerApp
 					double scaleY = pageSize.Height / Math.Max(1.0, pageBitmap.PixelHeight);
 					foreach (var line in result.Lines)
 					{
-						string text = line.Text?.Trim() ?? "";
-						if (string.IsNullOrWhiteSpace(text))
-						{
-							continue;
-						}
-						Windows.Foundation.Rect? rect = null;
 						foreach (var word in line.Words)
 						{
-							Windows.Foundation.Rect wordRect = word.BoundingRect;
-							rect = rect == null ? wordRect : UnionRect(rect.Value, wordRect);
+							string text = word.Text?.Trim() ?? "";
+							if (string.IsNullOrWhiteSpace(text)) continue;
+
+							Windows.Foundation.Rect rect = word.BoundingRect;
+							double left = rect.X * scaleX;
+							double width = rect.Width * scaleX;
+							double height = rect.Height * scaleY;
+							double pdfBottom = pageSize.Height - (rect.Y + rect.Height) * scaleY;
+							regions.Add(new OcrTextRegion(text, left, pdfBottom, width, height));
 						}
-						if (rect == null)
-						{
-							continue;
-						}
-						double left = rect.Value.X * scaleX;
-						double right = (rect.Value.X + rect.Value.Width) * scaleX;
-						double top = pageSize.Height - rect.Value.Y * scaleY;
-						double bottom = pageSize.Height - (rect.Value.Y + rect.Value.Height) * scaleY;
-						regions.Add(new OcrTextRegion(text, left, bottom, right - left, top - bottom));
 					}
 					return regions;
 				}

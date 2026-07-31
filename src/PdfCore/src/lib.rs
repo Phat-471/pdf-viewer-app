@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::io::Write;
+
+pub mod text_editor;
+
 use lopdf::{xobject, Dictionary, Document, Object};
 use image::ImageEncoder;
 use flate2::read::ZlibDecoder;

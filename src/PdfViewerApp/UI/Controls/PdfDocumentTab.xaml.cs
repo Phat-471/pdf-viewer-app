@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -3719,117 +3719,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	}
 	private void ShowDirectTextEditOverlayFromBounds(Canvas canvas, int pageNumber, double minLeft, double minBottom, double maxRight, double maxTop, string existingText)
 	{
-		if (!TryGetPageSize(pageNumber, out Size pageSize) || !TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect)) return;
-
-		double fontSizePoints = maxTop - minBottom;
-		if (fontSizePoints <= 0.0) fontSizePoints = 12.0;
-		double replacementFontSize = Math.Min(fontSizePoints * 1.15, Math.Max(fontSizePoints, fontSizePoints * 0.82));
-		Color sampledBackground = SamplePdfPageBackgroundColor(canvas, editRect);
-
-		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
-		{
-			Width = Math.Max(50.0, editRect.Width + 30.0),
-			Height = Math.Max(20.0, editRect.Height + 6.0),
-			Text = existingText,
-			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = Math.Max(8.0, replacementFontSize * canvas.Height / pageSize.Height),
-			Foreground = Brushes.Black,
-			TextWrapping = TextWrapping.NoWrap,
-			AcceptsReturn = false,
-			BorderBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
-			BorderThickness = new Thickness(1.5),
-			Background = new SolidColorBrush(sampledBackground),
-			Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
-		};
-
-		Canvas.SetLeft(tbInput, editRect.X - 2.0);
-		Canvas.SetTop(tbInput, editRect.Y - 3.0);
-		canvas.Children.Add(tbInput);
-
-		// Vﾃ・L盻蜂 M蘯､T CON TR盻・
-		tbInput.Loaded += (s, e) =>
-		{
-			tbInput.Focus();
-			Keyboard.Focus(tbInput);
-			tbInput.SelectAll();
-			tbInput.CaretIndex = tbInput.Text.Length;
-		};
-		long creationTime = Environment.TickCount;
-
-		bool editCommitted = false;
-		Action commitEdit = delegate
-		{
-			if (editCommitted) return;
-			if (tbInput.IsFocused)
-			{
-				LogToDesktop("[DEBUG] B盻・qua LostFocus vﾃｬ TextBox v蘯ｫn ﾄ疎ng ﾄ柁ｰ盻｣c Focus (Focus gi蘯｣).");
-				return;
-			}
-
-			long aliveTime = Environment.TickCount - creationTime;
-			LogToDesktop($"[DEBUG] ﾄ静ｳng TextBox th蘯ｭt s盻ｱ. Th盻拱 gian s盻創g: {aliveTime}ms");
-
-			editCommitted = true;
-
-			string text = tbInput.Text.TrimEnd('\r', '\n');
-			if (canvas.Children.Contains(tbInput)) canvas.Children.Remove(tbInput);
-
-			if (text != existingText)
-			{
-				string editGroupId = Guid.NewGuid().ToString("N");
-				PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation
-				{
-					PageIndex = pageNumber - 1,
-					AnnotationGroupId = editGroupId,
-					X = minLeft / pageSize.Width,
-					Y = (pageSize.Height - maxTop) / pageSize.Height,
-					Width = (maxRight - minLeft) / pageSize.Width,
-					Height = (maxTop - minBottom) / pageSize.Height,
-					Text = "",
-					BgColor = sampledBackground,
-					StrokeColor = Colors.Transparent,
-					Opacity = 1.0
-				};
-				PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
-				{
-					PageIndex = pageNumber - 1,
-					AnnotationGroupId = editGroupId,
-					X = minLeft / pageSize.Width,
-					Y = (pageSize.Height - maxTop) / pageSize.Height,
-					Width = (maxRight - minLeft) / pageSize.Width,
-					Height = (maxTop - minBottom) / pageSize.Height,
-					Text = text,
-					BgColor = Colors.Transparent,
-					StrokeColor = Colors.Black,
-					FontFamily = ActiveFontFamily,
-					FontSize = replacementFontSize,
-					Opacity = 1.0
-				};
-
-				try { SaveUndoState(); } catch {}
-				Annotations.Add(whiteout);
-				Annotations.Add(replacement);
-				_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
-				RedrawPageAnnotations(canvas, pageNumber);
-				LogStatus("Staged text replacement. Save the PDF to apply the actual content change.");
-			}
-		};
-
-		tbInput.PreviewLostKeyboardFocus += (s, ev) =>
-		{
-			// N蘯ｿu ngﾆｰ盻拱 dﾃｹng click vﾃo m盻冲 cﾃ｡i gﾃｬ ﾄ妥ｳ h盻｣p l盻・(nhﾆｰ thanh Ribbon),
-			// thﾃｬ m盻嬖 cho ﾄ妥ｳng TextBox. N蘯ｿu click vﾃo canvas, v蘯ｫn gi盻ｯ TextBox.
-			if (Keyboard.FocusedElement is DependencyObject focused &&
-			   (focused is Fluent.Button || focused is Fluent.MenuItem))
-			{
-				commitEdit();
-			}
-			else if (Keyboard.FocusedElement == null)
-			{
-				// Click vﾃo vﾃｹng tr盻創g, ch蘯ｷn ﾄ妥ｳng
-				ev.Handled = true;
-			}
-		};
+		// Đã gỡ bỏ overlay cũ
 	}
 	private string RenderReplacementOverlayImage(PendingTextEdit pendingTextEdit)
 	{

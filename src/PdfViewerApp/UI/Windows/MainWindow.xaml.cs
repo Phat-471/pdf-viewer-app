@@ -2752,33 +2752,10 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		if (activeTab != null)
 		{
 			activeTab.ActiveTool = "EditText";
-			activeTab.RedrawAllPageAnnotations();
+			activeTab.SetHighlightEditableRegions(true);
 		}
 
-		if (activeTab == null || string.IsNullOrEmpty(activeTab.CurrentPdfPath) || !System.IO.File.Exists(activeTab.CurrentPdfPath))
-		{
-			LogStatus("Vui lòng mở một file PDF trước khi sửa chữ.");
-			return;
-		}
-
-		var dlg = new EditTextDialog
-		{
-			Owner = this,
-			PdfPath = activeTab.CurrentPdfPath
-		};
-
-		if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.ResultPath))
-		{
-			try
-			{
-				activeTab.LoadDocument(dlg.ResultPath, clearPendingTextEdits: true);
-				LogStatus("Đã thay thế chữ thành công. Font, cỡ chữ và màu được giữ nguyên; khoảng cách tự động dãn lại.");
-			}
-			catch (Exception ex)
-			{
-				LogStatus("Lỗi khi tải lại file sau khi sửa: " + ex.Message);
-			}
-		}
+		LogStatus("Đã bật công cụ Sửa chữ. Các vùng chữ có thể sửa được khoanh khung viền nổi bật.");
 	}
 
 	private void EditOriginalFont_Click(object sender, RoutedEventArgs e)

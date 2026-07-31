@@ -279,7 +279,7 @@ public partial class PdfDocumentTab
 		canvas.Children.Clear();
 		if (ActiveTool == "EditText")
 		{
-			DrawAllEditTextBounds(canvas, pageNumber);
+			DrawEditableTextRegionsHighlight(canvas, pageNumber);
 		}
 		int actualPageIndex = pageNumber - 1;
 		foreach (PdfAnnotation item in Annotations.Where((PdfAnnotation a) => a.PageIndex == actualPageIndex).ToList())
