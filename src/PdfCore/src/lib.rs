@@ -2965,12 +2965,13 @@ fn replace_text_reflow(
                     let _ = replaced;
                     result.push('[');
                     result.push_str(&buf);
+                    i = j + 1;
                 }
             } else {
                 result.push('[');
                 result.push_str(&buf);
+                i = j + 1;
             }
-            i = j + 1;
         } else {
             result.push(c);
             i += 1;
