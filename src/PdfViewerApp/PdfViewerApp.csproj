@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
     <AssemblyName>PdfViewerApp</AssemblyName>
+    <Version>1.7.0</Version>
+    <FileVersion>1.7.0.0</FileVersion>
+    <AssemblyVersion>1.7.0.0</AssemblyVersion>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <OutputType>WinExe</OutputType>
     <UseWPF>True</UseWPF>
