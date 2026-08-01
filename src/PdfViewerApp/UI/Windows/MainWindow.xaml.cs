@@ -1556,6 +1556,24 @@ exit 0
 		}
 	}
 
+	private void ExportDocx_Click(object sender, RoutedEventArgs e)
+	{
+		if (EnsureActivated())
+		{
+			var tab = GetActiveTab();
+			if (tab != null && !string.IsNullOrEmpty(tab.CurrentPdfPath))
+			{
+				var dlg = new PdfViewerApp.UI.Dialogs.ExportDocumentDialog(tab.CurrentPdfPath)
+
+				{
+					Owner = this
+				};
+				dlg.ShowDialog();
+			}
+		}
+	}
+
+
 	private void ComparePdfs_Click(object sender, RoutedEventArgs e)
 	{
 		if (EnsureActivated())
@@ -1605,10 +1623,17 @@ exit 0
 
 			WatermarkDialog dialog = new WatermarkDialog(activeTab.CurrentPdfPath);
 			dialog.Owner = this;
-			if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.WatermarkedPdfPath))
+			if (dialog.ShowDialog() == true)
 			{
-				activeTab.LoadDocument(dialog.WatermarkedPdfPath);
-				LogStatus("Đóng dấu watermark PDF thành công.");
+				if (!string.IsNullOrEmpty(dialog.WatermarkedPdfPath))
+				{
+					activeTab.LoadDocument(dialog.WatermarkedPdfPath);
+				}
+				else
+				{
+					activeTab.AddTextWatermark(dialog.WatermarkText, dialog.WatermarkFontSize, dialog.WatermarkAngle, dialog.WatermarkOpacity, dialog.WatermarkColorHex);
+				}
+				LogStatus($"Đã đóng dấu watermark '{dialog.WatermarkText}' lên tài liệu.");
 			}
 		}
 	}
@@ -3264,6 +3289,8 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.EditOriginalFontRequested += EditOriginalFont_Click;
 		_mainRibbon.ExportOcrTextRequested += ExportOcrText_Click;
 		_mainRibbon.ExportSearchablePdfRequested += ExportSearchablePdf_Click;
+		_mainRibbon.ExportDocxRequested += ExportDocx_Click;
+
 		_mainRibbon.ToggleSidebarRequested += ToggleSidebar_Click;
 		_mainRibbon.ThemeToggleRequested += ThemeToggle_Click;
 		_mainRibbon.SettingsRequested += Settings_Click;

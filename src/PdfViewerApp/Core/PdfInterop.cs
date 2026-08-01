@@ -225,5 +225,40 @@ public static class PdfInterop
         public static extern bool repair_pdf(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, 
             [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RawTextRegion
+        {
+            public double X;
+            public double Y;
+            public double Width;
+            public double Height;
+            public double FontSize;
+            public int ObjType; // 1: Vector, 2: Subset CID, 3: Scanned OCR
+        }
+
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int pdf_get_page_text_objects(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
+            int pageNum,
+            [Out] RawTextRegion[] outRegions,
+            int maxCount);
+
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool pdf_replace_text_object(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
+            int pageNum,
+            double x,
+            double y,
+            double width,
+            double height,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string newText,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath);
+
+        [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool pdf_export_to_docx(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputDocxPath);
     }
 }
+

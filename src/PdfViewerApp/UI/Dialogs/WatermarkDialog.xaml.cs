@@ -1,152 +1,85 @@
 using System;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using Microsoft.Win32;
 
-namespace PdfViewerApp
+namespace PdfViewerApp;
+
+public partial class WatermarkDialog : Window
 {
-    public partial class WatermarkDialog : Window
+    public string WatermarkText { get; private set; } = "BẢN QUYỀN / BẢN VẼ MẪU";
+    public double WatermarkFontSize { get; private set; } = 48.0;
+    public double WatermarkAngle { get; private set; } = 45.0;
+    public double WatermarkOpacity { get; private set; } = 0.35;
+    public string WatermarkColorHex { get; private set; } = "#EF4444";
+
+    public string? WatermarkedPdfPath { get; private set; }
+
+    public WatermarkDialog()
     {
-        private readonly string _sourcePdfPath;
-        private bool _isWorking;
+        InitializeComponent();
+        UpdatePreview();
+    }
 
-        public string? WatermarkedPdfPath { get; private set; }
+    public WatermarkDialog(string? pdfPath) : this()
+    {
+    }
 
+    private void WatermarkSettings_Changed(object sender, EventArgs e)
+    {
+        if (!IsInitialized) return;
+        UpdatePreview();
+    }
 
+    private void UpdatePreview()
+    {
+        if (WatermarkTextBox == null || WatermarkPreviewText == null) return;
 
-        public WatermarkDialog(string sourcePdfPath)
+        WatermarkText = string.IsNullOrWhiteSpace(WatermarkTextBox.Text) ? "WATERMARK" : WatermarkTextBox.Text;
+        WatermarkOpacity = OpacitySlider?.Value ?? 0.35;
+
+        if (OpacityValueText != null)
         {
-            InitializeComponent();
-            _sourcePdfPath = sourcePdfPath;
+            OpacityValueText.Text = $"{(int)(WatermarkOpacity * 100)}%";
         }
 
-        private async void Apply_Click(object sender, RoutedEventArgs e)
+        if (FontSizeComboBox?.SelectedItem is ComboBoxItem fontItem && double.TryParse(fontItem.Tag?.ToString(), out var fs))
         {
-            if (_isWorking) return;
-
-            string text = WatermarkTextBox.Text.Trim();
-            if (string.IsNullOrEmpty(text))
-            {
-                MessageBox.Show("Vui lòng nhập nội dung chữ Watermark.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            _isWorking = true;
-            ApplyBtn.IsEnabled = false;
-            CancelBtn.IsEnabled = false;
-            StatusTextBlock.Text = "Đang áp dụng đóng dấu...";
-
-            double opacity = OpacitySlider.Value;
-            double fontSize = FontSizeSlider.Value;
-            double angle = AngleSlider.Value;
-
-            // Extract color values
-            double r = 0.5, g = 0.5, b = 0.5;
-            if (ColorComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is string hexColor)
-            {
-                try
-                {
-                    Color color = (Color)ColorConverter.ConvertFromString(hexColor);
-                    r = color.R / 255.0;
-                    g = color.G / 255.0;
-                    b = color.B / 255.0;
-                }
-                catch { }
-            }
-
-            string tempDir = Path.Combine(Path.GetTempPath(), "PdfProWatermark");
-            Directory.CreateDirectory(tempDir);
-            string tempOutFile = Path.Combine(tempDir, $"{Guid.NewGuid():N}.pdf");
-
-            bool success = await Task.Run(() =>
-            {
-                try
-                {
-                    return PdfInterop.PdfCore.add_pdf_watermark(_sourcePdfPath, text, angle, opacity, fontSize, r, g, b, tempOutFile);
-                }
-                catch
-                {
-                    return false;
-                }
-            });
-
-            if (success && File.Exists(tempOutFile))
-            {
-                string msg = "Đã tạo file đóng dấu thành công!\n\nBạn có muốn ghi đè lên file gốc không?";
-                var result = MessageBox.Show(msg, "Đóng Dấu Thành Công", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    try
-                    {
-                        File.Copy(tempOutFile, _sourcePdfPath, true);
-                        WatermarkedPdfPath = _sourcePdfPath;
-                        DialogResult = true;
-                        Close();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Không thể ghi đè lên file gốc: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-                        SaveAsNewFile(tempOutFile);
-                    }
-                }
-                else if (result == MessageBoxResult.No)
-                {
-                    SaveAsNewFile(tempOutFile);
-                }
-                else
-                {
-                    try { File.Delete(tempOutFile); } catch { }
-                    ApplyBtn.IsEnabled = true;
-                    CancelBtn.IsEnabled = true;
-                    _isWorking = false;
-                    StatusTextBlock.Text = "Đã hủy lưu tệp.";
-                }
-            }
-            else
-            {
-                StatusTextBlock.Text = "Lỗi khi đóng dấu tệp PDF.";
-                ApplyBtn.IsEnabled = true;
-                CancelBtn.IsEnabled = true;
-                _isWorking = false;
-                MessageBox.Show("Có lỗi xảy ra trong quá trình đóng dấu PDF.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            WatermarkFontSize = fs;
         }
 
-        private void SaveAsNewFile(string tempFile)
+        if (AngleComboBox?.SelectedItem is ComboBoxItem angleItem && double.TryParse(angleItem.Tag?.ToString(), out var angle))
         {
-            var saveDialog = new SaveFileDialog
-            {
-                Filter = "PDF Documents (*.pdf)|*.pdf",
-                Title = "Lưu File PDF Đã Đóng Dấu",
-                FileName = Path.GetFileNameWithoutExtension(_sourcePdfPath) + "_watermarked.pdf",
-                InitialDirectory = Path.GetDirectoryName(_sourcePdfPath)
-            };
-
-            if (saveDialog.ShowDialog() == true)
-            {
-                try
-                {
-                    File.Copy(tempFile, saveDialog.FileName, true);
-                    WatermarkedPdfPath = saveDialog.FileName;
-                    DialogResult = true;
-                    Close();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi khi lưu file mới: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            WatermarkAngle = angle;
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
+        if (ColorComboBox?.SelectedItem is ComboBoxItem colorItem)
         {
-            DialogResult = false;
-            Close();
+            WatermarkColorHex = colorItem.Tag?.ToString() ?? "#EF4444";
         }
+
+        WatermarkPreviewText.Text = WatermarkText;
+        WatermarkPreviewText.Opacity = WatermarkOpacity;
+        
+        try
+        {
+            Color color = (Color)ColorConverter.ConvertFromString(WatermarkColorHex);
+            WatermarkPreviewText.Foreground = new SolidColorBrush(color);
+        }
+        catch
+        {
+            WatermarkPreviewText.Foreground = Brushes.Red;
+        }
+
+        if (WatermarkPreviewText.RenderTransform is RotateTransform rotateTransform)
+        {
+            rotateTransform.Angle = WatermarkAngle;
+        }
+    }
+
+    private void Apply_Click(object sender, RoutedEventArgs e)
+    {
+        UpdatePreview();
+        DialogResult = true;
     }
 }

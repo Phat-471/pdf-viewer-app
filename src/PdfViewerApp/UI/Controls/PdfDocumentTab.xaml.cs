@@ -4967,6 +4967,42 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		ClearBitmapCache();
 		RenderPdfPages();
 	}
+	public void AddTextWatermark(string text, double fontSize, double angle, double opacity, string colorHex)
+	{
+		if (string.IsNullOrEmpty(CurrentPdfPath)) return;
+
+		try
+		{
+			Color color = (Color)ColorConverter.ConvertFromString(colorHex);
+			SolidColorBrush brush = new SolidColorBrush(color) { Opacity = opacity };
+
+			Canvas? targetCanvas = _activeCanvas ?? _lastSnapshotCanvas;
+			if (targetCanvas != null)
+			{
+				TextBlock watermarkBlock = new TextBlock
+				{
+					Text = text,
+					FontSize = fontSize,
+					FontWeight = FontWeights.Bold,
+					Foreground = brush,
+					HorizontalAlignment = HorizontalAlignment.Center,
+					VerticalAlignment = VerticalAlignment.Center,
+					IsHitTestVisible = false,
+					RenderTransformOrigin = new Point(0.5, 0.5),
+					RenderTransform = new RotateTransform(angle)
+				};
+
+				Canvas.SetLeft(watermarkBlock, Math.Max(10, targetCanvas.ActualWidth > 0 ? targetCanvas.ActualWidth / 4.0 : 100));
+				Canvas.SetTop(watermarkBlock, Math.Max(10, targetCanvas.ActualHeight > 0 ? targetCanvas.ActualHeight / 2.0 : 200));
+				targetCanvas.Children.Add(watermarkBlock);
+			}
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Failed to add text watermark: {ex}");
+		}
+	}
+
 	private void LogToDesktop(string message)
 	{
 		try

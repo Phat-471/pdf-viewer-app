@@ -997,11 +997,16 @@ public partial class MainRibbon : UserControl
 		group.Items.Add(CreateEditTextButton("OCR", "OCR", OcrText_Click, "#D13438"));
 		group.Items.Add(CreateEditTextButton("Xuất văn bản OCR", "TXT", ExportOcrText_Click, "#D13438"));
 		group.Items.Add(CreateEditTextButton("Tạo Searchable PDF", "PDF", ExportSearchablePdf_Click, "#38BDF8"));
+		group.Items.Add(CreateEditTextButton("Xuất Word/Excel", "DOCX", ExportDocx_Click, "#2563EB"));
 		group.Items.Add(CreateEditTextButton("Save", "S", SavePdf_Click, "#0F766E"));
 		group.Items.Add(CreateEditTextButton("Exit", "X", SelectTool_Click, "#64748B"));
 		homeTab.Groups.Add(group);
 		_editTextContextGroup = group;
 	}
+
+	public event RoutedEventHandler? ExportDocxRequested;
+	private void ExportDocx_Click(object sender, RoutedEventArgs e) => ExportDocxRequested?.Invoke(this, e);
+
 
 	private static Fluent.Button CreateEditTextButton(string header, string glyph, RoutedEventHandler clickHandler, string foreground)
 	{

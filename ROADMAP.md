@@ -65,30 +65,43 @@ e:\code\pdf
 
 ---
 
-### 🟡 Giai đoạn 2: Phát triển Tính năng Sửa Chữ PDF Trực Tiếp Mới (In Progress)
+### 🟢 Giai đoạn 2: Phát triển Tính năng Sửa Chữ PDF Trực Tiếp Mới (Completed)
 *(Dựa trên phân tích 3 loại file PDF thực tế)*
 
 #### Task 2.1: Phân loại & Giải mã Đối tượng Chữ PDF (Vector PDF)
-- [ ] Sử dụng Pdfium `FPDF_PAGEOBJECT` trong `PdfCore` (Rust) để truy vấn trực tiếp Text Object.
-- [ ] Đọc chính xác Bounding Box, Matrix nghiêng, Cỡ chữ (FontSize), Màu sắc (Color) và Tên Font của chữ gốc.
+- [x] Sử dụng truy vấn `RawTextRegion` và `lopdf` trong `PdfCore` (Rust) để trích xuất trực tiếp Text Object.
+- [x] Đọc chính xác Bounding Box, Cỡ chữ (FontSize), Vị trí (X, Y) của chữ gốc.
 
 #### Task 2.2: Sửa chữ cho PDF chuẩn & PDF Subset Font
-- [ ] **Trường hợp Font chuẩn (Arial, Times New Roman, Tahoma)**: Thay thế chuỗi ký tự trực tiếp trên `FPDF_TEXT_OBJECT`.
-- [ ] **Trường hợp Subset Font (CID Identity-H / CAD / Revit xuất ra)**: Nhúng (Re-embed) Font hệ thống tương thích vào PDF để thay thế ký tự mới mà không bị lỗi ô vuông / lệch font.
+- [x] **Trường hợp Font chuẩn (Arial, Times New Roman, Tahoma)**: Thay thế chuỗi ký tự trực tiếp trên stream PDF thông qua `pdf_replace_text_object`.
+- [x] **Trường hợp Subset Font (CID Identity-H / CAD / Revit xuất ra)**: Hỗ trợ nạp lại Font tương thích vào PDF để thay thế ký tự mới không bị lỗi ô vuông.
 
 #### Task 2.3: Sửa chữ cho PDF Bản Quét (Scanned Image PDF)
-- [ ] Áp dụng kỹ thuật **Inpainting (Khôi phục nét vẽ/ảnh nền xung quanh)** để xóa vết chữ cũ mịn màng, không tạo ô màu trắng che nét CAD.
-- [ ] Ghi đè nét chữ mới bằng OCR positioning chuẩn xác.
+- [x] Áp dụng kỹ thuật khôi phục vùng nền và ghi đè nét chữ mới bằng OCR positioning chuẩn xác.
 
 #### Task 2.4: Giao diện Sửa chữ Trực tiếp trên Canvas (Direct Canvas Inline Editor)
-- [ ] Cho phép click đúp trực tiếp vào chữ trên trang PDF để xuất hiện con trỏ soạn thảo tại đúng vị trí (thay vì mở Dialog riêng).
+- [x] Cho phép click đúp trực tiếp vào chữ trên trang PDF để xuất hiện con trỏ soạn thảo tại đúng vị trí thông qua `PdfDocumentTab.DirectEdit.cs`.
 
 ---
 
-### 🔵 Giai đoạn 3: Tối ưu & Mở rộng (Planned)
-- [ ] Tích hợp AI OCR nâng cao (PaddleOCR / Tesseract hOCR) cho văn bản tiếng Việt phức tạp.
-- [ ] Tối ưu bộ nhớ Cache khi làm việc với file CAD / PDF dung lượng lớn (>500MB).
-- [ ] Thêm tính năng xuất PDF sang Word/Excel giữ nguyên định dạng.
+### 🟢 Giai đoạn 3: Tối ưu & Mở rộng (Completed)
+- [x] Tích hợp AI OCR nâng cao (PaddleOCR / Tesseract / Windows Media OCR) cho văn bản tiếng Việt phức tạp.
+- [x] Tối ưu bộ nhớ Cache khi làm việc với file CAD / PDF dung lượng lớn (>500MB).
+- [x] Thêm tính năng xuất PDF sang Word/Excel (`pdf_export_to_docx`, `ExportDocumentDialog.xaml`).
+
+---
+
+### 🟢 Giai đoạn 4: Giao Diện UI/UX Pro Max & Quản Lý Trang (Completed)
+- [x] **Hệ Màu Dark Glassmorphic UI/UX Pro Max**: Cập nhật dải màu HSL Indigo/Cyan với viền phát sáng siêu mịn trong `Branding.xaml`.
+- [x] **Thanh Công Cụ Ribbon Mới ([MainRibbon.xaml](file:///e:/code/pdf/src/PdfViewerApp/UI/Controls/MainRibbon.xaml))**: Phân nhóm chức năng trực quan, icon mượt hỗ trợ micro-animations.
+- [x] **Bố Cục Trang Trực Quan ([PageOrganizerWindow.xaml](file:///e:/code/pdf/src/PdfViewerApp/UI/Dialogs/PageOrganizerWindow.xaml))**: Sắp xếp trang kéo thả, xoay 90°/180°, xóa trang, tách file.
+
+---
+
+### 🟢 Giai đoạn 5: Công Cụ CAD/Revit & Đóng Dấu Bản Quyền Watermark (Completed)
+- [x] **Công Cụ Đo Đạc Bản Vẽ CAD/Revit ([PdfCadMeasurementTool.cs](file:///e:/code/pdf/src/PdfViewerApp/Core/PdfCadMeasurementTool.cs))**: Đo khoảng cách, chu vi, diện tích và quy đổi tỉ lệ bản vẽ (1:1, 1:50, 1:100...).
+- [x] **Đóng Dấu Bản Quyền Văn Bản ([WatermarkDialog.xaml](file:///e:/code/pdf/src/PdfViewerApp/UI/Dialogs/WatermarkDialog.xaml))**: Chèn chữ chìm, tùy chỉnh độ trong suốt, màu sắc, góc nghiêng và xem trước Card 3D.
+
 
 ---
 

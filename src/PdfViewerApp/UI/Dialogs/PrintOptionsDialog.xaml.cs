@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Printing;
+using System.Printing.Interop;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
@@ -12,6 +14,58 @@ namespace PdfViewerApp;
 
 public partial class PrintOptionsDialog : Window, IComponentConnector
 {
+	[DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern int OpenPrinter(string pPrinterName, out IntPtr phPrinter, IntPtr pDefault);
+
+	[DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern int ClosePrinter(IntPtr hPrinter);
+
+	[DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+	private static extern int DocumentProperties(IntPtr hwnd, IntPtr hPrinter, string pDeviceName, IntPtr pDevModeOutput, IntPtr pDevModeInput, int fMode);
+
+	private const int DM_OUT_BUFFER = 2;
+
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+	public struct DEVMODEW
+	{
+		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+		public string dmDeviceName;
+		public short dmSpecVersion;
+		public short dmDriverVersion;
+		public short dmSize;
+		public short dmDriverExtra;
+		public int dmFields;
+		public short dmOrientation;      // 1 = Portrait, 2 = Landscape
+		public short dmPaperSize;        // 8 = A3, 9 = A4, 1 = Letter...
+		public short dmPaperLength;
+		public short dmPaperWidth;
+		public short dmScale;
+		public short dmCopies;
+		public short dmDefaultSource;
+		public short dmPrintQuality;
+		public short dmColor;
+		public short dmDuplex;
+		public short dmYResolution;
+		public short dmTTOption;
+		public short dmCollate;
+		[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+		public string dmFormName;
+		public short dmLogPixels;
+		public int dmBitsPerPel;
+		public int dmPelsWidth;
+		public int dmPelsHeight;
+		public int dmNup;
+		public int dmDisplayFrequency;
+		public int dmICMMethod;
+		public int dmICMIntent;
+		public int dmMediaType;
+		public int dmDitherType;
+		public int dmReserved1;
+		public int dmReserved2;
+		public int dmPanningWidth;
+		public int dmPanningHeight;
+	}
+
 	public static string? LastSelectedPrinterName { get; set; }
 
 	private readonly int _pageCount;
@@ -19,32 +73,23 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	private int _previewPageNumber;
 	private readonly string? _pdfPath;
 	private bool _loadingPrinterDefaults;
+	private System.Threading.CancellationTokenSource? _printerSelectionCts;
 	private PdfSnapshotSelection? _snapshotSelection;
 
 	public int StartPageIndex { get; private set; }
-
 	public int EndPageIndex { get; private set; }
-
 	public int Copies { get; private set; } = 1;
-
 	public double PrintDpi { get; private set; } = 600.0;
-
 	public string PaperSizeKey { get; private set; } = "A3";
-
 	public string OrientationKey { get; private set; } = "Landscape";
-
 	public PrintQueue? SelectedPrintQueue { get; private set; }
-
 	public PrintTicket? SelectedPrintTicket { get; private set; }
+	public byte[]? NativeDevModeBytes { get; private set; }
 
 	public bool AutoCenter => AutoCenterCheckBox.IsChecked == true;
-
 	public bool FitToPrintableArea => FitMarginsRadio.IsChecked == true;
-
 	public bool PrintTestFrame => TestFrameCheckBox.IsChecked == true;
-
 	public bool NativeSeparatePageJobs => NativeSeparateJobsCheckBox.IsChecked == true;
-
 	public bool OptimizeCadDrawings => OptimizeCadCheckBox.IsChecked == true;
 
 	public bool ReversePageOrder
@@ -123,6 +168,70 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		UpdatePreview();
 	}
 
+	private static (DEVMODEW? DevModeStruct, byte[]? DevModeBytes) GetNativePrinterDevModeInfo(string printerName)
+	{
+		if (string.IsNullOrEmpty(printerName)) return (null, null);
+		if (OpenPrinter(printerName, out IntPtr hPrinter, IntPtr.Zero) != 0 && hPrinter != IntPtr.Zero)
+		{
+			try
+			{
+				int size = DocumentProperties(IntPtr.Zero, hPrinter, printerName, IntPtr.Zero, IntPtr.Zero, 0);
+				if (size > 0)
+				{
+					IntPtr pDevMode = Marshal.AllocHGlobal(size);
+					try
+					{
+						if (DocumentProperties(IntPtr.Zero, hPrinter, printerName, pDevMode, IntPtr.Zero, DM_OUT_BUFFER) == 1)
+						{
+							DEVMODEW devMode = Marshal.PtrToStructure<DEVMODEW>(pDevMode);
+							byte[] bytes = new byte[size];
+							Marshal.Copy(pDevMode, bytes, 0, size);
+							return (devMode, bytes);
+						}
+					}
+					finally
+					{
+						Marshal.FreeHGlobal(pDevMode);
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				System.Diagnostics.Debug.WriteLine($"Error reading Win32 DocumentProperties: {ex}");
+			}
+			finally
+			{
+				ClosePrinter(hPrinter);
+			}
+		}
+		return (null, null);
+	}
+
+	private static string ParsePaperKeyFromDevMode(DEVMODEW devMode)
+	{
+		return devMode.dmPaperSize switch
+		{
+			8 => "A3",
+			3 or 4 => "A3", // Tabloid / Ledger
+			9 => "A4",
+			66 => "A2",
+			67 => "A1",
+			68 => "A0",
+			1 => "Letter",
+			_ => (devMode.dmPaperWidth >= 2800 || devMode.dmPaperLength >= 4000) ? "A3" : "A4"
+		};
+	}
+
+	private static string ParseOrientationKeyFromDevMode(DEVMODEW devMode)
+	{
+		return devMode.dmOrientation switch
+		{
+			2 => "Landscape",
+			1 => "Portrait",
+			_ => "Landscape"
+		};
+	}
+
 	private void UpdatePreview()
 	{
 		ReadPreviewSettingsFromUi();
@@ -159,10 +268,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 	private void PrintPreviewSettings_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (!IsInitialized)
-		{
-			return;
-		}
+		if (!IsInitialized) return;
 		UpdatePreview();
 	}
 
@@ -191,7 +297,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		{
 			landscape = false;
 		}
-		else // Default - dùng theo máy in hoặc căn theo tỷ lệ khổ giấy
+		else // Default - dùng theo máy in
 		{
 			if (SelectedPrintTicket?.PageOrientation.HasValue == true)
 			{
@@ -325,7 +431,6 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 		catch
 		{
-			// Fallback 1: Try local only
 			try
 			{
 				list = new LocalPrintServer().GetPrintQueues(new[] 
@@ -335,7 +440,6 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			}
 			catch
 			{
-				// Fallback 2: Just try to get the default printer
 				try
 				{
 					PrintQueue defaultQueue = LocalPrintServer.GetDefaultPrintQueue();
@@ -379,13 +483,88 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 	}
 
-	private void PrinterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	private async void PrinterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (!_loadingPrinterDefaults && PrinterComboBox.SelectedItem is PrintQueue printQueue)
+		if (_loadingPrinterDefaults || !(PrinterComboBox.SelectedItem is PrintQueue printQueue))
 		{
-			SelectedPrintQueue = printQueue;
-			SelectedPrintTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket);
-			LastSelectedPrinterName = printQueue.FullName;
+			return;
+		}
+
+		// Hủy các tác vụ đọc máy in cũ nếu người dùng chuyển máy in liên tục
+		_printerSelectionCts?.Cancel();
+		_printerSelectionCts = new System.Threading.CancellationTokenSource();
+		System.Threading.CancellationToken ct = _printerSelectionCts.Token;
+
+		SelectedPrintQueue = printQueue;
+		LastSelectedPrinterName = printQueue.FullName;
+
+		string printerName = printQueue.FullName;
+		int schemaVersion = printQueue.ClientPrintSchemaVersion;
+		PrintTicket? fallbackTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket);
+
+		// Phản hồi UI tức thì
+		if (PrinterDefaultText != null)
+		{
+			PrinterDefaultText.Text = $"Đang đọc thuộc tính {printQueue.FullName}...";
+		}
+
+		try
+		{
+			// Đẩy việc giao tiếp Win32 Driver (DocumentProperties RPC) & PrintTicketConverter ra Thread ngầm
+			(DEVMODEW? nativeDevMode, byte[]? devModeBytes, PrintTicket? printTicket) = await System.Threading.Tasks.Task.Run<(DEVMODEW?, byte[]?, PrintTicket?)>(() =>
+			{
+				if (ct.IsCancellationRequested) return (null, null, null);
+
+				(DEVMODEW? devStruct, byte[]? devBytes) = GetNativePrinterDevModeInfo(printerName);
+				PrintTicket? ticket = null;
+
+				if (devBytes != null && devBytes.Length > 0)
+				{
+					try
+					{
+						using var converter = new PrintTicketConverter(printerName, schemaVersion);
+						ticket = converter.ConvertDevModeToPrintTicket(devBytes);
+					}
+					catch
+					{
+						ticket = fallbackTicket;
+					}
+				}
+				else
+				{
+					ticket = fallbackTicket;
+				}
+
+				return (devStruct, devBytes, ticket);
+			}, ct);
+
+			if (ct.IsCancellationRequested) return;
+
+			NativeDevModeBytes = devModeBytes;
+			SelectedPrintTicket = printTicket ?? fallbackTicket;
+
+			if (nativeDevMode.HasValue && SelectedPrintTicket != null)
+			{
+				string nativePaperKey = ParsePaperKeyFromDevMode(nativeDevMode.Value);
+				string nativeOrientationKey = ParseOrientationKeyFromDevMode(nativeDevMode.Value);
+
+				if (nativePaperKey == "A3") SelectedPrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA3);
+				else if (nativePaperKey == "A4") SelectedPrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
+
+				if (nativeOrientationKey == "Landscape") SelectedPrintTicket.PageOrientation = PageOrientation.Landscape;
+				else if (nativeOrientationKey == "Portrait") SelectedPrintTicket.PageOrientation = PageOrientation.Portrait;
+			}
+
+			ApplyTicketDefaultsToUi(SelectedPrintTicket, nativeDevMode);
+		}
+		catch (System.OperationCanceledException)
+		{
+			// Đã bị hủy do chuyển máy in khác nhanh
+		}
+		catch (Exception ex)
+		{
+			System.Diagnostics.Debug.WriteLine($"Error querying printer background: {ex.Message}");
+			SelectedPrintTicket = fallbackTicket;
 			ApplyTicketDefaultsToUi(SelectedPrintTicket);
 		}
 	}
@@ -416,6 +595,99 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			SelectedPrintTicket = CloneTicket(printDialog.PrintTicket);
 			PrinterComboBox.SelectedItem = SelectedPrintQueue;
 			ApplyTicketDefaultsToUi(SelectedPrintTicket);
+		}
+	}
+
+	private void TestPrinter_Click(object sender, RoutedEventArgs e)
+	{
+		try
+		{
+			var sb = new System.Text.StringBuilder();
+			sb.AppendLine("=== KẾT QUẢ KIỂM TRA THÔNG TIN MÁY IN NATIVE (WIN32 + PRINTTICKET) ===");
+			sb.AppendLine();
+
+			PrintQueue? queue = PrinterComboBox.SelectedItem as PrintQueue;
+			if (queue == null)
+			{
+				try
+				{
+					queue = LocalPrintServer.GetDefaultPrintQueue();
+				}
+				catch { }
+			}
+
+			if (queue != null)
+			{
+				sb.AppendLine($"📌 Máy in được chọn: {queue.FullName}");
+				sb.AppendLine($"   • Trạng thái: {(queue.IsOffline ? "Offline (Tắt/Mất kết nối)" : "Online (Sẵn sàng)")}");
+				sb.AppendLine($"   • Tệp chờ in (Jobs): {queue.NumberOfJobs}");
+
+				// Đọc trực tiếp từ Win32 DEVMODE Driver
+				(DEVMODEW? nativeDevMode, _) = GetNativePrinterDevModeInfo(queue.FullName);
+				if (nativeDevMode.HasValue)
+				{
+					var dev = nativeDevMode.Value;
+					string devPaper = ParsePaperKeyFromDevMode(dev);
+					string devOrientation = ParseOrientationKeyFromDevMode(dev);
+
+					sb.AppendLine();
+					sb.AppendLine("🖨️ Thông số thực tế đọc trực tiếp từ Win32 Driver (DEVMODE):");
+					sb.AppendLine($"   • Driver Form Name: {dev.dmFormName}");
+					sb.AppendLine($"   • Khổ giấy Driver (dmPaperSize={dev.dmPaperSize}): {devPaper}");
+					sb.AppendLine($"   • Kích thước Driver (W x L): {dev.dmPaperWidth / 10.0:F1} mm x {dev.dmPaperLength / 10.0:F1} mm");
+					sb.AppendLine($"   • Hướng in Driver (dmOrientation={dev.dmOrientation}): {devOrientation}");
+				}
+				
+				PrintTicket? ticket = SelectedPrintTicket ?? queue.UserPrintTicket ?? queue.DefaultPrintTicket;
+				if (ticket != null)
+				{
+					string paperKey = GetPaperKey(ticket.PageMediaSize?.PageMediaSizeName);
+					string orientationKey = GetOrientationKey(ticket.PageOrientation);
+
+					sb.AppendLine();
+					sb.AppendLine("📄 Thông số đọc qua WPF PrintTicket Schema:");
+					sb.AppendLine($"   • Khổ giấy PrintTicket: {paperKey} (MediaName: {ticket.PageMediaSize?.PageMediaSizeName})");
+					if (ticket.PageMediaSize?.Width != null && ticket.PageMediaSize?.Height != null)
+					{
+						sb.AppendLine($"   • Kích thước vùng in: {ticket.PageMediaSize.Width:F1} x {ticket.PageMediaSize.Height:F1} DIPs");
+					}
+					sb.AppendLine($"   • Hướng in PrintTicket: {orientationKey} ({ticket.PageOrientation})");
+					if (ticket.PageResolution != null)
+					{
+						sb.AppendLine($"   • Độ phân giải DPI: {ticket.PageResolution.X} x {ticket.PageResolution.Y} DPI");
+					}
+				}
+			}
+			else
+			{
+				sb.AppendLine("❌ Không tìm thấy máy in mặc định hoặc máy in được chọn.");
+			}
+
+			sb.AppendLine();
+			sb.AppendLine("📋 Danh sách tất cả máy in trên hệ thống:");
+			try
+			{
+				var allPrinters = new LocalPrintServer().GetPrintQueues(new[] 
+				{ 
+					EnumeratedPrintQueueTypes.Local, 
+					EnumeratedPrintQueueTypes.Connections 
+				});
+				int index = 1;
+				foreach (var p in allPrinters)
+				{
+					sb.AppendLine($"   {index++}. {p.FullName} {(p.IsOffline ? "[Offline]" : "[Ready]")}");
+				}
+			}
+			catch (Exception exPrinters)
+			{
+				sb.AppendLine($"   • Lỗi liệt kê danh sách: {exPrinters.Message}");
+			}
+
+			MessageBox.Show(sb.ToString(), "Kiểm Tra Thuộc Tính Máy In (Win32 DEVMODE)", MessageBoxButton.OK, MessageBoxImage.Information);
+		}
+		catch (Exception ex)
+		{
+			MessageBox.Show($"Lỗi khi kiểm tra thuộc tính máy in:\n{ex.Message}", "Lỗi Kiểm Tra", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 	}
 
@@ -452,7 +724,6 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			StartPageIndex = start - 1;
 			EndPageIndex = end - 1;
 		}
-		// Đọc giá trị từ Combobox hoặc fallback về mặc định A3/Landscape
 		PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
 		OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Landscape";
 
@@ -463,7 +734,6 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		
 		SelectedPrintQueue = printQueue;
 		
-		// Đảm bảo SelectedPrintTicket được khởi tạo và ghi đè trực tiếp cấu hình giấy/hướng
 		if (SelectedPrintTicket == null)
 		{
 			SelectedPrintTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket) ?? new PrintTicket();
@@ -485,31 +755,49 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		base.DialogResult = true;
 	}
 
-	private void ApplyTicketDefaultsToUi(PrintTicket? ticket)
+	private void ApplyTicketDefaultsToUi(PrintTicket? ticket, DEVMODEW? devMode = null)
 	{
 		_loadingPrinterDefaults = true;
 		try
 		{
-			string paperKey = GetPaperKey(ticket?.PageMediaSize?.PageMediaSizeName);
-			string orientationKey = GetOrientationKey(ticket?.PageOrientation);
+			string paperKey = devMode.HasValue ? ParsePaperKeyFromDevMode(devMode.Value) : GetPaperKey(ticket?.PageMediaSize?.PageMediaSizeName);
+			string orientationKey = devMode.HasValue ? ParseOrientationKeyFromDevMode(devMode.Value) : GetOrientationKey(ticket?.PageOrientation);
+			
 			string value = ((paperKey == "Default") ? "theo máy in" : paperKey);
 			string text = ((orientationKey == "Portrait") ? "Dọc" : ((!(orientationKey == "Landscape")) ? "theo máy in" : "Ngang"));
 			string value2 = text;
-			object obj;
-			if (ticket != null)
+			
+			string value3 = (ticket?.PageResolution?.X.HasValue == true) 
+				? $"{ticket.PageResolution.X}x{ticket.PageResolution.Y} dpi" 
+				: "độ phân giải mặc định";
+
+			PrinterDefaultText.Text = $"Mặc định máy in: khổ {value}, hướng {value2}, {value3}.";
+
+			// Tự động chọn giá trị tương ứng trong ComboBox khổ giấy & hướng in
+			if (PaperSizeComboBox != null)
 			{
-				PageResolution pageResolution = ticket.PageResolution;
-				if (pageResolution != null && pageResolution.X.HasValue && ticket.PageResolution.Y.HasValue)
+				foreach (ComboBoxItem item in PaperSizeComboBox.Items)
 				{
-					obj = $"{ticket.PageResolution.X}x{ticket.PageResolution.Y} dpi";
-					goto IL_0129;
+					if (item.Tag?.ToString() == paperKey)
+					{
+						PaperSizeComboBox.SelectedItem = item;
+						break;
+					}
 				}
 			}
-			obj = "độ phân giải mặc định";
-			goto IL_0129;
-			IL_0129:
-			string value3 = (string)obj;
-			PrinterDefaultText.Text = $"Mặc định máy in: khổ {value}, hướng {value2}, {value3}.";
+
+			if (OrientationComboBox != null)
+			{
+				foreach (ComboBoxItem item in OrientationComboBox.Items)
+				{
+					if (item.Tag?.ToString() == orientationKey)
+					{
+						OrientationComboBox.SelectedItem = item;
+						break;
+					}
+				}
+			}
+
 			UpdatePreview();
 		}
 		finally
