@@ -169,6 +169,32 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 	}
 
+	private SnapshotPaperLayout? _snapshotLayout;
+	private Size _snapshotCropPoints;
+
+	internal void ConfigureSnapshot(PdfSnapshotSelection selection, BitmapSource? preview,
+		SnapshotPaperLayout layout, Size cropPoints)
+	{
+		_snapshotLayout = layout;
+		_snapshotCropPoints = cropPoints;
+		if (preview?.IsFrozen == true) _previewSources[selection] = preview;
+		SnapshotSelection = selection;
+		ApplyTicketDefaultsToUi(null);
+		PaperSizeComboBox.IsEnabled = OrientationComboBox.IsEnabled = false;
+		FitMarginsRadio.IsEnabled = ActualSizeRadio.IsEnabled = false;
+		FitMarginsRadio.IsChecked = layout.FitToPage;
+		ActualSizeRadio.IsChecked = !layout.FitToPage;
+		FitMarginsRadio.Content = "Vừa trang (bố cục Snapshot)";
+		ActualSizeRadio.Content = $"Tỷ lệ Snapshot: {layout.ScalePercent:N1}%";
+		AutoCenterCheckBox.IsChecked = true;
+		AutoCenterCheckBox.IsEnabled = false;
+		AllPagesRadio.IsChecked = CurrentViewRadio.IsChecked = CustomPagesRadio.IsChecked = false;
+		CurrentPageRadio.IsChecked = true;
+		AllPagesRadio.IsEnabled = CurrentViewRadio.IsEnabled = CustomPagesRadio.IsEnabled = false;
+		PageRangeTextBox.IsEnabled = false;
+		PaperSizeComboBox.ToolTip = OrientationComboBox.ToolTip = "Bố cục được chọn trong Snapshot. Đóng hộp thoại in để chỉnh lại.";
+	}
+
 	public PrintOptionsDialog(int pageCount, int currentPageNumber)
 		: this(pageCount, currentPageNumber, null)
 	{
@@ -350,6 +376,8 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 
 	private BitmapSource RenderSnapshotOnPreviewPaper(BitmapSource snapshotBitmap)
 	{
+		if (_snapshotLayout != null)
+			return _snapshotLayout.Compose(snapshotBitmap, _snapshotCropPoints, 1200, showGuides: true);
 		(double paperWidth, double paperHeight) = GetPreviewPaperSize();
 		
 		bool landscape = false;
@@ -781,6 +809,12 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 				: "độ phân giải mặc định";
 
 			PrinterDefaultText.Text = $"Mặc định máy in: khổ {value}, hướng {value2}, {value3}.";
+			if (_snapshotLayout != null)
+			{
+				paperKey = _snapshotLayout.PaperKey;
+				orientationKey = _snapshotLayout.Landscape ? "Landscape" : "Portrait";
+				PrinterDefaultText.Text += " Bố cục in lấy từ Snapshot.";
+			}
 
 			// Tự động chọn giá trị tương ứng trong ComboBox khổ giấy & hướng in
 			if (PaperSizeComboBox != null)

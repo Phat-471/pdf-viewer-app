@@ -256,8 +256,12 @@ if (-not $SkipPublish -and (Test-Path $publishSettingsFile)) {
 # 5. Optional: Build Inno Setup Installer (Setup.exe)
 Write-Host "`n[5/5] Building Inno Setup Installer (Optional)..." -ForegroundColor Yellow
 $isccPath = ""
-if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") {
+if (Test-Path "${env:ProgramFiles}\Inno Setup 7\ISCC.exe") {
+    $isccPath = "${env:ProgramFiles}\Inno Setup 7\ISCC.exe"
+} elseif (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") {
     $isccPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+} elseif (Test-Path "${env:ProgramFiles}\Inno Setup 6\ISCC.exe") {
+    $isccPath = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
 } elseif (Get-Command iscc -ErrorAction SilentlyContinue) {
     $isccPath = (Get-Command iscc).Source
 }
@@ -266,7 +270,7 @@ if ($isccPath -ne "") {
     Write-Host "    Found Inno Setup Compiler: $isccPath" -ForegroundColor DarkGray
     Write-Host "    Running Inno Setup compiler..." -ForegroundColor Yellow
     $absoluteIssPath = Join-Path $scriptDir "installer.iss"
-    & $isccPath "/dMyAppVersion=$version" $absoluteIssPath
+    Invoke-PackageCommand -Command $isccPath -Arguments @("/dMyAppVersion=$version", $absoluteIssPath)
     if ($LASTEXITCODE -eq 0) {
         Write-Host "    Inno Setup package created successfully!" -ForegroundColor Green
     } else {

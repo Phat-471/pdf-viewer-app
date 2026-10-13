@@ -13,7 +13,9 @@ $baseKey = "HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merg
 $commandKey = Join-Path $baseKey "command"
 
 New-Item -Path $commandKey -Force | Out-Null
-New-ItemProperty -Path $baseKey -Name "MUIVerb" -Value "Merge PDF with PDF Hphat" -PropertyType String -Force | Out-Null
+# ASCII source also works in Windows PowerShell 5.1 without an encoding-dependent label.
+$menuLabel = "Gh$([char]0x00e9)p PDF b$([char]0x1eb1)ng PDF HPhat"
+New-ItemProperty -Path $baseKey -Name "MUIVerb" -Value $menuLabel -PropertyType String -Force | Out-Null
 $iconPath = Join-Path (Split-Path $AppExePath) "Assets\hphat_logo_1780279208636.png"
 if (Test-Path -LiteralPath $iconPath) {
     New-ItemProperty -Path $baseKey -Name "Icon" -Value $iconPath -PropertyType String -Force | Out-Null

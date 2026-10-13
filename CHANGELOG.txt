@@ -1,5 +1,4 @@
-﻿- Cải thiện tốc độ mở và độ nét khi xem PDF.
-- Cải thiện thao tác thu phóng.
-- Khắc phục tình trạng giao diện bị treo khi chuẩn bị in.
-- Cải thiện cập nhật ứng dụng.
-- Khắc phục lỗi kết nối máy chủ cập nhật.
+- Sửa tiếng Việt trong menu chuột phải.
+- Thêm xem trước và chỉnh bố cục Snapshot.
+- Thêm lựa chọn chất lượng ảnh copy và PNG.
+- Cải thiện tốc độ xử lý và in vùng chọn.

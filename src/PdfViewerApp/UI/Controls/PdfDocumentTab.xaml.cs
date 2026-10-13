@@ -1405,145 +1405,33 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_lastSnapshotCanvas = canvas;
 	}
 
-	private async void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
-
+	private void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 	{
-		if (string.IsNullOrEmpty(CurrentPdfPath))
+		if (tempRect != null) canvas.Children.Remove(tempRect);
+		if (string.IsNullOrEmpty(CurrentPdfPath)) return;
+		if (w < 10 || h < 10)
 		{
-			if (tempRect != null)
-			{
-				canvas.Children.Remove(tempRect);
-			}
+			LogStatus("Vùng chọn Snapshot quá nhỏ. Hãy kéo chọn vùng lớn hơn.");
 			return;
 		}
-		if (w < 10.0 || h < 10.0)
-		{
-			if (tempRect != null)
-			{
-				canvas.Children.Remove(tempRect);
-			}
-			LogStatus("Snapshot selection is too small.");
-			return;
-		}
-		PdfSnapshotSelection snapshot = new PdfSnapshotSelection(CurrentPdfPath, pageNumber - 1, Math.Clamp(x / canvas.Width, 0.0, 1.0), Math.Clamp(y / canvas.Height, 0.0, 1.0), Math.Clamp(w / canvas.Width, 0.001, 1.0), Math.Clamp(h / canvas.Height, 0.001, 1.0));
-		SnapshotActionDialog snapshotActionDialog = new SnapshotActionDialog(pageNumber, snapshot)
+		if (canvas.Width <= 0 || canvas.Height <= 0 || !TryGetPageSize(pageNumber, out Size pageSize)) return;
+		double left = Math.Clamp(x / canvas.Width, 0, 1);
+		double top = Math.Clamp(y / canvas.Height, 0, 1);
+		double right = Math.Clamp((x + w) / canvas.Width, left, 1);
+		double bottom = Math.Clamp((y + h) / canvas.Height, top, 1);
+		if (right <= left || bottom <= top) return;
+		var snapshot = new PdfSnapshotSelection(CurrentPdfPath, pageNumber - 1, left, top, right - left, bottom - top);
+		var dialog = new SnapshotActionDialog(pageNumber, snapshot, pageSize, _renderSession)
 		{
 			Owner = Window.GetWindow(this)
 		};
-		bool? flag = snapshotActionDialog.ShowDialog();
-		if (tempRect != null)
+		dialog.ShowDialog();
+		if (dialog.ReselectRequested)
 		{
-			canvas.Children.Remove(tempRect);
-		}
-		if (flag != true)
-		{
-			LogStatus("Snapshot selected");
-			return;
-		}
-		if (snapshotActionDialog.SelectedAction == SnapshotAction.CopyImage)
-		{
-			CopySnapshotImage(snapshot);
-			return;
-		}
-		if (snapshotActionDialog.SelectedAction == SnapshotAction.SavePng)
-		{
-			SaveSnapshotPng(snapshot, pageNumber);
-			return;
-		}
-		if (snapshotActionDialog.SelectedAction != SnapshotAction.Print)
-		{
-			LogStatus("Snapshot selected");
-			return;
-		}
-		PrintOptionsDialog printOptionsDialog = new PrintOptionsDialog(1, 1, CurrentPdfPath)
-		{
-			Owner = Window.GetWindow(this),
-			SnapshotSelection = snapshot
-		};
-		if (printOptionsDialog.ShowDialog() != true || string.IsNullOrEmpty(printOptionsDialog.SelectedPrinterName))
-		{
-			return;
-		}
-		try
-		{
-			PrintTicket printTicket = printOptionsDialog.SelectedPrintTicket?.Clone() ?? new PrintTicket();
-			PageMediaSize pageMediaSize = printOptionsDialog.CreatePageMediaSize();
-			if (pageMediaSize != null)
-			{
-				printTicket.PageMediaSize = pageMediaSize;
-			}
-			PageOrientation? pageOrientation = printOptionsDialog.CreatePageOrientation();
-			if (pageOrientation.HasValue)
-			{
-				printTicket.PageOrientation = pageOrientation;
-			}
-			int num = Math.Clamp((int)Math.Round(printOptionsDialog.PrintDpi), 72, 1200);
-			printTicket.PageResolution = new PageResolution(num, num);
-			printTicket.CopyCount = printOptionsDialog.Copies;
-			string printerName = printOptionsDialog.SelectedPrinterName!;
-			using var xml = printTicket.GetXmlStream();
-			byte[] ticketBytes = xml.ToArray();
-			LogStatus("Preparing snapshot print...");
-			await PrintWorker.RunAsync(() =>
-			{
-				using var server = new LocalPrintServer();
-				using var queue = new PrintQueue(server, printerName, Array.Empty<string>());
-				var workerTicket = new PrintTicket(new System.IO.MemoryStream(ticketBytes));
-				var profile = PrinterPrintProfile.Resolve(queue);
-				PdfSnapshotPrinter.PrintSnapshot(snapshot, queue, workerTicket, profile.RightSafetyPadding, profile.BottomSafetyPadding);
-			});
-			LogStatus("Snapshot print job sent");
-		}
-		catch (Exception ex)
-		{
-			MessageBox.Show("Snapshot print failed: " + ex.Message, "Snapshot", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Snapshot print failed");
-		}
-	}
-
-	private void CopySnapshotImage(PdfSnapshotSelection snapshot)
-	{
-		try
-		{
-			LogToDesktop("Snapshot copy image start");
-			BitmapSource bitmapSource = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot);
-			Clipboard.SetImage(bitmapSource);
-			LogToDesktop($"Snapshot copy image done: {bitmapSource.PixelWidth}x{bitmapSource.PixelHeight}");
-			LogStatus("Snapshot image copied to clipboard");
-		}
-		catch (Exception ex)
-		{
-			MessageBox.Show("Copy snapshot failed: " + ex.Message, "Snapshot", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Snapshot copy failed");
-		}
-	}
-
-	private void SaveSnapshotPng(PdfSnapshotSelection snapshot, int pageNumber)
-	{
-		SaveFileDialog saveFileDialog = new SaveFileDialog
-		{
-			Filter = "PNG image (*.png)|*.png",
-			Title = "Save snapshot as PNG",
-			FileName = $"{System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath)}_p{pageNumber}_snapshot.png",
-			InitialDirectory = (string.IsNullOrWhiteSpace(CurrentPdfPath) ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) : System.IO.Path.GetDirectoryName(CurrentPdfPath))
-		};
-		if (saveFileDialog.ShowDialog() != true)
-		{
-			LogStatus("Snapshot selected");
-			return;
-		}
-		try
-		{
-			LogToDesktop("Snapshot save PNG start: " + saveFileDialog.FileName);
-			byte[] array = PdfSnapshotImageRenderer.RenderSnapshotToPngBytes(snapshot);
-			File.WriteAllBytes(saveFileDialog.FileName, array);
-			LogToDesktop($"Snapshot save PNG done: {array.Length:N0} bytes");
-			LogStatus("Snapshot PNG saved");
-		}
-		catch (Exception ex)
-		{
-			MessageBox.Show("Save snapshot failed: " + ex.Message, "Snapshot", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Snapshot save failed");
+			ClearLastSnapshotOverlay();
+			ActiveTool = "Snapshot";
+			if (Window.GetWindow(this) is MainWindow window) window.ActiveTool = "Snapshot";
+			LogStatus("Kéo chọn vùng Snapshot mới.");
 		}
 	}
 

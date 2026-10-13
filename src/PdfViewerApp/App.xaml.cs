@@ -59,6 +59,7 @@ public partial class App : Application
 		base.Startup += async delegate(object sender, StartupEventArgs e)
 		{
 			SecurityHelper.CheckIntegrity();
+			ExplorerContextMenuService.RepairLabels();
 			string[] args = e.Args;
 			bool flag = args.Any((string arg) => arg.Equals("--merge", StringComparison.OrdinalIgnoreCase));
 			bool flag2 = args.Any((string arg) => arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase));

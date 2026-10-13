@@ -36,207 +36,131 @@ internal static class PdfSnapshotPrinter
 
 	private const int PHYSICALOFFSETY = 113;
 
-	public static void PrintSnapshot(PdfSnapshotSelection snapshot, PrintQueue printQueue, PrintTicket printTicket, double rightSafetyPaddingDips, double bottomSafetyPaddingDips)
+	public static void PrintSnapshot(PdfSnapshotSelection snapshot, PrintQueue printQueue, PrintTicket printTicket,
+		double rightSafetyPaddingDips, double bottomSafetyPaddingDips, SnapshotPaperLayout layout,
+		System.Threading.CancellationToken cancellationToken = default)
 	{
-		Stopwatch stopwatch = Stopwatch.StartNew();
-		PdfPerfLogger.Log("Snapshot native print start");
+		cancellationToken.ThrowIfCancellationRequested();
 		PdfiumEngine.Initialize();
-		lock (PdfiumEngine.SyncRoot)
+		nint document = IntPtr.Zero, page = IntPtr.Zero, dc = IntPtr.Zero;
+		bool jobStarted = false;
+		bool ownsEngine = false;
+		GCHandle pin = default;
+		try
 		{
-			nint num = PdfiumEngine.FPDF_LoadDocument(snapshot.PdfPath, null);
-			if (num == IntPtr.Zero)
+			int copies = Math.Clamp(printTicket.CopyCount ?? 1, 1, 999);
+			var driverTicket = printTicket.Clone();
+			driverTicket.CopyCount = 1; // Copies are submitted by this loop, not duplicated by the driver.
+			dc = CreatePrinterDc(printQueue, driverTicket);
+			if (dc == IntPtr.Zero) throw new InvalidOperationException("Không kết nối được máy in.");
+			int dpiX = Math.Max(72, GetDeviceCaps(dc, LOGPIXELSX));
+			int dpiY = Math.Max(72, GetDeviceCaps(dc, LOGPIXELSY));
+			int offsetX = Math.Max(0, GetDeviceCaps(dc, PHYSICALOFFSETX));
+			int offsetY = Math.Max(0, GetDeviceCaps(dc, PHYSICALOFFSETY));
+			int printableWidth = Math.Max(1, GetDeviceCaps(dc, HORZRES));
+			int printableHeight = Math.Max(1, GetDeviceCaps(dc, VERTRES));
+			var paper = layout.PaperSizeMm;
+			double actualWidthMm = GetDeviceCaps(dc, 110) * 25.4 / dpiX;
+			double actualHeightMm = GetDeviceCaps(dc, 111) * 25.4 / dpiY;
+			if (Math.Abs(actualWidthMm - paper.Width) > 3 || Math.Abs(actualHeightMm - paper.Height) > 3)
+				throw new InvalidOperationException($"Máy in không áp dụng khổ {layout.PaperKey} hoặc hướng giấy đã chọn. Hãy chọn khổ được máy in hỗ trợ.");
+			int clipLeft = Math.Max(0, (int)Math.Round(layout.MarginMm * dpiX / 25.4) - offsetX);
+			int clipTop = Math.Max(0, (int)Math.Round(layout.MarginMm * dpiY / 25.4) - offsetY);
+			int clipRight = Math.Min(printableWidth - DipsToDevicePixels(rightSafetyPaddingDips, dpiX),
+				(int)Math.Round((paper.Width - layout.MarginMm) * dpiX / 25.4) - offsetX);
+			int clipBottom = Math.Min(printableHeight - DipsToDevicePixels(bottomSafetyPaddingDips, dpiY),
+				(int)Math.Round((paper.Height - layout.MarginMm) * dpiY / 25.4) - offsetY);
+			if (clipRight <= clipLeft || clipBottom <= clipTop)
+				throw new InvalidOperationException("Máy in không có vùng in phù hợp với lề đã chọn.");
+			double pageWidth, pageHeight;
+			System.Threading.Monitor.Enter(PdfiumEngine.SyncRoot);
+			ownsEngine = true;
+			lock (PdfiumEngine.SyncRoot)
 			{
-				throw new InvalidOperationException("Unable to load PDF for snapshot printing.");
+				document = PdfiumEngine.FPDF_LoadDocument(snapshot.PdfPath, null);
+				if (document == IntPtr.Zero) throw new InvalidOperationException("Không mở được PDF để in.");
+				page = PdfiumEngine.FPDF_LoadPage(document, snapshot.PageIndex);
+				if (page == IntPtr.Zero) throw new InvalidOperationException("Không đọc được trang PDF để in.");
+				pageWidth = PdfiumEngine.FPDF_GetPageWidth(page);
+				pageHeight = PdfiumEngine.FPDF_GetPageHeight(page);
 			}
-			nint num2 = IntPtr.Zero;
-			bool flag = false;
-			try
+			var cropPoints = new System.Windows.Size(pageWidth * snapshot.Width, pageHeight * snapshot.Height);
+			var bounds = layout.ImageBoundsMm(cropPoints);
+			double scale = bounds.Width / (cropPoints.Width * 25.4 / 72);
+			int destWidth = Math.Max(1, (int)Math.Round(bounds.Width * dpiX / 25.4));
+			int destHeight = Math.Max(1, (int)Math.Round(bounds.Height * dpiY / 25.4));
+			int drawX = (int)Math.Round(bounds.X * dpiX / 25.4) - offsetX;
+			int drawY = (int)Math.Round(bounds.Y * dpiY / 25.4) - offsetY;
+			double sampleWidth = pageWidth / 72 * Math.Min(dpiX, printTicket.PageResolution?.X ?? dpiX) * scale;
+			double sampleHeight = pageHeight / 72 * Math.Min(dpiY, printTicket.PageResolution?.Y ?? dpiY) * scale;
+			double limit = Math.Min(1, 40000 / Math.Max(sampleWidth, sampleHeight));
+			limit = Math.Min(limit, Math.Sqrt(47000000 / (sampleWidth * snapshot.Width * sampleHeight * snapshot.Height)));
+			int fullWidth = Math.Max(1, (int)(sampleWidth * limit));
+			int fullHeight = Math.Max(1, (int)(sampleHeight * limit));
+			int tileX = Math.Max(0, (int)Math.Floor(snapshot.X * fullWidth));
+			int tileY = Math.Max(0, (int)Math.Floor(snapshot.Y * fullHeight));
+			int width = Math.Max(1, Math.Min(fullWidth, (int)Math.Ceiling((snapshot.X + snapshot.Width) * fullWidth)) - tileX);
+			int height = Math.Max(1, Math.Min(fullHeight, (int)Math.Ceiling((snapshot.Y + snapshot.Height) * fullHeight)) - tileY);
+			int stride = checked((width * 3 + 3) / 4 * 4);
+			byte[] pixels = new byte[checked(stride * height)];
+			pin = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+			lock (PdfiumEngine.SyncRoot)
 			{
-				num2 = CreatePrinterDc(printQueue, printTicket);
-				if (num2 == IntPtr.Zero)
-				{
-					throw new InvalidOperationException("Cannot create printer DC for " + printQueue.FullName + ".");
-				}
-				int num3 = Math.Max(1, GetDeviceCaps(num2, HORZRES));
-				int num4 = Math.Max(1, GetDeviceCaps(num2, VERTRES));
-				int num5 = Math.Max(72, GetDeviceCaps(num2, LOGPIXELSX));
-				int num6 = Math.Max(72, GetDeviceCaps(num2, LOGPIXELSY));
-				int offsetX = Math.Max(0, GetDeviceCaps(num2, PHYSICALOFFSETX));
-				int offsetY = Math.Max(0, GetDeviceCaps(num2, PHYSICALOFFSETY));
-				bool isLandscape = num3 > num4;
-
-				int num7 = Math.Max(1, num3 - DipsToDevicePixels(rightSafetyPaddingDips, num5));
-				int num8 = Math.Max(1, num4 - DipsToDevicePixels(bottomSafetyPaddingDips, num6));
-				PdfPerfLogger.Log($"Snapshot printer DC: printable={num3}x{num4} (landscape={isLandscape}), dpi={num5}x{num6}, offset={offsetX}x{offsetY}, safe={num7}x{num8}");
-				PdfPerfLogger.Log($"Snapshot source: page={snapshot.PageIndex + 1}, rect=({snapshot.X},{snapshot.Y},{snapshot.Width},{snapshot.Height})");
-				nint num9 = PdfiumEngine.FPDF_LoadPage(num, snapshot.PageIndex);
-				if (num9 == IntPtr.Zero)
-				{
-					throw new InvalidOperationException("Unable to load snapshot page.");
-				}
+				nint bitmap = PdfiumEngine.FPDFBitmap_CreateEx(width, height, 2, pin.AddrOfPinnedObject(), stride);
+				if (bitmap == IntPtr.Zero) throw new InvalidOperationException("Không tạo được ảnh vùng in.");
 				try
 				{
-					double pagePdfWidth = PdfiumEngine.FPDF_GetPageWidth(num9);
-					double pagePdfHeight = PdfiumEngine.FPDF_GetPageHeight(num9);
-					
-					double cropPdfWidth = Math.Max(0.001, snapshot.Width * pagePdfWidth);
-					double cropPdfHeight = Math.Max(0.001, snapshot.Height * pagePdfHeight);
-					
-					double cropPixelWidthAtDpi = cropPdfWidth / 72.0 * (double)num5;
-					double cropPixelHeightAtDpi = cropPdfHeight / 72.0 * (double)num6;
-					
-					// Scale để vùng snapshot vừa khít trang in (giữ tỷ lệ khung hình)
-					double scale = Math.Min((double)num7 / cropPixelWidthAtDpi, (double)num8 / cropPixelHeightAtDpi);
-					
-					int printWidth = Math.Max(1, (int)Math.Round(cropPixelWidthAtDpi * scale));
-					int printHeight = Math.Max(1, (int)Math.Round(cropPixelHeightAtDpi * scale));
-					
-					// Căn giữa trên trang in
-					int drawX = Math.Max(0, (num7 - printWidth) / 2);
-					int drawY = Math.Max(0, (num8 - printHeight) / 2);
-					
-					int fullWidth = Math.Max(1, (int)Math.Round((pagePdfWidth / 72.0 * (double)num5) * scale));
-					int fullHeight = Math.Max(1, (int)Math.Round((pagePdfHeight / 72.0 * (double)num6) * scale));
-					
-					int tileX = Math.Max(0, (int)Math.Round(snapshot.X * (double)fullWidth));
-					int tileY = Math.Max(0, (int)Math.Round(snapshot.Y * (double)fullHeight));
-					int tileWidth = Math.Min(printWidth, fullWidth - tileX);
-					int tileHeight = Math.Min(printHeight, fullHeight - tileY);
-
-					PdfPerfLogger.Log($"Snapshot render: fullPage={fullWidth}x{fullHeight}, printArea={printWidth}x{printHeight}, tile=({tileX},{tileY},{tileWidth},{tileHeight}), draw=({drawX},{drawY})");
-
-					// ─── FIX: In đủ số bản theo Copies ───
-					int copyCount = Math.Max(1, printTicket.CopyCount ?? 1);
-					for (int copyIndex = 0; copyIndex < copyCount; copyIndex++)
-					{
-						DOCINFO lpdi = new DOCINFO
-						{
-							cbSize = Marshal.SizeOf<DOCINFO>(),
-							lpszDocName = $"PDF Pro Snapshot - p{snapshot.PageIndex + 1}"
-						};
-						Stopwatch stopwatch2 = Stopwatch.StartNew();
-						if (StartDoc(num2, ref lpdi) <= 0)
-						{
-							throw new InvalidOperationException("Snapshot StartDoc failed: " + GetLastErrorMessage());
-						}
-						flag = true;
-						stopwatch2.Stop();
-						PdfPerfLogger.Log($"Snapshot StartDoc (copy {copyIndex + 1}/{copyCount}): {stopwatch2.ElapsedMilliseconds} ms");
-						Stopwatch stopwatch3 = Stopwatch.StartNew();
-						if (StartPage(num2) <= 0)
-						{
-							throw new InvalidOperationException("Snapshot StartPage failed: " + GetLastErrorMessage());
-						}
-						PatBlt(num2, 0, 0, num3, num4, WHITENESS);
-						
-						int stride = tileWidth * 4;
-						byte[] array = new byte[stride * tileHeight];
-						GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
-						try
-						{
-							nint first_scan = gCHandle.AddrOfPinnedObject();
-							nint num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(tileWidth, tileHeight, 4, first_scan, stride);
-							if (num5_bmp != IntPtr.Zero)
-							{
-								PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, tileWidth, tileHeight, uint.MaxValue);
-								PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num9, -tileX, -tileY, fullWidth, fullHeight, 0, 2049);
-								PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
-							}
-						}
-						finally
-						{
-							gCHandle.Free();
-						}
-						
-						int stride24 = ((tileWidth * 3 + 3) / 4) * 4;
-						byte[] array24 = new byte[stride24 * tileHeight];
-						for (int y = 0; y < tileHeight; y++)
-						{
-							int srcRowOffset = y * stride;
-							int destRowOffset = y * stride24;
-							for (int x = 0; x < tileWidth; x++)
-							{
-								int srcIndex = srcRowOffset + x * 4;
-								int destIndex = destRowOffset + x * 3;
-								array24[destIndex] = array[srcIndex];       // B
-								array24[destIndex + 1] = array[srcIndex + 1]; // G
-								array24[destIndex + 2] = array[srcIndex + 2]; // R
-							}
-						}
-						
-						GCHandle gCHandle24 = GCHandle.Alloc(array24, GCHandleType.Pinned);
-						try
-						{
-							nint first_scan24 = gCHandle24.AddrOfPinnedObject();
-							BITMAPINFO bmi = default(BITMAPINFO);
-							bmi.bmiHeader.biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>();
-							bmi.bmiHeader.biWidth = tileWidth;
-							bmi.bmiHeader.biHeight = -tileHeight;
-							bmi.bmiHeader.biPlanes = 1;
-							bmi.bmiHeader.biBitCount = 24;
-							bmi.bmiHeader.biCompression = 0; // BI_RGB
-							bmi.bmiHeader.biSizeImage = (uint)(stride24 * tileHeight);
-
-							int result = StretchDIBits(
-								num2,
-								drawX,
-								drawY,
-								printWidth,  // Dùng printWidth thay vì tileWidth để kéo giãn vừa đúng trang in
-								printHeight, // Dùng printHeight thay vì tileHeight để kéo giãn vừa đúng trang in
-								0,
-								0,
-								tileWidth,
-								tileHeight,
-								first_scan24,
-								ref bmi,
-								0, // DIB_RGB_COLORS
-								13369376 // SRCCOPY
-							);
-							if (result == -1)
-							{
-								PdfPerfLogger.Log($"Snapshot StretchDIBits failed: {GetLastErrorMessage()}");
-							}
-						}
-						finally
-						{
-							gCHandle24.Free();
-						}
-						
-						if (EndPage(num2) <= 0)
-						{
-							throw new InvalidOperationException("Snapshot EndPage failed: " + GetLastErrorMessage());
-						}
-						stopwatch3.Stop();
-						PdfPerfLogger.Log($"Snapshot page render+EndPage (copy {copyIndex + 1}): {stopwatch3.ElapsedMilliseconds} ms");
-						Stopwatch stopwatch4 = Stopwatch.StartNew();
-						if (EndDoc(num2) <= 0)
-						{
-							throw new InvalidOperationException("Snapshot EndDoc failed: " + GetLastErrorMessage());
-						}
-						flag = false;
-						stopwatch4.Stop();
-						PdfPerfLogger.Log($"Snapshot EndDoc spool (copy {copyIndex + 1}): {stopwatch4.ElapsedMilliseconds} ms");
-					} // end copy loop
+					PdfiumEngine.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, uint.MaxValue);
+					PdfiumEngine.FPDF_RenderPageBitmap(bitmap, page, -tileX, -tileY, fullWidth, fullHeight, 0, 0x801);
 				}
-				finally
-				{
-					PdfiumEngine.FPDF_ClosePage(num9);
-				}
+				finally { PdfiumEngine.FPDFBitmap_Destroy(bitmap); }
 			}
-			finally
+			PdfiumEngine.FPDF_ClosePage(page);
+			PdfiumEngine.FPDF_CloseDocument(document);
+			page = document = IntPtr.Zero;
+			System.Threading.Monitor.Exit(PdfiumEngine.SyncRoot);
+			ownsEngine = false;
+			PdfPerfLogger.Log($"Snapshot print: {layout.PaperKey}, scale={scale:P1}, raster={width}x{height}, copies={copies}");
+			BITMAPINFO info = default;
+			info.bmiHeader.biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>();
+			info.bmiHeader.biWidth = width;
+			info.bmiHeader.biHeight = -height;
+			info.bmiHeader.biPlanes = 1;
+			info.bmiHeader.biBitCount = 24;
+			info.bmiHeader.biSizeImage = (uint)pixels.Length;
+			for (int copy = 0; copy < copies; copy++)
 			{
-				if (flag && num2 != IntPtr.Zero)
-				{
-					AbortDoc(num2);
-				}
-				if (num2 != IntPtr.Zero)
-				{
-					DeleteDC(num2);
-				}
-				PdfiumEngine.FPDF_CloseDocument(num);
-				stopwatch.Stop();
-				PdfPerfLogger.Log($"Snapshot native print total: {stopwatch.ElapsedMilliseconds} ms");
+				cancellationToken.ThrowIfCancellationRequested();
+				var docInfo = new DOCINFO { cbSize = Marshal.SizeOf<DOCINFO>(), lpszDocName = $"PDF Pro Snapshot - p{snapshot.PageIndex + 1}" };
+				if (StartDoc(dc, ref docInfo) <= 0) throw new InvalidOperationException("Không bắt đầu được lệnh in: " + GetLastErrorMessage());
+				jobStarted = true;
+				if (StartPage(dc) <= 0) throw new InvalidOperationException("Không bắt đầu được trang in: " + GetLastErrorMessage());
+				PatBlt(dc, 0, 0, printableWidth, printableHeight, WHITENESS);
+				if (IntersectClipRect(dc, clipLeft, clipTop, clipRight, clipBottom) == 0)
+					throw new InvalidOperationException("Không thiết lập được vùng in.");
+				SetStretchBltMode(dc, 4); // HALFTONE
+				int result = StretchDIBits(dc, drawX, drawY, destWidth, destHeight, 0, 0, width, height,
+					pin.AddrOfPinnedObject(), ref info, 0, 13369376);
+				if (result == 0 || result == -1) throw new InvalidOperationException("Không gửi được ảnh tới máy in: " + GetLastErrorMessage());
+				if (EndPage(dc) <= 0) throw new InvalidOperationException("Không hoàn tất được trang in: " + GetLastErrorMessage());
+				if (EndDoc(dc) <= 0) throw new InvalidOperationException("Không hoàn tất được lệnh in: " + GetLastErrorMessage());
+				jobStarted = false;
 			}
+		}
+		finally
+		{
+			if (jobStarted && dc != IntPtr.Zero) AbortDoc(dc);
+			if (dc != IntPtr.Zero) DeleteDC(dc);
+			if (pin.IsAllocated) pin.Free();
+			try
+			{
+				lock (PdfiumEngine.SyncRoot)
+				{
+					if (page != IntPtr.Zero) PdfiumEngine.FPDF_ClosePage(page);
+					if (document != IntPtr.Zero) PdfiumEngine.FPDF_CloseDocument(document);
+				}
+			}
+			finally { if (ownsEngine) System.Threading.Monitor.Exit(PdfiumEngine.SyncRoot); }
 		}
 	}
 
@@ -338,6 +262,12 @@ internal static class PdfSnapshotPrinter
 
 	[DllImport("gdi32.dll", SetLastError = true)]
 	private static extern bool DeleteDC(nint hdc);
+
+	[DllImport("gdi32.dll", SetLastError = true)]
+	private static extern int IntersectClipRect(nint hdc, int left, int top, int right, int bottom);
+
+	[DllImport("gdi32.dll", SetLastError = true)]
+	private static extern int SetStretchBltMode(nint hdc, int mode);
 
 	[DllImport("gdi32.dll", SetLastError = true)]
 	private static extern int GetDeviceCaps(nint hdc, int index);

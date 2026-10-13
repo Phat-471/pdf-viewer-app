@@ -1,7 +1,58 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="PdfViewerApp.SnapshotActionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Snapshot" Height="230" Width="460" MinHeight="230" MinWidth="420" WindowStartupLocation="CenterOwner" ResizeMode="CanResize" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma" xmlns:pdfviewerapp="clr-namespace:PdfViewerApp;assembly=PdfViewerApp">
+<Window x:Class="PdfViewerApp.SnapshotActionDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Snapshot — Xem trước vùng chọn" Height="690" Width="880" MinHeight="540" MinWidth="730" WindowStartupLocation="CenterOwner" ResizeMode="CanResize" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma" PreviewKeyDown="Window_PreviewKeyDown">
   <Window.Resources>
     <ResourceDictionary>
+      <Style TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ComboBoxItem">
+              <Border Name="ItemBorder" Background="#1E293B" Padding="{TemplateBinding Padding}">
+                <ContentPresenter />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#0F766E" /></Trigger>
+                <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#334155" /></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style TargetType="ComboBox">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ComboBox">
+              <Grid>
+                <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border CornerRadius="4" BorderBrush="#475569" BorderThickness="1" Background="#1E293B">
+                        <Path Data="M 0 0 L 4 4 L 8 0" Stroke="#CBD5E1" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+                      </Border>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="8,4,28,4" IsHitTestVisible="False" VerticalAlignment="Center" />
+                <Popup Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
+                  <Border Background="#1E293B" BorderBrush="#475569" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                    <ScrollViewer MaxHeight="260" CanContentScroll="True"><ItemsPresenter /></ScrollViewer>
+                  </Border>
+                </Popup>
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style TargetType="TextBox">
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="BorderBrush" Value="#475569" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+      </Style>
       <Style x:Key="PremiumButton" TargetType="{x:Type Button}">
         <Setter Property="Foreground" Value="#FFFFFFFF" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -20,6 +71,7 @@
                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
               <ControlTemplate.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Border" Property="Opacity" Value="0.4" /></Trigger>
                 <Trigger Property="UIElement.IsMouseOver" Value="True">
                   <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.9" />
                 </Trigger>
@@ -43,6 +95,7 @@
                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
               <ControlTemplate.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Border" Property="Opacity" Value="0.4" /></Trigger>
                 <Trigger Property="UIElement.IsMouseOver" Value="True">
                   <Setter TargetName="Border" Property="Border.BorderBrush" Value="#475569" />
                   <Setter Property="Foreground" Value="#F8FAFC" />
@@ -58,22 +111,71 @@
       </Style>
     </ResourceDictionary>
   </Window.Resources>
-  <Grid Margin="18">
+  <Grid Margin="24">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <TextBlock Text="Đã chọn vùng snapshot" FontSize="18" FontWeight="SemiBold" Foreground="#38BDF8" />
-    <StackPanel Grid.Row="1" Margin="0,14,0,12">
-      <TextBlock Text="Chọn thao tác tiếp theo. Lệnh in sẽ dùng PDFium native để phóng vùng chọn lên toàn bộ trang in nên bản vẽ vẫn nét." TextWrapping="Wrap" Foreground="#94A3B8" />
-      <TextBlock Name="SnapshotInfoText" Margin="0,10,0,0" Foreground="#64748B" TextWrapping="Wrap" />
+    <StackPanel Margin="0,0,0,16">
+      <TextBlock Text="Xem trước vùng chọn" FontSize="21" FontWeight="SemiBold" Foreground="#38BDF8" />
+      <TextBlock Name="SnapshotInfoText" Margin="0,6,0,0" Foreground="#CBD5E1" TextWrapping="Wrap" />
     </StackPanel>
-    <WrapPanel Grid.Row="2" HorizontalAlignment="Right">
-      <Button Content="In..." Style="{StaticResource PremiumButton}" Width="92" Height="32" Margin="0,0,8,0" IsDefault="True" Click="Print_Click" />
-      <Button Content="Copy ảnh" Style="{StaticResource SecondaryButton}" Width="92" Height="32" Margin="0,0,8,0" Click="Copy_Click" />
-      <Button Content="Lưu PNG" Style="{StaticResource SecondaryButton}" Width="92" Height="32" Margin="0,0,8,0" Click="Save_Click" />
-      <Button Content="Hủy" Style="{StaticResource SecondaryButton}" Width="80" Height="32" IsCancel="True" Click="Cancel_Click" />
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="240" /></Grid.ColumnDefinitions>
+      <Border Background="#111827" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Padding="16" Margin="0,0,20,0">
+        <Grid>
+          <Image Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Xem trước Snapshot trên giấy" />
+          <TextBlock Name="PreviewPlaceholder" Text="Đang chuẩn bị xem trước…" Foreground="#CBD5E1" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+      <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Name="SettingsPanel">
+          <TextBlock Text="BỐ CỤC GIẤY" Foreground="#94A3B8" FontWeight="SemiBold" Margin="0,0,0,12" />
+          <TextBlock Text="Khổ giấy" Margin="0,0,0,6" />
+          <ComboBox Name="PaperCombo" SelectedIndex="3" SelectionChanged="Layout_Changed" Margin="0,0,0,12" MinHeight="32">
+            <ComboBoxItem Content="A0 · 841 × 1189 mm" Tag="A0" />
+            <ComboBoxItem Content="A1 · 594 × 841 mm" Tag="A1" />
+            <ComboBoxItem Content="A2 · 420 × 594 mm" Tag="A2" />
+            <ComboBoxItem Content="A3 · 297 × 420 mm" Tag="A3" />
+            <ComboBoxItem Content="A4 · 210 × 297 mm" Tag="A4" />
+            <ComboBoxItem Content="Letter · 216 × 279 mm" Tag="Letter" />
+          </ComboBox>
+          <TextBlock Text="Hướng giấy" Margin="0,0,0,6" />
+          <ComboBox Name="OrientationCombo" SelectedIndex="0" SelectionChanged="Layout_Changed" Margin="0,0,0,12" MinHeight="32">
+            <ComboBoxItem Content="Ngang" Tag="Landscape" /><ComboBoxItem Content="Dọc" Tag="Portrait" />
+          </ComboBox>
+          <TextBlock Text="Tỷ lệ" Margin="0,0,0,6" />
+          <ComboBox Name="ScaleModeCombo" SelectedIndex="0" SelectionChanged="Layout_Changed" Margin="0,0,0,8" MinHeight="32">
+            <ComboBoxItem Content="Vừa trang, giữ tỷ lệ" /><ComboBoxItem Content="Tỷ lệ thực / nhập tay" />
+          </ComboBox>
+          <DockPanel Margin="0,0,0,8">
+            <TextBlock Text="%" DockPanel.Dock="Right" Margin="8,0,0,0" VerticalAlignment="Center" />
+            <TextBox Name="ScaleTextBox" Text="100" IsEnabled="False" TextChanged="Scale_TextChanged" MinHeight="30" Padding="6" AutomationProperties.Name="Tỷ lệ Snapshot từ 10 đến 400 phần trăm" />
+          </DockPanel>
+          <TextBlock Text="Lề giấy 10 mm. 100% giữ kích thước của vùng chọn trong PDF." Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,18" />
+          <TextBlock Text="ẢNH COPY / PNG" Foreground="#94A3B8" FontWeight="SemiBold" Margin="0,0,0,12" />
+          <TextBlock Text="Chất lượng ảnh (cạnh dài tối đa)" Margin="0,0,0,6" />
+          <ComboBox Name="QualityCombo" SelectedIndex="1" Margin="0,0,0,12" MinHeight="32">
+            <ComboBoxItem Content="Nhanh · 1600 px" Tag="1600" /><ComboBoxItem Content="Rõ · 2400 px" Tag="2400" /><ComboBoxItem Content="Chi tiết · 4800 px" Tag="4800" />
+          </ComboBox>
+          <ComboBox Name="ExportModeCombo" SelectedIndex="0" MinHeight="32" AutomationProperties.Name="Phạm vi ảnh xuất">
+            <ComboBoxItem Content="Theo bố cục giấy" /><ComboBoxItem Content="Chỉ vùng chọn" />
+          </ComboBox>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+    <StackPanel Grid.Row="2" Margin="0,12,0,16">
+      <ProgressBar Name="BusyProgress" Height="3" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8" />
+      <TextBlock Name="StatusText" Foreground="#CBD5E1" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+    <WrapPanel Grid.Row="3" HorizontalAlignment="Right">
+      <Button Name="ReselectButton" Content="Chọn lại vùng" Style="{StaticResource SecondaryButton}" MinWidth="110" Height="36" Margin="0,0,8,0" Click="Reselect_Click" />
+      <Button Name="PrintButton" Content="In…" Style="{StaticResource PremiumButton}" MinWidth="88" Height="36" Margin="0,0,8,0" IsDefault="True" Click="Print_Click" />
+      <Button Name="CopyButton" Content="Copy ảnh" Style="{StaticResource SecondaryButton}" MinWidth="92" Height="36" Margin="0,0,8,0" Click="Copy_Click" ToolTip="Copy ảnh vào Clipboard (Ctrl+C)" />
+      <Button Name="SaveButton" Content="Lưu PNG" Style="{StaticResource SecondaryButton}" MinWidth="92" Height="36" Margin="0,0,8,0" Click="Save_Click" />
+      <Button Content="Đóng" Style="{StaticResource SecondaryButton}" MinWidth="80" Height="36" IsCancel="True" Click="Cancel_Click" />
     </WrapPanel>
   </Grid>
 </Window>
