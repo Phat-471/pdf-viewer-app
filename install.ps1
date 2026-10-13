@@ -1,107 +1,60 @@
-# install.ps1
-# PDF Pro - Automated Installer for Desktop Shortcut & Explorer Context Menu
-$ErrorActionPreference = "Stop"
-
-# 1. Require Administrator Elevation
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Write-Host "Dang yeu cau quyen Administrator de cai dat..." -ForegroundColor Yellow
-    try {
-        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -Wait
-    } catch {
-        Write-Error "Yeu cau quyen Administrator bi tu choi!"
-    }
-    exit
-}
-
+﻿# Install the prebuilt ZIP for the current Windows user. No SDK or elevation required.
+param([switch]$RegisterVirtualPrinter)
+$ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptDir
-
-Write-Host "=== Bat dau qua trinh cai dat PDF Pro - HPhat Edition ===" -ForegroundColor Cyan
-
-# 2. Terminate any running PdfViewerApp process
-Write-Host "`n[1/7] Dang dong cac ung dung dang chay de tranh khoa tap tin..." -ForegroundColor Yellow
-Stop-Process -Name PdfViewerApp -Force -ErrorAction SilentlyContinue
-Get-Process | Where-Object {$_.Path -like "*PdfViewerApp*"} | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
-
-# 3. Clean previous builds and caches
-Write-Host "`n[2/7] Dang xoa cac ban build cu va lam sach cache..." -ForegroundColor Yellow
-$wpfProjectDir = Join-Path $scriptDir "src\PdfViewerApp"
-$rustProjectDir = Join-Path $scriptDir "src\PdfCore"
-
-# Shutdown MSBuild server to release any lock
-dotnet build-server shutdown | Out-Null
-
-if (Test-Path "src\PdfViewerApp\bin") { Remove-Item -Path "src\PdfViewerApp\bin" -Recurse -Force -ErrorAction SilentlyContinue }
-if (Test-Path "src\PdfViewerApp\obj") { Remove-Item -Path "src\PdfViewerApp\obj" -Recurse -Force -ErrorAction SilentlyContinue }
-if (Test-Path "src\PdfCore\target") { Remove-Item -Path "src\PdfCore\target" -Recurse -Force -ErrorAction SilentlyContinue }
-
+$sourceDir = $scriptDir
+if (-not (Test-Path -LiteralPath (Join-Path $sourceDir 'PdfViewerApp.exe'))) {
+    $sourceDir = Join-Path $scriptDir 'src/PdfViewerApp/bin/Release/net8.0-windows10.0.26100.0/win-x64/publish'
+}
+foreach ($name in @('PdfViewerApp.exe', 'pdf_core.dll', 'pdfium.dll')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $sourceDir $name) -PathType Leaf)) { throw "Incomplete package: $name. Build with package_project.ps1 or download the complete release ZIP." }
+}
+$canonicalDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'PDF Pro'))
+$legacyDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'PDFPro'))
+$installDir = if ((Test-Path -LiteralPath $legacyDir) -and -not (Test-Path -LiteralPath $canonicalDir)) { $legacyDir } else { $canonicalDir }
+if ($installDir -notin @($canonicalDir, $legacyDir)) { throw 'Invalid installation directory.' }
+$sourceDir = [IO.Path]::GetFullPath($sourceDir)
+if ($sourceDir.TrimEnd('\') -eq $installDir.TrimEnd('\')) { throw 'This package is already in the installation directory. Run the application or use Setup.exe.' }
+$exePath = Join-Path $installDir 'PdfViewerApp.exe'
+$files = @(Get-ChildItem -LiteralPath $sourceDir -File -Recurse | Where-Object { $_.Name -notlike '*.pdb' })
+$sourcePrefix = $sourceDir.TrimEnd('\') + '\'
+$installPrefix = $installDir.TrimEnd('\') + '\'
+# Validate every destination before stopping this installation or replacing files.
+$payload = foreach ($file in $files) {
+    $relative = $file.FullName.Substring($sourcePrefix.Length)
+    $dest = [IO.Path]::GetFullPath((Join-Path $installDir $relative))
+    if (-not $dest.StartsWith($installPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Package path is outside the installation directory.' }
+    [PSCustomObject]@{ Source = $file.FullName; Relative = $relative; Destination = $dest }
+}
+Get-Process -Name PdfViewerApp -ErrorAction SilentlyContinue | Where-Object {
+    $_.Path -and [IO.Path]::GetFullPath($_.Path) -eq $exePath
+} | Stop-Process -Force
+$backupDir = [IO.Path]::GetFullPath((Join-Path $env:TEMP ('pdfpro-install-backup-' + [Guid]::NewGuid().ToString('N'))))
+$tempPrefix = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\') + '\'
+if (-not $backupDir.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Backup directory is outside TEMP.' }
+$replaced = [Collections.Generic.List[object]]::new()
 try {
-    dotnet nuget locals all --clear | Out-Null
-    Write-Host "    Da lam sach cache NuGet thanh cong!" -ForegroundColor Green
-} catch {
-    Write-Host "    Khong the lam sach cache NuGet, tiep tuc..." -ForegroundColor DarkYellow
-}
-
-# 4. Compile and Publish Project
-Write-Host "`n[3/7] Bien dich va xuat ban tu ma nguon..." -ForegroundColor Yellow
-$installDir = Join-Path $env:LOCALAPPDATA "PDFPro"
-if (-not (Test-Path $installDir)) {
-    New-Item -ItemType Directory -Path $installDir -Force | Out-Null
-}
-
-if (Test-Path $wpfProjectDir) {
-    # Compile Rust core first
-    if (Test-Path $rustProjectDir) {
-        Write-Host "    Dang bien dich Rust Core (PdfCore)..." -ForegroundColor Yellow
-        Set-Location $rustProjectDir
-        & cargo build --release
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Bien dich Rust core that bai!"
-            exit 1
+    foreach ($file in $payload) {
+        $backupPath = Join-Path $backupDir $file.Relative
+        $existed = Test-Path -LiteralPath $file.Destination
+        if ($existed) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $backupPath) -Force | Out-Null
+            Copy-Item -LiteralPath $file.Destination -Destination $backupPath -Force
         }
-        Set-Location $scriptDir
+        $replaced.Add([PSCustomObject]@{ Destination = $file.Destination; Backup = $backupPath; Existed = $existed })
+        New-Item -ItemType Directory -Path (Split-Path -Parent $file.Destination) -Force | Out-Null
+        Copy-Item -LiteralPath $file.Source -Destination $file.Destination -Force
     }
-
-    # Publish C# WPF
-    Write-Host "    Dang xuat ban C# WPF Application..." -ForegroundColor Yellow
-    Set-Location $wpfProjectDir
-    & dotnet publish -c Release -r win-x64 --self-contained true
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Xuat ban WPF that bai!"
-        exit 1
+} catch {
+    foreach ($file in $replaced) {
+        if ($file.Existed) { Copy-Item -LiteralPath $file.Backup -Destination $file.Destination -Force }
+        elseif (Test-Path -LiteralPath $file.Destination) { Remove-Item -LiteralPath $file.Destination -Force }
     }
-    Set-Location $scriptDir
-
-    # Copy native dependencies
-    $publishDir = Join-Path $scriptDir "src\PdfViewerApp\bin\Release\net8.0-windows10.0.26100.0\win-x64\publish"
-    
-    if (Test-Path "libs\pdfium.dll") {
-        Copy-Item "libs\pdfium.dll" -Destination "$publishDir\pdfium.dll" -Force
-    }
-    
-    $rustDll = Join-Path $rustProjectDir "target\release\pdf_core.dll"
-    if (Test-Path $rustDll) {
-        Copy-Item $rustDll -Destination "$publishDir\pdf_core.dll" -Force
-    } elseif (Test-Path "libs\pdf_core.dll") {
-        Copy-Item "libs\pdf_core.dll" -Destination "$publishDir\pdf_core.dll" -Force
-    }
-
-    # Clear target install directory first to avoid old files, but preserve configuration and license (*.json) files
-    if (Test-Path $installDir) {
-        Get-ChildItem -Path $installDir -Exclude "*.json" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Copy-Item -Path "$publishDir\*" -Destination $installDir -Recurse -Force
-} else {
-    Write-Host "`n[3/7] Che do cai dat nhanh tu file dung san..." -ForegroundColor Yellow
-    if (Test-Path $installDir) {
-        Get-ChildItem -Path $installDir -Exclude "*.json" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Copy-Item -Path "$scriptDir\*" -Destination $installDir -Exclude "install.ps1", "install.bat", "uninstall.ps1", "uninstall.bat", "*.zip", ".git" -Recurse -Force
+    throw
 }
-
-Write-Host "    Da thiet lap thu muc ung dung tai: $installDir" -ForegroundColor Green
+if (Test-Path -LiteralPath $backupDir) { Remove-Item -LiteralPath $backupDir -Recurse -Force }
+ConvertTo-Json -InputObject @($payload | ForEach-Object { $_.Relative }) | Set-Content -LiteralPath (Join-Path $installDir 'installed-files.json') -Encoding UTF8
+Write-Host "Installed the complete package to $installDir" -ForegroundColor Green
 
 # 5. Create Desktop Shortcut
 Write-Host "`n[5/7] Tao phim tat tren Desktop (Shortcut)..." -ForegroundColor Yellow
@@ -144,25 +97,14 @@ New-ItemProperty -Path $appRootKey -Name "FriendlyTypeName" -Value "PDF Pro - HP
 $appShellKey = "HKCU:\Software\Classes\Applications\PdfViewerApp.exe\shell\open"
 New-ItemProperty -Path $appShellKey -Name "FriendlyAppName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 
-$openWithKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithList"
-if (-not (Test-Path $openWithKey)) {
-    New-Item -Path $openWithKey -Force | Out-Null
-}
-$existingValues = (Get-Item $openWithKey -ErrorAction SilentlyContinue).Property | Where-Object { $_ -ne 'MRUList' }
-$nextLetter = 'a'
-if ($existingValues) {
-    $usedLetters = $existingValues
-    $nextLetter = [char](([int][char]($usedLetters | Sort-Object | Select-Object -Last 1)) + 1)
-}
-New-ItemProperty -Path $openWithKey -Name $nextLetter -Value "PdfViewerApp.exe" -PropertyType String -Force | Out-Null
+$supportedTypes = 'HKCU:\Software\Classes\Applications\PdfViewerApp.exe\SupportedTypes'
+New-Item -Path $supportedTypes -Force | Out-Null
+New-ItemProperty -Path $supportedTypes -Name '.pdf' -Value '' -PropertyType String -Force | Out-Null
+$openWithProgIdsKey = 'HKCU:\Software\Classes\.pdf\OpenWithProgids'
+New-Item -Path $openWithProgIdsKey -Force | Out-Null
+New-ItemProperty -Path $openWithProgIdsKey -Name 'PDFPro.PDF' -Value ([byte[]]@()) -PropertyType Binary -Force | Out-Null
 
-$openWithProgIdsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids"
-if (-not (Test-Path $openWithProgIdsKey)) {
-    New-Item -Path $openWithProgIdsKey -Force | Out-Null
-}
-New-ItemProperty -Path $openWithProgIdsKey -Name "PdfViewerApp.Document" -Value ([byte[]]@()) -PropertyType Binary -Force | Out-Null
-
-$progIdKey = "HKCU:\Software\Classes\PdfViewerApp.Document"
+$progIdKey = "HKCU:\Software\Classes\PDFPro.PDF"
 New-Item -Path "$progIdKey\shell\open\command" -Force | Out-Null
 New-ItemProperty -Path $progIdKey -Name "(default)" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
 New-ItemProperty -Path $progIdKey -Name "FriendlyTypeName" -Value "PDF Pro - HPhat Edition" -PropertyType String -Force | Out-Null
@@ -170,6 +112,21 @@ Set-ItemProperty -Path "$progIdKey\shell\open\command" -Name "(default)" -Value 
 
 Write-Host "    Hiep hoi tep tin va Menu chuot phai hoan tat!" -ForegroundColor Green
 
+$appPaths = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe'
+New-Item -Path $appPaths -Force | Out-Null
+Set-ItemProperty -LiteralPath $appPaths -Name '(default)' -Value $exePath
+New-ItemProperty -LiteralPath $appPaths -Name 'Path' -Value $installDir -PropertyType String -Force | Out-Null
+$capabilities = 'HKCU:\Software\PDFPro\Capabilities'
+New-Item -Path "$capabilities\FileAssociations" -Force | Out-Null
+New-ItemProperty -LiteralPath $capabilities -Name 'ApplicationName' -Value 'PDF Pro' -PropertyType String -Force | Out-Null
+New-ItemProperty -LiteralPath "$capabilities\FileAssociations" -Name '.pdf' -Value 'PDFPro.PDF' -PropertyType String -Force | Out-Null
+New-Item -Path 'HKCU:\Software\RegisteredApplications' -Force | Out-Null
+New-ItemProperty -LiteralPath 'HKCU:\Software\RegisteredApplications' -Name 'PDF Pro' -Value 'Software\PDFPro\Capabilities' -PropertyType String -Force | Out-Null
+
+if ($RegisterVirtualPrinter) {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) { Write-Warning 'Virtual printer registration requires an administrator. Application installation is complete.' }
+    else {
 # 7. Register Virtual PDF Printer
 Write-Host "`n[7/7] Dang ky may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
 $printerName = "PDF Pro - HPhat Edition"
@@ -198,6 +155,6 @@ try {
     Write-Host "    Loi khi cai dat may in ao: $($_.Exception.Message)" -ForegroundColor DarkYellow
 }
 
-Write-Host "`n=== CAI DAT HOAN TAT VA THANH CONG! ===" -ForegroundColor Cyan
-Write-Host "Ban co the chay ung dung tu shortcut tren Desktop" -ForegroundColor Green
-# Read-Host "`nNhan Enter de thoat..."
+    }
+}
+Write-Host 'PDF Pro installation completed.' -ForegroundColor Green

@@ -1,96 +1,59 @@
-# uninstall.ps1
-# PDF Pro - Automated Uninstaller for Desktop Shortcut, App Folder & Explorer Context Menu
-$ErrorActionPreference = "Stop"
-
-# 1. Require Administrator Elevation
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Write-Host "Dang yeu cau quyen Administrator de go cai dat..." -ForegroundColor Yellow
-    try {
-        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs -Wait
-    } catch {
-        Write-Error "Yeu cau quyen Administrator bi tu choi!"
-    }
-    exit
+﻿# Remove a user installation. Prefer the registered Inno Setup uninstaller.
+param([switch]$RemoveVirtualPrinter)
+$ErrorActionPreference = 'Stop'
+$canonicalDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'PDF Pro'))
+$legacyDir = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'PDFPro'))
+$scriptDir = [IO.Path]::GetFullPath($PSScriptRoot)
+$installDir = if ($scriptDir -in @($canonicalDir, $legacyDir)) { $scriptDir }
+    elseif (Test-Path -LiteralPath $canonicalDir) { $canonicalDir }
+    else { $legacyDir }
+if ($installDir -notin @($canonicalDir, $legacyDir)) { throw 'Invalid installation directory.' }
+if (-not (Test-Path -LiteralPath $installDir)) { Write-Host 'PDF Pro is not installed.'; return }
+$innoUninstaller = Join-Path $installDir 'unins000.exe'
+if (Test-Path -LiteralPath $innoUninstaller) {
+    Start-Process -FilePath $innoUninstaller -Wait
+    return
 }
-
-Write-Host "=== Go Cai Dat PDF Pro - HPhat Edition ===" -ForegroundColor Cyan
-
-# 2. Terminate any running PdfViewerApp process
-Write-Host "`n[1/4] Dang dong cac ung dung dang chay..." -ForegroundColor Yellow
-Stop-Process -Name PdfViewerApp -Force -ErrorAction SilentlyContinue
-Get-Process | Where-Object {$_.Path -like "*PdfViewerApp*"} | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
-
-# 3. Clean up Desktop Shortcut
-Write-Host "`n[2/4] Dang xoa phim tat tren Desktop..." -ForegroundColor Yellow
-$desktopPath = [System.IO.Path]::Combine([System.Environment]::GetFolderPath('Desktop'), "PDF Pro - HPhat Edition.lnk")
-if (Test-Path $desktopPath) {
-    Remove-Item $desktopPath -Force
-    Write-Host "    Da xoa phim tat tren Desktop." -ForegroundColor Green
+$installPrefix = $installDir.TrimEnd('\') + '\'
+$manifestPath = Join-Path $installDir 'installed-files.json'
+if (Test-Path -LiteralPath $manifestPath) {
+    $names = @(Get-Content -LiteralPath $manifestPath -Encoding UTF8 -Raw | ConvertFrom-Json)
+} else {
+    # Old ZIP installations did not record payload files. Keep unknown files and user data.
+    $names = @('PdfViewerApp.exe','pdf_core.dll','pdfium.dll','VCRUNTIME140.dll','VCRUNTIME140_1.dll','MSVCP140.dll','CONCRT140.dll','install.ps1','install.bat','uninstall.ps1','uninstall.bat')
 }
-
-# 4. Clean up Registry Keys
-Write-Host "`n[3/4] Dang xoa cau hinh Registry va Menu chuot phai..." -ForegroundColor Yellow
-Remove-Item -Path "HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\Classes\Applications\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\Classes\PdfViewerApp.Document" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\Classes\PDFPro.PDF" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\Classes\.pdf\OpenWithList\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe" -Recurse -ErrorAction SilentlyContinue
-Remove-Item -Path "HKCU:\Software\PDFPro" -Recurse -ErrorAction SilentlyContinue
-
-# Clean OpenWithProgids & RegisteredApplications
-$openWithProgIdsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids"
-if (Test-Path $openWithProgIdsKey) {
-    Remove-ItemProperty -Path $openWithProgIdsKey -Name "PdfViewerApp.Document" -ErrorAction SilentlyContinue
-    Remove-ItemProperty -Path $openWithProgIdsKey -Name "PDFPro.PDF" -ErrorAction SilentlyContinue
+$paths = foreach ($name in $names) {
+    if ([string]::IsNullOrWhiteSpace([string]$name) -or [IO.Path]::IsPathRooted([string]$name)) { throw 'Invalid installed file list.' }
+    $path = [IO.Path]::GetFullPath((Join-Path $installDir ([string]$name)))
+    if (-not $path.StartsWith($installPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Uninstall path is outside the application directory.' }
+    $path
 }
-$classesPdfOpenWithProgids = "HKCU:\Software\Classes\.pdf\OpenWithProgids"
-if (Test-Path $classesPdfOpenWithProgids) {
-    Remove-ItemProperty -Path $classesPdfOpenWithProgids -Name "PDFPro.PDF" -ErrorAction SilentlyContinue
+$exePath = Join-Path $installDir 'PdfViewerApp.exe'
+Get-Process -Name PdfViewerApp -ErrorAction SilentlyContinue | Where-Object {
+    $_.Path -and [IO.Path]::GetFullPath($_.Path) -eq $exePath
+} | Stop-Process -Force
+foreach ($path in $paths) {
+    if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
 }
-$registeredAppsKey = "HKCU:\Software\RegisteredApplications"
-if (Test-Path $registeredAppsKey) {
-    Remove-ItemProperty -Path $registeredAppsKey -Name "PDF Pro" -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $manifestPath) { Remove-Item -LiteralPath $manifestPath -Force }
+$desktopPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'PDF Pro - HPhat Edition.lnk'
+if (Test-Path -LiteralPath $desktopPath) { Remove-Item -LiteralPath $desktopPath -Force }
+foreach ($key in @(
+    'HKCU:\Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge',
+    'HKCU:\Software\Classes\Applications\PdfViewerApp.exe',
+    'HKCU:\Software\Classes\PdfViewerApp.Document',
+    'HKCU:\Software\Classes\PDFPro.PDF',
+    'HKCU:\Software\Classes\.pdf\OpenWithList\PdfViewerApp.exe',
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe',
+    'HKCU:\Software\PDFPro\Capabilities'
+)) { if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key -Recurse -Force } }
+foreach ($key in @('HKCU:\Software\Classes\.pdf\OpenWithProgids', 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids')) {
+    foreach ($name in @('PdfViewerApp.Document','PDFPro.PDF')) { Remove-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue }
 }
-Write-Host "    Da xoa cac khoa registry cau hinh." -ForegroundColor Green
-
-# 5. Clean up Virtual Printer
-Write-Host "`n[4/4] Dang go bo may in ao 'PDF Pro - HPhat Edition'..." -ForegroundColor Yellow
-$printerName = "PDF Pro - HPhat Edition"
-$oldPortName = "PDFPro_HPhat_Port:"
-try {
-    if (Get-Printer -Name $printerName -ErrorAction SilentlyContinue) {
-        Remove-Printer -Name $printerName -ErrorAction Stop
-        Write-Host "    Da go bo may in ao." -ForegroundColor Green
-    }
-    if (Get-PrinterPort -Name $oldPortName -ErrorAction SilentlyContinue) {
-        Remove-PrinterPort -Name $oldPortName -ErrorAction Stop
-        Write-Host "    Da xoa cong may in cu." -ForegroundColor Green
-    }
-} catch {
-    Write-Host "    Loi khi go bo may in ao: $($_.Exception.Message)" -ForegroundColor DarkYellow
+Remove-ItemProperty -LiteralPath 'HKCU:\Software\RegisteredApplications' -Name 'PDF Pro' -ErrorAction SilentlyContinue
+if ($RemoveVirtualPrinter) {
+    try { Remove-Printer -Name 'PDF Pro - HPhat Edition' -ErrorAction Stop }
+    catch { Write-Warning "Could not remove the optional virtual printer: $_" }
 }
-
-# 6. Clean up AppData Directory
-$installDir = Join-Path $env:LOCALAPPDATA "PDFPro"
-if (Test-Path $installDir) {
-    # If the uninstaller is running from AppData/Local/PDFPro, we copy a helper batch file to Temp to delete the folder after this script closes.
-    $tempBatch = Join-Path $env:TEMP "pdfpro_uninstaller.bat"
-    $batchContent = @"
-@echo off
-timeout /t 2 /nobreak > nul
-if exist "$installDir" rd /s /q "$installDir"
-del "%~f0"
-"@
-    $batchContent = $batchContent.Replace('"$installDir"', "`"$installDir`"")
-    [System.IO.File]::WriteAllText($tempBatch, $batchContent, [System.Text.Encoding]::Default)
-
-    # Start the helper batch file
-    Start-Process -FilePath $tempBatch -WindowStyle Hidden
-    Write-Host "    Da len lich xoa thu muc cai dat sach se sau khi dong cua so." -ForegroundColor Green
-}
-
-Write-Host "`n=== GO CAI DAT HOAN TAT VA THANH CONG! ===" -ForegroundColor Cyan
-Read-Host "`nNhan Enter de hoan tat..."
+# Keep the installation folder and unknown files: activation/settings are not application payload.
+Write-Host 'PDF Pro application files removed. User settings and activation data were retained.' -ForegroundColor Green

@@ -18,7 +18,9 @@ if (-not (Test-Path -LiteralPath $ManifestPath)) {
     throw "Missing update manifest: $ManifestPath"
 }
 
-$manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+$manifest = Get-Content -LiteralPath $ManifestPath -Encoding UTF8 -Raw | ConvertFrom-Json
+if ([string]$manifest.version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid stable release version.' }
+if ($manifest.file -ne "PdfViewerApp_v$($manifest.version).zip") { throw 'ZIP name does not match the release version.' }
 
 function Assert-TextValue {
     param(
@@ -84,3 +86,51 @@ Write-Host "Version: $($manifest.version)"
 Write-Host "File: $zipPath"
 Write-Host "Size: $($zipItem.Length) bytes"
 Write-Host "SHA256: $actualSha256"
+
+if ($manifest.schema_version -ne 2 -or $null -eq $manifest.installer) {
+    throw 'A complete release must include installer metadata (schema_version=2).'
+}
+$installer = $manifest.installer
+if ($installer.file -ne "PDFPro_Setup_v$($manifest.version).exe") { throw 'Installer name does not match the release version.' }
+if ([string]$installer.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid installer SHA256.' }
+$installerPath = Join-Path $ReleaseDir $installer.file
+$installerItem = Get-Item -LiteralPath $installerPath -ErrorAction Stop
+if ($installerItem.Length -le 0 -or $installerItem.Length -ne [int64]$installer.size) { throw 'Installer size mismatch.' }
+if ((Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash -ne $installer.sha256) { throw 'Installer SHA256 mismatch.' }
+$info = [Diagnostics.FileVersionInfo]::GetVersionInfo($installerPath)
+$binaryVersion = '{0}.{1}.{2}.{3}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart
+if ([Version]$binaryVersion -ne [Version]"$($manifest.version).0") { throw 'Installer binary version does not match the manifest.' }
+
+foreach ($artifact in @($manifest, $installer)) {
+    if ($RequireDownloadUrl -or $artifact.download_url) {
+        Assert-TextValue $artifact.download_url 'download_url'
+        $uri = $null
+        if (-not [Uri]::TryCreate([string]$artifact.download_url, [UriKind]::Absolute, [ref]$uri) -or
+            $uri.Scheme -ne 'https' -or
+            [Uri]::UnescapeDataString($uri.Segments[-1]) -ne $artifact.file) { throw 'Artifact URL must be HTTPS and reference its own filename.' }
+    }
+}
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archive = [IO.Compression.ZipFile]::OpenRead($zipPath)
+try {
+    $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+    foreach ($required in @('PdfViewerApp.exe', 'pdf_core.dll', 'pdfium.dll', 'install.bat', 'install.ps1', 'uninstall.bat', 'uninstall.ps1')) {
+        if ($required -notin $names) { throw "Update ZIP is missing $required at its root." }
+        if (($archive.Entries | Where-Object { $_.FullName -eq $required }).Length -le 0) { throw "Update ZIP contains empty $required." }
+    }
+    foreach ($name in $names) {
+        if ($name -match '(^/|(^|/)\.\.(/|$)|:)' -or $name -match '(^|/)(publish_config|publish_settings)\.json$') {
+            throw "Invalid update ZIP entry: $name"
+        }
+    }
+} finally { $archive.Dispose() }
+
+$checksumPath = Join-Path $ReleaseDir 'SHA256SUMS.txt'
+$checksumLines = @(Get-Content -LiteralPath $checksumPath)
+if ($checksumLines.Count -ne 3) { throw 'SHA256SUMS.txt must contain exactly the ZIP, installer and manifest.' }
+foreach ($name in @($manifest.file, $installer.file, 'update-manifest.json')) {
+    $hash = (Get-FileHash -LiteralPath (Join-Path $ReleaseDir $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ("$hash  $name" -cnotin $checksumLines) { throw "Checksum list mismatch for $name." }
+}
+Write-Host 'Complete release verified: installer, ZIP payload, manifest and checksums.' -ForegroundColor Green

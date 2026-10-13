@@ -14,7 +14,9 @@ commit, push và release; không hỏi lại cho mỗi đợt sửa.
    Không đưa token, `publish_settings.json` hoặc `tools/publish_config.json` lên Git.
 5. Commit, tạo tag `vX.Y.Z`, push nhánh `master` và tag. Không sửa hoặc force-push tag đã phát hành.
 6. Theo dõi `.github/workflows/release.yml` đến khi hoàn tất. Workflow phải tạo GitHub Release,
-   đăng ZIP và manifest, rồi thông báo phiên bản tới máy chủ WordPress.
+   đăng bộ cài EXE, ZIP cập nhật, manifest và SHA256SUMS.txt, rồi thông báo phiên bản tới máy chủ WordPress.
+   Bộ cài là thành phần bắt buộc. Thiếu một tệp hoặc sai hash phải dừng phát hành.
+   Tạo bản nháp, tải lại và kiểm tra đủ bốn tệp trước khi công bố; sau đó mới gửi thông báo cập nhật.
 7. Đọc lại API `GET /wp-json/pdfpro/v1/update-check`; xác nhận phiên bản, URL tải,
    kích thước và SHA-256 khớp đúng gói được tải thực tế.
 8. Chỉ báo đã phát hành khi các bước trên thành công. Nếu có lỗi bên ngoài,
@@ -26,3 +28,4 @@ người dùng; không lấy hash của gói local thay cho hash của gói đư
 
 Đóng gói trong quá trình phát hành với `-SkipPublish -SkipLocalDeploy`;
 thông báo cập nhật chỉ được gửi sau khi file tải đã có trên GitHub Release.
+Ứng dụng cập nhật bằng ZIP; bộ cài EXE dành cho cài mới hoặc cài lại. Hai gói phải cùng phiên bản và cùng đầu ra build.

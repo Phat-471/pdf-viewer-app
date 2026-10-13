@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet("patch", "minor", "major")]
     [string]$Part = "patch",
     [Parameter(Mandatory = $true)]
@@ -75,9 +75,13 @@ Invoke-ReleaseCommand -Command git -Arguments @('push', '--atomic', 'origin', 'H
 $commit = (git rev-parse HEAD).Trim()
 $runId = ''
 for ($attempt = 0; $attempt -lt 20 -and -not $runId; $attempt++) {
-    $runId = gh run list --workflow release.yml --commit $commit --event push --json databaseId --jq '.[0].databaseId'
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the release workflow.' }
-    if (-not $runId) { Start-Sleep -Seconds 3 }
+    $savedPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $candidate = gh run list --workflow release.yml --commit $commit --event push --json databaseId --jq '.[0].databaseId' 2>$null
+        if ($LASTEXITCODE -eq 0 -and "$candidate".Trim() -match '^\d+$') { $runId = "$candidate".Trim() }
+    } finally { $ErrorActionPreference = $savedPreference }
+    if (-not $runId) { Start-Sleep -Seconds 6 }
 }
 if (-not $runId) { throw 'The tag was pushed, but the release workflow could not be found. Inspect GitHub Actions.' }
 Invoke-ReleaseCommand -Command gh -Arguments @('run', 'watch', ([string]$runId).Trim(), '--exit-status')

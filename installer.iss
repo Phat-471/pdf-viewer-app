@@ -1,4 +1,4 @@
-; installer.iss
+﻿; installer.iss
 #define MyAppName "PDF Pro"
 #ifndef MyAppVersion
   #define MyAppVersion "1.6.2"
@@ -11,9 +11,15 @@
 AppId={{D3B16A74-7D68-4EA4-BD4D-B66AEFA1FA3C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoProductVersion={#MyAppVersion}.0
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoProductTextVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\{#MyAppName}
+DefaultDirName={code:GetDefaultInstallDir}
 PrivilegesRequired=lowest
+CloseApplications=yes
+RestartApplications=no
 DisableDirPage=yes
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -76,25 +82,11 @@ Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueN
 ; Open With list support
 Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
 
+; Upgrade in place. Never delete the installed app or registry keys during wizard initialization.
 [Code]
-function InitializeSetup(): Boolean;
+function GetDefaultInstallDir(Param: String): String;
 begin
-  // Delete all old Explorer context menu registry keys and application associations
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.Merge');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\Applications\PdfViewerApp.exe');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\PdfViewerApp.Document');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\PDFPro.PDF');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Classes\.pdf\OpenWithList\PdfViewerApp.exe');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\Microsoft\Windows\CurrentVersion\App Paths\PdfViewerApp.exe');
-  RegDeleteKeyIncludingSubKeys(HKCU, 'Software\PDFPro');
-
-  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids', 'PdfViewerApp.Document');
-  RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids', 'PDFPro.PDF');
-  RegDeleteValue(HKCU, 'Software\Classes\.pdf\OpenWithProgids', 'PDFPro.PDF');
-  RegDeleteValue(HKCU, 'Software\RegisteredApplications', 'PDF Pro');
-
-  // Delete previous installation directory for a clean re-install
-  DelTree(ExpandConstant('{localappdata}\PDF Pro'), True, True, True);
-
-  Result := True;
+  Result := ExpandConstant('{localappdata}\PDF Pro');
+  if (not DirExists(Result)) and DirExists(ExpandConstant('{localappdata}\PDFPro')) then
+    Result := ExpandConstant('{localappdata}\PDFPro');
 end;

@@ -36,7 +36,8 @@ if ($token -eq "YOUR_SECURE_PUBLISH_TOKEN_HERE" -or [string]::IsNullOrWhiteSpace
 }
 
 # Read and parse update-manifest.json
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+& (Join-Path $toolsDir 'verify_release_assets.ps1')
+$manifest = Get-Content -LiteralPath $manifestPath -Encoding UTF8 -Raw | ConvertFrom-Json
 
 # Construct publish payload
 $payload = @{
@@ -51,6 +52,10 @@ $payload = @{
 }
 
 $publishUrl = "$siteUrl/wp-json/pdfpro/v1/update-publish"
+$current = Invoke-RestMethod -Uri "$siteUrl/wp-json/pdfpro/v1/update-check?release_check=$([Guid]::NewGuid().ToString('N'))" -TimeoutSec 30
+if ($current.success -ne $true -or [Version]$current.latest_version -gt [Version]$manifest.version) {
+    throw 'Cannot publish an invalid endpoint or replace a newer version with an older version.'
+}
 Write-Host "Publishing release v$($manifest.version) to $publishUrl..." -ForegroundColor Cyan
 
 try {

@@ -96,7 +96,10 @@ Mỗi khi hoàn thành công việc sửa đổi mã nguồn:
 
 > 5. **Xác nhận phát hành hoàn tất:**
 >    - Theo dõi workflow `.github/workflows/release.yml` đến khi thành công.
->    - Xác nhận GitHub Release có ZIP và manifest đúng phiên bản.
+>    - Xác nhận GitHub Release có bộ cài EXE, ZIP cập nhật, manifest và SHA256SUMS.txt đúng phiên bản.
+>    - Bộ cài là bắt buộc; không bỏ qua khi thiếu trình biên dịch Inno Setup. Tạo EXE và ZIP từ cùng đầu ra build.
+>    - Giữ bản phát hành ở trạng thái nháp cho tới khi tải lại và kiểm tra đủ các tệp cùng SHA-256. Công bố xong mới thông báo WordPress.
+>    - Đóng gói chỉ tạo tệp; không tự gửi metadata và không tự thay tệp của ứng dụng đang chạy trên máy local.
 >    - Đọc API `GET /wp-json/pdfpro/v1/update-check`, kiểm tra phiên bản, URL, kích thước và SHA-256 của gói tải thực tế.
 >    - Chỉ báo hoàn tất khi người dùng có thể nhận được cập nhật từ API. Gói local hoặc tag trên Git chưa đủ.
 >    - Không commit token hoặc cấu hình bí mật; không thay thế tag đã phát hành.

@@ -1,4 +1,3 @@
-- Sửa tiếng Việt trong menu chuột phải.
-- Thêm xem trước và chỉnh bố cục Snapshot.
-- Thêm lựa chọn chất lượng ảnh copy và PNG.
-- Cải thiện tốc độ xử lý và in vùng chọn.
+﻿- Hoàn thiện bộ cài và gói cập nhật cho mỗi phiên bản.
+- Kiểm tra đầy đủ tệp phát hành trước khi thông báo cập nhật.
+- Giữ bản đang cài khi mở hoặc hủy trình cài đặt.

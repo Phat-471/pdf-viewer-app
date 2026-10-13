@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: pdfpro-production-release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -30,59 +34,98 @@ jobs:
     - name: Package project
       id: package
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $ErrorActionPreference = 'Stop'
         $version = (Get-Content VERSION.txt -Raw).Trim()
         if ($env:GITHUB_REF_NAME -ne "v$version") {
             throw "Release tag $env:GITHUB_REF_NAME does not match VERSION.txt ($version)."
         }
-        # Run the existing packaging script
-        .\package_project.ps1 -SkipPublish -SkipLocalDeploy
-        
-        # Return to repository root directory to ensure paths are correct
-        Set-Location $env:GITHUB_WORKSPACE
-        
-        # Parse update-manifest.json to set outputs for release action
-        $manifestPath = "releases/update-manifest.json"
-        if (Test-Path $manifestPath) {
-            $manifest = Get-Content $manifestPath | ConvertFrom-Json
-            $manifest.download_url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$($manifest.file)"
-            $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding utf8
-            .\tools\verify_update_manifest.ps1 -RequireDownloadUrl
-            echo "version=$($manifest.version)" >> $env:GITHUB_OUTPUT
-            echo "zip_file=$($manifest.file)" >> $env:GITHUB_OUTPUT
-            echo "sha256=$($manifest.sha256)" >> $env:GITHUB_OUTPUT
-            echo "size=$($manifest.size)" >> $env:GITHUB_OUTPUT
-            echo "release_date=$($manifest.release_date)" >> $env:GITHUB_OUTPUT
-        } else {
-            Write-Error "update-manifest.json not found after packaging!"
-            exit 1
+        # A retry must never rebuild or replace files of an already published version.
+        $pages = gh api --paginate --slurp "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing releases. Retry when GitHub is available.' }
+        foreach ($page in ($pages | ConvertFrom-Json)) {
+            foreach ($existingRelease in $page) {
+                if ($existingRelease.tag_name -eq $env:GITHUB_REF_NAME -and -not $existingRelease.draft) {
+                    throw 'This release is already public. Download its verified assets and use tools/publish_release.ps1 to retry WordPress notification; do not replace published binaries.'
+                }
+            }
         }
+        $baseUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME"
+        .\package_project.ps1 -SkipPublish -SkipLocalDeploy -DownloadBaseUrl $baseUrl
+        Set-Location $env:GITHUB_WORKSPACE
+        .\tools\verify_update_manifest.ps1 -RequireDownloadUrl
+        $manifest = Get-Content releases/update-manifest.json -Raw -Encoding UTF8 | ConvertFrom-Json
+        "version=$($manifest.version)" >> $env:GITHUB_OUTPUT
+        "zip_file=$($manifest.file)" >> $env:GITHUB_OUTPUT
+        "installer_file=$($manifest.installer.file)" >> $env:GITHUB_OUTPUT
+        "sha256=$($manifest.sha256)" >> $env:GITHUB_OUTPUT
+        "size=$($manifest.size)" >> $env:GITHUB_OUTPUT
+        "release_date=$($manifest.release_date)" >> $env:GITHUB_OUTPUT
 
-    - name: Create GitHub Release
+    - name: Preserve complete release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDFPro-${{ steps.package.outputs.version }}
+        path: |
+          releases/${{ steps.package.outputs.zip_file }}
+          releases/${{ steps.package.outputs.installer_file }}
+          releases/update-manifest.json
+          releases/SHA256SUMS.txt
+        if-no-files-found: error
+        retention-days: 14
+
+    - name: Upload complete draft release
       id: create_release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
           releases/${{ steps.package.outputs.zip_file }}
+          releases/${{ steps.package.outputs.installer_file }}
           releases/update-manifest.json
+          releases/SHA256SUMS.txt
+        fail_on_unmatched_files: true
+        body_path: releases/update-package-summary.md
         name: Release ${{ steps.package.outputs.version }}
         tag_name: ${{ github.ref_name }}
-        draft: false
+        draft: true
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Download and verify every uploaded asset before publishing
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $verifyDir = Join-Path $env:RUNNER_TEMP "release-verify-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+        gh release download $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --dir $verifyDir --pattern '*.zip' --pattern '*.exe' --pattern 'update-manifest.json' --pattern 'SHA256SUMS.txt'
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot download all draft release assets.' }
+        .\tools\verify_update_manifest.ps1 -ReleaseDir $verifyDir -RequireDownloadUrl
+        foreach ($source in @('releases/${{ steps.package.outputs.zip_file }}', 'releases/${{ steps.package.outputs.installer_file }}', 'releases/update-manifest.json', 'releases/SHA256SUMS.txt')) {
+            $downloaded = Join-Path $verifyDir (Split-Path -Leaf $source)
+            if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $downloaded -Algorithm SHA256).Hash) {
+                throw "Uploaded asset differs from the build: $source"
+            }
+        }
+        gh release edit $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --draft=false --latest
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot publish the verified release.' }
 
     - name: Notify WordPress Licensing Server
       shell: pwsh
       env:
         SITE_URL: ${{ secrets.PDFPRO_UPDATE_SITE_URL }}
         TOKEN: ${{ secrets.PDFPRO_PUBLISH_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $ErrorActionPreference = 'Stop'
         if ([string]::IsNullOrEmpty($env:SITE_URL) -or [string]::IsNullOrEmpty($env:TOKEN)) {
             throw "PDFPRO_UPDATE_SITE_URL and PDFPRO_PUBLISH_TOKEN must be configured to publish an app update."
         }
+
+        .\tools\verify_release_assets.ps1
 
         # Build download URL pointing to the GitHub Release asset
         $repo = "${{ github.repository }}"
@@ -105,13 +148,17 @@ jobs:
             version = "${{ steps.package.outputs.version }}"
             download_url = $downloadUrl
             sha256 = "${{ steps.package.outputs.sha256 }}"
-            size = [int]("${{ steps.package.outputs.size }}")
+            size = [int64]("${{ steps.package.outputs.size }}")
             release_date = "${{ steps.package.outputs.release_date }}"
             mandatory = [bool]$manifest.mandatory
             changelog = $changelog
         }
 
         $apiUrl = "$($env:SITE_URL.TrimEnd('/'))/wp-json/pdfpro/v1/update-publish"
+        $current = Invoke-RestMethod -Uri "$($env:SITE_URL.TrimEnd('/'))/wp-json/pdfpro/v1/update-check?release_check=$env:GITHUB_RUN_ID" -TimeoutSec 30
+        if ($current.success -ne $true -or [Version]$current.latest_version -gt [Version]$body.version) {
+            throw 'Cannot publish metadata: the endpoint is invalid or a newer version is already available.'
+        }
         Write-Host "Sending update publish notification to: $apiUrl"
         Write-Host "Download URL will be: $downloadUrl"
         

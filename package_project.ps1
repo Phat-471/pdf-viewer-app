@@ -1,9 +1,11 @@
-# package_project.ps1
+﻿# package_project.ps1
 # Automates the build and zipping of PDF Pro using VERSION.txt as the release source of truth
 
 param(
     [switch]$SkipPublish,
-    [switch]$SkipLocalDeploy
+    [switch]$SkipLocalDeploy,
+    [string]$InstallerCompiler = $env:PDFPRO_ISCC_PATH,
+    [string]$DownloadBaseUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -72,6 +74,24 @@ foreach ($relativePath in $requiredPaths) {
     }
 }
 
+# Resolve the compiler before doing any expensive build work.
+if (-not $InstallerCompiler) {
+    $candidates = @(
+        "${env:ProgramFiles}\Inno Setup 7\ISCC.exe",
+        "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+        "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+    )
+    $InstallerCompiler = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $InstallerCompiler) {
+        $command = Get-Command iscc -ErrorAction SilentlyContinue
+        if ($command) { $InstallerCompiler = $command.Source }
+    }
+}
+if (-not $InstallerCompiler -or -not (Test-Path -LiteralPath $InstallerCompiler -PathType Leaf)) {
+    throw 'Inno Setup compiler is required. Install Inno Setup or set PDFPRO_ISCC_PATH; no release will be created without Setup.exe.'
+}
+
 Write-Host "=== PDF HPhat: Packaging Version $version ===" -ForegroundColor Cyan
 
 # 1. Compile Rust core
@@ -97,6 +117,11 @@ Write-Host "`n[3/4] Publishing WPF application..." -ForegroundColor Yellow
 cd src/PdfViewerApp
 Invoke-PackageCommand -Command dotnet -Arguments @('restore', 'PdfViewerApp.csproj', '-r', 'win-x64')
 Invoke-PackageCommand -Command dotnet -Arguments @('clean', 'PdfViewerApp.csproj', '-c', 'Release', '-r', 'win-x64')
+# Remove only this project's resolved publish directory to avoid stale dependencies.
+$publishOut = [IO.Path]::GetFullPath((Join-Path $scriptDir 'src/PdfViewerApp/bin/Release/net8.0-windows10.0.26100.0/win-x64/publish'))
+$expectedParent = [IO.Path]::GetFullPath((Join-Path $scriptDir 'src/PdfViewerApp/bin/Release')) + [IO.Path]::DirectorySeparatorChar
+if (-not $publishOut.StartsWith($expectedParent, [StringComparison]::OrdinalIgnoreCase)) { throw 'Publish path is outside the project build directory.' }
+if (Test-Path -LiteralPath $publishOut) { Remove-Item -LiteralPath $publishOut -Recurse -Force }
 Invoke-PackageCommand -Command dotnet -Arguments @('publish', 'PdfViewerApp.csproj', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '/p:PublishSingleFile=true', '/p:PublishReadyToRun=false')
 if ($LASTEXITCODE -ne 0) {
     Write-Error "WPF application publish failed!"
@@ -157,167 +182,21 @@ Copy-Item -LiteralPath "$scriptDir/uninstall.ps1" -Destination "$publishOut/unin
 # Compress the publish folder contents to ZIP
 Compress-Archive -Path "$publishOut/*" -DestinationPath $zipPath -Force
 
-$zipItem = Get-Item -LiteralPath $zipPath
-$sha256 = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$releaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$manifestPath = Join-Path $releaseDir "update-manifest.json"
-
-$changelogText = ""
-$changelogFile = Join-Path $scriptDir "CHANGELOG.txt"
-if (Test-Path $changelogFile) {
-    $changelogText = (Get-Content -LiteralPath $changelogFile -Encoding UTF8 -Raw).Trim()
+# Both installer and ZIP are required. Never announce a partially built release.
+$installerFile = "PDFPro_Setup_v$safeVersion.exe"
+$installerPath = Join-Path $releaseDir $installerFile
+if (Test-Path -LiteralPath $installerPath) { Remove-Item -LiteralPath $installerPath -Force }
+Write-Host "Building required Inno Setup installer..." -ForegroundColor Yellow
+Invoke-PackageCommand -Command $InstallerCompiler -Arguments @("/dMyAppVersion=$version", (Join-Path $scriptDir 'installer.iss'))
+foreach ($artifact in @((Join-Path $publishOut 'PdfViewerApp.exe'), $installerPath)) {
+    $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($artifact)
+    $binaryVersion = '{0}.{1}.{2}.{3}' -f $info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart
+    if ([Version]$binaryVersion -ne [Version]"$version.0") { throw "Artifact version mismatch: $artifact ($binaryVersion)." }
 }
-
-$manifest = [ordered]@{
-    version = $version
-    file = $zipFileName
-    sha256 = $sha256
-    size = $zipItem.Length
-    release_date = $releaseDate
-    download_url = ""
-    mandatory = $false
-    changelog = $changelogText
-}
-
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
-
-$packageSummaryPath = Join-Path $releaseDir "update-package-summary.md"
-$manifestJson = $manifest | ConvertTo-Json -Depth 4
-$summaryTemplate = @'
-# Thong tin ban dong goi moi (v__VERSION__) de cap nhat len Host
-
-- Tep ZIP dong goi: `releases/__ZIP_FILE__`
-- Dung luong thuc te (Size): `__SIZE__` bytes
-- Ma bam SHA256: `__SHA256__`
-- Tep Manifest cap nhat: `releases/update-manifest.json`
-
-Ban su dung noi dung cau hinh JSON duoi day de dua len server cap nhat nhe:
-
-```json
-__MANIFEST_JSON__
-```
-'@
-
-$summary = $summaryTemplate.
-    Replace('__VERSION__', $version).
-    Replace('__ZIP_FILE__', $zipFileName).
-    Replace('__SIZE__', $zipItem.Length.ToString()).
-    Replace('__SHA256__', $sha256).
-    Replace('__MANIFEST_JSON__', $manifestJson)
-
-$summary | Set-Content -LiteralPath $packageSummaryPath -Encoding UTF8
-
-# 4.5. Optional Auto-Publish to WordPress REST API
-$publishSettingsFile = Join-Path $scriptDir "publish_settings.json"
-if (-not $SkipPublish -and (Test-Path $publishSettingsFile)) {
-    Write-Host "`n[Auto-Publish] Found publish_settings.json. Proceeding to sync with WordPress API..." -ForegroundColor Yellow
-    $pubSettings = Get-Content -LiteralPath $publishSettingsFile | ConvertFrom-Json
-    $token = $pubSettings.publish_token
-    $apiDomain = $pubSettings.api_domain
-    $downloadUrlPrefix = $pubSettings.download_url_prefix
-
-    if ([string]::IsNullOrWhiteSpace($token)) {
-        Write-Warning "[Auto-Publish] publish_token is empty. Skipping auto-publish."
-    } else {
-        $downloadUrl = "$downloadUrlPrefix$zipFileName"
-        
-        # Update manifest object in memory and re-save
-        $manifest.download_url = $downloadUrl
-        $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
-
-        $body = @{
-            token = $token
-            latest_version = $version
-            download_url = $downloadUrl
-            sha256 = $sha256
-            file_size = $zipItem.Length
-            release_date = $releaseDate
-            mandatory = $false
-            changelog = $changelogText
-        } | ConvertTo-Json
-
-        try {
-            $publishUrl = "$apiDomain/wp-json/pdfpro/v1/update-publish"
-            Write-Host "[Auto-Publish] Sending update metadata to $publishUrl..." -ForegroundColor DarkGray
-            $response = Invoke-RestMethod -Uri $publishUrl -Method Post -ContentType "application/json" -Body $body
-            if ($response.success) {
-                Write-Host "[Auto-Publish] SUCCESS: $($response.message)" -ForegroundColor Green
-            } else {
-                Write-Warning "[Auto-Publish] Failed to publish update: $($response.message)"
-            }
-        } catch {
-            Write-Warning "[Auto-Publish] API Request failed: $_"
-        }
-    }
-} else {
-    Write-Host "`n[Auto-Publish] publish_settings.json not found. Copy publish_settings.json.template to publish_settings.json and fill in your token to enable auto-publishing." -ForegroundColor DarkYellow
-}
-
-# 5. Optional: Build Inno Setup Installer (Setup.exe)
-Write-Host "`n[5/5] Building Inno Setup Installer (Optional)..." -ForegroundColor Yellow
-$isccPath = ""
-if (Test-Path "${env:ProgramFiles}\Inno Setup 7\ISCC.exe") {
-    $isccPath = "${env:ProgramFiles}\Inno Setup 7\ISCC.exe"
-} elseif (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") {
-    $isccPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-} elseif (Test-Path "${env:ProgramFiles}\Inno Setup 6\ISCC.exe") {
-    $isccPath = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
-} elseif (Get-Command iscc -ErrorAction SilentlyContinue) {
-    $isccPath = (Get-Command iscc).Source
-}
-
-if ($isccPath -ne "") {
-    Write-Host "    Found Inno Setup Compiler: $isccPath" -ForegroundColor DarkGray
-    Write-Host "    Running Inno Setup compiler..." -ForegroundColor Yellow
-    $absoluteIssPath = Join-Path $scriptDir "installer.iss"
-    Invoke-PackageCommand -Command $isccPath -Arguments @("/dMyAppVersion=$version", $absoluteIssPath)
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "    Inno Setup package created successfully!" -ForegroundColor Green
-    } else {
-        Write-Warning "Inno Setup compilation failed (Optional step). Resetting exit code to avoid failing the build."
-        $global:LASTEXITCODE = 0
-    }
-} else {
-    Write-Host "    Inno Setup compiler (ISCC.exe) not found. Skipping Setup.exe creation." -ForegroundColor DarkYellow
-}
-
-Write-Host "`n=== Packaging completed successfully! ===" -ForegroundColor Green
-Write-Host "Zip package created at: $zipPath" -ForegroundColor White
-Write-Host "Manifest created at: $manifestPath" -ForegroundColor White
-Write-Host "Summary created at: $packageSummaryPath" -ForegroundColor White
-Write-Host "SHA256: $sha256" -ForegroundColor White
-
-# 6. Local Hot-Deploy: Automatically sync DLL and EXE to local install directory
-# This ensures the developer's local installation always matches the freshly built output.
-Write-Host "`n[6/6] Local Hot-Deploy..." -ForegroundColor Yellow
-
-$localInstallDir = "$env:LOCALAPPDATA\PDF Pro"
-$newDll = Join-Path $scriptDir "src\PdfCore\target\release\pdf_core.dll"
-$newExe = Join-Path $publishOut "PdfViewerApp.exe"
-
-if (-not $SkipLocalDeploy -and (Test-Path $localInstallDir)) {
-    # Stop app if running
-    $proc = Get-Process -Name "PdfViewerApp" -ErrorAction SilentlyContinue
-    if ($proc) {
-        Write-Host "    Stopping running PdfViewerApp..." -ForegroundColor DarkGray
-        Stop-Process -Name "PdfViewerApp" -Force
-        Start-Sleep -Seconds 1
-    }
-
-    # Copy pdf_core.dll
-    if (Test-Path $newDll) {
-        Copy-Item -LiteralPath $newDll -Destination "$localInstallDir\pdf_core.dll" -Force
-        Write-Host "    [OK] pdf_core.dll -> $localInstallDir" -ForegroundColor Green
-    }
-
-    # Copy PdfViewerApp.exe
-    if (Test-Path $newExe) {
-        Copy-Item -LiteralPath $newExe -Destination "$localInstallDir\PdfViewerApp.exe" -Force
-        Write-Host "    [OK] PdfViewerApp.exe -> $localInstallDir" -ForegroundColor Green
-    }
-
-    Write-Host "    Local install synced to v$version" -ForegroundColor Green
-} else {
-    Write-Host "    Local install dir not found ($localInstallDir). Skipping hot-deploy." -ForegroundColor DarkYellow
-    Write-Host "    Run the installer first: releases\PDFPro_Setup_v$safeVersion.exe" -ForegroundColor DarkYellow
-}
+Set-Location $scriptDir
+& (Join-Path $scriptDir 'tools/write_release_metadata.ps1') -DownloadBaseUrl $DownloadBaseUrl
+& (Join-Path $scriptDir 'tools/verify_update_manifest.ps1')
+Write-Host "Packaging completed: installer, update ZIP, manifest and SHA256SUMS.txt." -ForegroundColor Green
+# Packaging never publishes metadata or replaces a running local installation.
+# SkipPublish/SkipLocalDeploy are retained for compatibility with existing callers.
+Write-Host "Publish with tools/release.ps1; GitHub Actions verifies all assets before notifying WordPress."
