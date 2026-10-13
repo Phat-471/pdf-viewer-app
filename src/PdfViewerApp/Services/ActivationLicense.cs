@@ -767,24 +767,18 @@ internal static class ActivationLicense
 		// Thử kết nối tới domain máy chủ bản quyền trước
 		try
 		{
-			using (var client = new HttpClient())
-			{
-				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
-				HttpResponseMessage response = await client.GetAsync(ApiDomain, cts.Token);
-				return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
-			}
+			using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
+			using HttpResponseMessage response = await HttpHelper.Client.GetAsync(ApiDomain, cts.Token);
+			return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NotFound || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
 		}
 		catch
 		{
 			// Fallback sang google.com nếu máy chủ bản quyền bị lỗi nhưng vẫn có mạng
 			try
 			{
-				using (var client = new HttpClient())
-				{
-					using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
-					HttpResponseMessage response = await client.GetAsync("https://www.google.com", cts.Token);
-					return response.IsSuccessStatusCode;
-				}
+				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5.0));
+				using HttpResponseMessage response = await HttpHelper.Client.GetAsync("https://www.google.com", cts.Token);
+				return response.IsSuccessStatusCode;
 			}
 			catch
 			{

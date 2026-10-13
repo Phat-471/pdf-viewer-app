@@ -2,3 +2,4 @@
 - Cải thiện thao tác thu phóng.
 - Khắc phục tình trạng giao diện bị treo khi chuẩn bị in.
 - Cải thiện cập nhật ứng dụng.
+- Khắc phục lỗi kết nối máy chủ cập nhật.
