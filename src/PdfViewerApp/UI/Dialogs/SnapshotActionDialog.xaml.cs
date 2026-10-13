@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Printing;
@@ -90,8 +90,10 @@ public partial class SnapshotActionDialog : Window
             StatusText.Text = "Nhập tỷ lệ từ 10% đến 400%.";
             return;
         }
-        Layout = new SnapshotPaperLayout((PaperCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3",
-            OrientationCombo.SelectedIndex == 0, fit, percent);
+        string paperKey = (PaperCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
+        bool landscape = OrientationCombo.SelectedIndex == 0;
+        Rect? printable = Layout.PaperKey == paperKey && Layout.Landscape == landscape ? Layout.PrintableAreaMm : null;
+        Layout = new SnapshotPaperLayout(paperKey, landscape, fit, percent, Center: Layout.Center, PrintableAreaMm: printable);
         if (_previewCrop != null)
         {
             PreviewImage.Source = Layout.Compose(_previewCrop, _cropPoints, 1200, showGuides: true);
@@ -99,7 +101,7 @@ public partial class SnapshotActionDialog : Window
             double actualPercent = bounds.Width / (_cropPoints.Width * 25.4 / 72) * 100;
             StatusText.Text = Layout.IsClipped(_cropPoints)
                 ? "Vùng chọn vượt khổ giấy: phần ngoài lề sẽ bị cắt. Giảm tỷ lệ hoặc chọn Vừa trang."
-                : $"{Layout.PaperKey} · {(Layout.Landscape ? "Ngang" : "Dọc")} · Tỷ lệ {actualPercent:N1}% · Lề 10 mm. Đường nét đứt chỉ hiển thị trong xem trước.";
+                : $"{Layout.PaperKey} · {(Layout.Landscape ? "Ngang" : "Dọc")} · Tỉ lệ {actualPercent:N1}% · Đường nét đứt chỉ giới hạn vùng xuất, không có trong ảnh lưu.";
         }
     }
 
@@ -195,7 +197,21 @@ public partial class SnapshotActionDialog : Window
         var options = new PrintOptionsDialog(_snapshot.PageIndex + 1, _snapshot.PageIndex + 1, _snapshot.PdfPath) { Owner = this };
         options.ConfigureSnapshot(_snapshot, _previewCrop, layout, _cropPoints);
         if (options.ShowDialog() != true || string.IsNullOrEmpty(options.SelectedPrinterName)) return;
+        layout = options.SnapshotLayout ?? layout;
+        Layout = layout;
+        _ready = false;
+        foreach (ComboBoxItem item in PaperCombo.Items)
+            if (Equals(item.Tag, layout.PaperKey)) PaperCombo.SelectedItem = item;
+        OrientationCombo.SelectedIndex = layout.Landscape ? 0 : 1;
+        ScaleModeCombo.SelectedIndex = layout.FitToPage ? 0 : 1;
+        ScaleTextBox.Text = layout.ScalePercent.ToString("0.##", CultureInfo.InvariantCulture);
+        _ready = true;
+        UpdateLayoutPreview();
         SetBusy(true, "Đang chuẩn bị in Snapshot…");
+        var progressDialog = new PrintProgressDialog { Owner = this };
+        IProgress<PrintProgressInfo> progress = new Progress<PrintProgressInfo>(progressDialog.UpdateProgress);
+        using var printCancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, progressDialog.CancellationToken);
+        progressDialog.Show();
         try
         {
             var ticket = options.SelectedPrintTicket?.Clone() ?? new PrintTicket();
@@ -207,7 +223,7 @@ public partial class SnapshotActionDialog : Window
             string printerName = options.SelectedPrinterName!;
             using var xml = ticket.GetXmlStream();
             byte[] ticketBytes = xml.ToArray();
-            var token = _lifetime.Token;
+            var token = printCancellation.Token;
             await PrintWorker.RunAsync(() =>
             {
                 token.ThrowIfCancellationRequested();
@@ -216,12 +232,21 @@ public partial class SnapshotActionDialog : Window
                 var workerTicket = new PrintTicket(new MemoryStream(ticketBytes));
                 var profile = PrinterPrintProfile.Resolve(queue);
                 PdfSnapshotPrinter.PrintSnapshot(_snapshot, queue, workerTicket,
-                    profile.RightSafetyPadding, profile.BottomSafetyPadding, layout, token);
+                    profile.RightSafetyPadding, profile.BottomSafetyPadding, layout, token, progress);
             });
+            progressDialog.MarkCompleted("Đã gửi lệnh in Snapshot tới máy in.");
             if (!_closed) StatusText.Text = "Đã gửi lệnh in Snapshot tới máy in. Có thể tiếp tục copy hoặc lưu ảnh.";
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) { if (!_closed) StatusText.Text = "Không in được Snapshot: " + ex.Message; }
+        catch (OperationCanceledException)
+        {
+            progressDialog.MarkFailed("Đã huỷ lệnh in Snapshot.");
+            if (!_closed) StatusText.Text = "Đã huỷ lệnh in Snapshot.";
+        }
+        catch (Exception ex)
+        {
+            progressDialog.MarkFailed("Không in được Snapshot: " + ex.Message);
+            if (!_closed) StatusText.Text = "Không in được Snapshot: " + ex.Message;
+        }
         finally { if (!_closed) SetBusy(false); }
     }
 

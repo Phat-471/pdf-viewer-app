@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -56,11 +56,11 @@ internal static class NativePdfPrinter
 
 	private const int WHITENESS = 16711778;
 
-	public static void Print(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken), double printDpi = 600.0)
+	public static void Print(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken), double printDpi = 600.0, double scalePercent = 100, IReadOnlyList<int>? pageIndices = null)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		PdfPerfLogger.Log("Native PDFium print start with Parallel Rendering");
-		progress?.Report(new PrintProgressInfo("Dang chuan bi PDFium...", 0, 0, IsIndeterminate: true));
+		progress?.Report(new PrintProgressInfo("Đang chuẩn bị tài liệu…", 0, 0, IsIndeterminate: true));
 		PdfiumEngine.Initialize();
 		
 		cancellationToken.ThrowIfCancellationRequested();
@@ -89,9 +89,14 @@ internal static class NativePdfPrinter
 			startPageIndex = Math.Clamp(startPageIndex, 0, num3 - 1);
 			endPageIndex = Math.Clamp(endPageIndex, startPageIndex, num3 - 1);
 			copies = Math.Clamp(copies, 1, 999);
-			int num4 = Math.Max(1, endPageIndex - startPageIndex + 1) * copies;
+			var selectedPages = (pageIndices ?? Enumerable.Range(startPageIndex, endPageIndex - startPageIndex + 1).ToArray()).ToArray();
+            if (selectedPages.Length == 0 || selectedPages.Any(p => p < 0 || p >= num3))
+                throw new ArgumentOutOfRangeException(nameof(pageIndices));
+            if (!double.IsFinite(scalePercent) || scalePercent < 10 || scalePercent > 400)
+                throw new ArgumentOutOfRangeException(nameof(scalePercent));
+            int num4 = selectedPages.Length * copies;
 			int num5 = 0;
-			progress?.Report(new PrintProgressInfo("Dang tao ket noi may in...", 0, num4, IsIndeterminate: true));
+			progress?.Report(new PrintProgressInfo("Đang kết nối máy in…", 0, num4, IsIndeterminate: true));
 			num2 = CreatePrinterDc(printQueueName, devMode);
 			if (num2 == IntPtr.Zero)
 			{
@@ -116,7 +121,7 @@ internal static class NativePdfPrinter
 			{
 				DOCINFO lpdi = CreateDocInfo(pdfPath, null);
 				Stopwatch stopwatch2 = Stopwatch.StartNew();
-				progress?.Report(new PrintProgressInfo("Dang mo lenh in...", num5, num4, IsIndeterminate: true));
+				progress?.Report(new PrintProgressInfo("Đang mở lệnh in…", num5, num4, IsIndeterminate: true));
 				if (StartDoc(num2, ref lpdi) <= 0)
 				{
 					throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
@@ -126,26 +131,18 @@ internal static class NativePdfPrinter
 				PdfPerfLogger.Log($"Native StartDoc: {stopwatch2.ElapsedMilliseconds} ms");
 			}
 
-			// Generate the list of print jobs
-			var printJobs = new List<(int pageIndex, int copy)>();
-			for (int i = 1; i <= copies; i++)
-			{
-				int num16 = ((!reversePageOrder) ? 1 : (-1));
-				int num17 = (reversePageOrder ? endPageIndex : startPageIndex);
-				int num18 = (reversePageOrder ? startPageIndex : endPageIndex);
-				for (int j = num17; reversePageOrder ? (j >= num18) : (j <= num18); j += num16)
-				{
-					printJobs.Add((j, i));
-				}
-			}
+            var printJobs = new List<(int pageIndex, int copy)>();
+            if (reversePageOrder) Array.Reverse(selectedPages);
+            for (int copy = 1; copy <= copies; copy++)
+                foreach (int pageIndex in selectedPages) printJobs.Add((pageIndex, copy));
 
 			// A single page in flight bounds native memory and avoids producer/consumer deadlocks.
 			foreach (var job in printJobs)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				progress?.Report(new PrintProgressInfo($"Preparing page {job.pageIndex + 1}, copy {job.copy}...", num5, num4));
+				progress?.Report(new PrintProgressInfo($"Đang chuẩn bị trang {job.pageIndex + 1}, bản {job.copy}…", num5, num4));
 				var rendered = forceRasterize
-					? PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi)
+					? PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi, scalePercent)
 					: PrepareVectorPage(num, job.pageIndex, job.copy);
 				try
 				{
@@ -156,14 +153,14 @@ internal static class NativePdfPrinter
 						if (StartDoc(num2, ref info) <= 0) throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
 						flag = true;
 					}
-					SpoolRenderedPage(num2, rendered, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, progress, num5, num4, cancellationToken);
+					SpoolRenderedPage(num2, rendered, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, progress, num5, num4, cancellationToken, scalePercent);
 					if (separatePageJobs)
 					{
 						if (EndDoc(num2) <= 0) throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
 						flag = false;
 					}
 					num5++;
-					progress?.Report(new PrintProgressInfo($"Page {rendered.PageIndex + 1} submitted ({num5}/{num4})", num5, num4));
+					progress?.Report(new PrintProgressInfo($"Đã gửi trang {rendered.PageIndex + 1} ({num5}/{num4})", num5, num4));
 				}
 				finally
 				{
@@ -180,7 +177,7 @@ internal static class NativePdfPrinter
 			if (!separatePageJobs)
 			{
 				Stopwatch stopwatch5 = Stopwatch.StartNew();
-				progress?.Report(new PrintProgressInfo("Dang ket thuc va spool lenh in...", num5, num4, IsIndeterminate: true));
+				progress?.Report(new PrintProgressInfo("Đang hoàn tất và gửi lệnh in…", num5, num4, IsIndeterminate: true));
 				if (EndDoc(num2) <= 0)
 				{
 					throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
@@ -192,7 +189,7 @@ internal static class NativePdfPrinter
 			// Ghi log đơn giản – KHÔNG dùng LocalPrintServer/PrintQueue trên background thread
 			// vì System.Printing objects có thread affinity → gây crash "The calling thread cannot access this object"
 			PdfPerfLogger.Log("Print job sent to spooler successfully.");
-			progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
+			progress?.Report(new PrintProgressInfo("Đã gửi lệnh in.", num4, num4));
 		}
 		finally
 		{
@@ -220,7 +217,7 @@ internal static class NativePdfPrinter
 			separatePageJobs, reversePageOrder, forceRasterize, progress, cancellationToken, printDpi);
 	}
 
-	private static PreRenderedPage PreRenderPageToBitmap(nint document, int pageIndex, int copy, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, double printDpi = 600.0)
+	private static PreRenderedPage PreRenderPageToBitmap(nint document, int pageIndex, int copy, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, double printDpi = 600.0, double scalePercent = 100)
 	{
 		nint num = IntPtr.Zero;
 		lock (PdfiumEngine.SyncRoot)
@@ -245,7 +242,7 @@ internal static class NativePdfPrinter
 			// 1. Calculate destination size in physical printer GDI pixels
 			double physicalWidthPx = num2 / 72.0 * dpiX;
 			double physicalHeightPx = num3 / 72.0 * dpiY;
-			double scale = 1.0;
+			double scale = scalePercent / 100;
 			if (fitToPrintableArea)
 			{
 				scale = Math.Min((double)safeWidth / physicalWidthPx, (double)safeHeight / physicalHeightPx);
@@ -275,15 +272,8 @@ internal static class NativePdfPrinter
 			double bmpWidth = num2 / 72.0 * targetDpiX;
 			double bmpHeight = num3 / 72.0 * targetDpiY;
 
-			if (fitToPrintableArea)
-			{
-				// In bitmap mode, if we fit to printable area, the bitmap only needs to be as large as the destination size at targetDpi
-				double targetSafeWidth = safeWidth * (targetDpiX / dpiX);
-				double targetSafeHeight = safeHeight * (targetDpiY / dpiY);
-				double bmpScale = Math.Min(targetSafeWidth / bmpWidth, targetSafeHeight / bmpHeight);
-				bmpWidth *= bmpScale;
-				bmpHeight *= bmpScale;
-			}
+            bmpWidth *= scale;
+            bmpHeight *= scale;
 
 			int width = Math.Max(1, (int)Math.Round(bmpWidth));
 			int height = Math.Max(1, (int)Math.Round(bmpHeight));
@@ -351,11 +341,11 @@ internal static class NativePdfPrinter
 		};
 	}
 
-	private static void SpoolRenderedPage(nint hdc, PreRenderedPage rendered, int printableWidth, int printableHeight, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, IProgress<PrintProgressInfo>? progress, int completedPages, int totalPages, CancellationToken cancellationToken)
+	private static void SpoolRenderedPage(nint hdc, PreRenderedPage rendered, int printableWidth, int printableHeight, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, IProgress<PrintProgressInfo>? progress, int completedPages, int totalPages, CancellationToken cancellationToken, double scalePercent)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		Stopwatch stopwatch = Stopwatch.StartNew();
-		progress?.Report(new PrintProgressInfo($"Dang mo trang in {rendered.PageIndex + 1}...", completedPages, totalPages));
+		progress?.Report(new PrintProgressInfo($"Đang gửi trang {rendered.PageIndex + 1}…", completedPages, totalPages));
 		if (StartPage(hdc) <= 0)
 		{
 			throw new InvalidOperationException($"StartPage failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
@@ -424,7 +414,7 @@ internal static class NativePdfPrinter
 						
 						double physicalWidthPx = num2 / 72.0 * dpiX;
 						double physicalHeightPx = num3 / 72.0 * dpiY;
-						double scale = 1.0;
+						double scale = scalePercent / 100;
 						if (fitToPrintableArea)
 						{
 							scale = Math.Min((double)safeWidth / physicalWidthPx, (double)safeHeight / physicalHeightPx);

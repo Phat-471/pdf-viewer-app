@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Printing;
 using System.Printing.Interop;
@@ -38,7 +38,7 @@ internal static class PdfSnapshotPrinter
 
 	public static void PrintSnapshot(PdfSnapshotSelection snapshot, PrintQueue printQueue, PrintTicket printTicket,
 		double rightSafetyPaddingDips, double bottomSafetyPaddingDips, SnapshotPaperLayout layout,
-		System.Threading.CancellationToken cancellationToken = default)
+		System.Threading.CancellationToken cancellationToken = default, IProgress<PrintProgressInfo>? progress = null)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		PdfiumEngine.Initialize();
@@ -49,6 +49,7 @@ internal static class PdfSnapshotPrinter
 		try
 		{
 			int copies = Math.Clamp(printTicket.CopyCount ?? 1, 1, 999);
+			progress?.Report(new PrintProgressInfo("Đang kết nối máy in…", 0, copies, true));
 			var driverTicket = printTicket.Clone();
 			driverTicket.CopyCount = 1; // Copies are submitted by this loop, not duplicated by the driver.
 			dc = CreatePrinterDc(printQueue, driverTicket);
@@ -64,15 +65,21 @@ internal static class PdfSnapshotPrinter
 			double actualHeightMm = GetDeviceCaps(dc, 111) * 25.4 / dpiY;
 			if (Math.Abs(actualWidthMm - paper.Width) > 3 || Math.Abs(actualHeightMm - paper.Height) > 3)
 				throw new InvalidOperationException($"Máy in không áp dụng khổ {layout.PaperKey} hoặc hướng giấy đã chọn. Hãy chọn khổ được máy in hỗ trợ.");
-			int clipLeft = Math.Max(0, (int)Math.Round(layout.MarginMm * dpiX / 25.4) - offsetX);
-			int clipTop = Math.Max(0, (int)Math.Round(layout.MarginMm * dpiY / 25.4) - offsetY);
+			layout = layout with { PrintableAreaMm = new System.Windows.Rect(offsetX * 25.4 / dpiX, offsetY * 25.4 / dpiY,
+				Math.Max(1, printableWidth - DipsToDevicePixels(rightSafetyPaddingDips, dpiX)) * 25.4 / dpiX,
+				Math.Max(1, printableHeight - DipsToDevicePixels(bottomSafetyPaddingDips, dpiY)) * 25.4 / dpiY) };
+			var contentArea = layout.ContentAreaMm;
+			int clipLeft = Math.Max(0, (int)Math.Round(contentArea.Left * dpiX / 25.4) - offsetX);
+			int clipTop = Math.Max(0, (int)Math.Round(contentArea.Top * dpiY / 25.4) - offsetY);
 			int clipRight = Math.Min(printableWidth - DipsToDevicePixels(rightSafetyPaddingDips, dpiX),
-				(int)Math.Round((paper.Width - layout.MarginMm) * dpiX / 25.4) - offsetX);
+				(int)Math.Round(contentArea.Right * dpiX / 25.4) - offsetX);
 			int clipBottom = Math.Min(printableHeight - DipsToDevicePixels(bottomSafetyPaddingDips, dpiY),
-				(int)Math.Round((paper.Height - layout.MarginMm) * dpiY / 25.4) - offsetY);
+				(int)Math.Round(contentArea.Bottom * dpiY / 25.4) - offsetY);
 			if (clipRight <= clipLeft || clipBottom <= clipTop)
 				throw new InvalidOperationException("Máy in không có vùng in phù hợp với lề đã chọn.");
 			double pageWidth, pageHeight;
+			cancellationToken.ThrowIfCancellationRequested();
+			progress?.Report(new PrintProgressInfo("Đang tạo ảnh vùng Snapshot…", 0, copies, true));
 			System.Threading.Monitor.Enter(PdfiumEngine.SyncRoot);
 			ownsEngine = true;
 			lock (PdfiumEngine.SyncRoot)
@@ -120,6 +127,7 @@ internal static class PdfSnapshotPrinter
 			page = document = IntPtr.Zero;
 			System.Threading.Monitor.Exit(PdfiumEngine.SyncRoot);
 			ownsEngine = false;
+			cancellationToken.ThrowIfCancellationRequested();
 			PdfPerfLogger.Log($"Snapshot print: {layout.PaperKey}, scale={scale:P1}, raster={width}x{height}, copies={copies}");
 			BITMAPINFO info = default;
 			info.bmiHeader.biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>();
@@ -131,6 +139,7 @@ internal static class PdfSnapshotPrinter
 			for (int copy = 0; copy < copies; copy++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
+				progress?.Report(new PrintProgressInfo($"Đang gửi bản in Snapshot {copy + 1}…", copy, copies));
 				var docInfo = new DOCINFO { cbSize = Marshal.SizeOf<DOCINFO>(), lpszDocName = $"PDF Pro Snapshot - p{snapshot.PageIndex + 1}" };
 				if (StartDoc(dc, ref docInfo) <= 0) throw new InvalidOperationException("Không bắt đầu được lệnh in: " + GetLastErrorMessage());
 				jobStarted = true;
@@ -145,6 +154,7 @@ internal static class PdfSnapshotPrinter
 				if (EndPage(dc) <= 0) throw new InvalidOperationException("Không hoàn tất được trang in: " + GetLastErrorMessage());
 				if (EndDoc(dc) <= 0) throw new InvalidOperationException("Không hoàn tất được lệnh in: " + GetLastErrorMessage());
 				jobStarted = false;
+				progress?.Report(new PrintProgressInfo($"Đã gửi bản in Snapshot {copy + 1}.", copy + 1, copies));
 			}
 		}
 		finally

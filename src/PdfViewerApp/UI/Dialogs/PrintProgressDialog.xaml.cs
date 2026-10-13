@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Threading;
 using System.Windows;
@@ -29,6 +29,7 @@ public partial class PrintProgressDialog : Window, IComponentConnector
 			});
 			return;
 		}
+		if (_allowClose || _cancellationTokenSource.IsCancellationRequested) return;
 		PrintProgressBar.IsIndeterminate = info.IsIndeterminate;
 		if (!info.IsIndeterminate)
 		{
@@ -36,7 +37,7 @@ public partial class PrintProgressDialog : Window, IComponentConnector
 			PrintProgressBar.Value = Math.Clamp(info.CurrentPage, 0, Math.Max(1, info.TotalPages));
 		}
 		StatusText.Text = info.Message;
-		DetailText.Text = ((info.TotalPages > 0) ? $"Trang da xu ly: {Math.Clamp(info.CurrentPage, 0, info.TotalPages)} / {info.TotalPages}" : string.Empty);
+		DetailText.Text = ((info.TotalPages > 0) ? $"Tiến trình: {Math.Clamp(info.CurrentPage, 0, info.TotalPages)} / {info.TotalPages}" : string.Empty);
 	}
 
 	public void MarkCompleted(string message)
@@ -107,8 +108,8 @@ public partial class PrintProgressDialog : Window, IComponentConnector
 		{
 			_cancellationTokenSource.Cancel();
 			CancelButton.IsEnabled = false;
-			StatusText.Text = "Dang huy lenh in...";
-			DetailText.Text = "Trang dang gui co the phai doi may in/driver ket thuc buoc hien tai.";
+			StatusText.Text = "Đang huỷ lệnh in…";
+			DetailText.Text = "Đang chờ driver kết thúc bước hiện tại. Trang đã gửi có thể vẫn được in.";
 		}
 	}
 

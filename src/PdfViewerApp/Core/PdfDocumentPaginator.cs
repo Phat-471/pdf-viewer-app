@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -30,6 +30,10 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 	public int EndPage { get; set; } = -1;
 
 	public bool ReversePageOrder { get; set; }
+
+	public int[]? PageIndices { get; set; }
+
+	public double ScalePercent { get; set; } = 100;
 
 	public double PrintDpi { get; set; } = 400.0;
 
@@ -71,6 +75,7 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 	{
 		get
 		{
+			if (PageIndices != null) return PageIndices.Length;
 			if (StartPage > EndPage || StartPage < 0 || EndPage >= _originalPageCount)
 			{
 				return 0;
@@ -123,8 +128,11 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 	private DocumentPage GetPageCore(int pageNumber)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
-		int actualPageNumber = (ReversePageOrder ? (EndPage - pageNumber) : (StartPage + pageNumber));
-		PrintProgress?.Report(new PrintProgressInfo($"Dang render trang {actualPageNumber + 1} bang WPF Bitmap...", pageNumber, PageCount));
+		if (pageNumber < 0 || pageNumber >= PageCount) return DocumentPage.Missing;
+        int actualPageNumber = PageIndices != null
+            ? PageIndices[ReversePageOrder ? PageIndices.Length - 1 - pageNumber : pageNumber]
+            : (ReversePageOrder ? EndPage - pageNumber : StartPage + pageNumber);
+		PrintProgress?.Report(new PrintProgressInfo($"Đang tạo ảnh trang {actualPageNumber + 1}…", pageNumber, PageCount));
 		if (actualPageNumber < 0 || actualPageNumber >= _originalPageCount)
 		{
 			throw new ArgumentOutOfRangeException("pageNumber");
@@ -148,8 +156,7 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 			double num11 = ((!_imageableArea.IsEmpty && _imageableArea.Height > 0.0) ? _imageableArea.Height : num7);
 			double num12 = Math.Max(1.0, num10 - RightSafetyPadding);
 			double num13 = Math.Max(1.0, num11 - BottomSafetyPadding);
-			double num14 = (FitToPrintableArea ? num12 : num6);
-			double num15 = Math.Min(val2: (FitToPrintableArea ? num13 : num7) / num5, val1: num14 / num4);
+			double num15 = FitToPrintableArea ? Math.Min(num12 / num4, num13 / num5) : ScalePercent / 100;
 			double num16 = num4 * num15;
 			double num17 = num5 * num15;
 			Size pageSize = new Size(num6, num7);
@@ -164,20 +171,20 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 				}
 				stopwatch.Stop();
 				PdfPerfLogger.Log($"Print test frame page {actualPageNumber + 1} total: {stopwatch.ElapsedMilliseconds} ms");
-				PrintProgress?.Report(new PrintProgressInfo($"Da render trang test {actualPageNumber + 1}", pageNumber + 1, PageCount));
+				PrintProgress?.Report(new PrintProgressInfo($"Đã tạo trang kiểm tra {actualPageNumber + 1}", pageNumber + 1, PageCount));
 				return new DocumentPage(drawingVisual, pageSize, rect, rect);
 			}
 			double num18;
 			double num19;
 			if (DriverAlreadyOffsetsPrintableArea)
 			{
-				num18 = (num12 - num16) / 2.0;
-				num19 = (num13 - num17) / 2.0;
+				num18 = AutoCenter ? (num12 - num16) / 2.0 : 0;
+				num19 = AutoCenter ? (num13 - num17) / 2.0 : 0;
 			}
 			else
 			{
-				num18 = num8 + (num12 - num16) / 2.0;
-				num19 = num9 + (num13 - num17) / 2.0;
+				num18 = num8 + (AutoCenter ? (num12 - num16) / 2.0 : 0);
+				num19 = num9 + (AutoCenter ? (num13 - num17) / 2.0 : 0);
 			}
 			double num20 = PrintDpi / 96.0 * num15;
 			int num21 = Math.Max(1, (int)(num4 * num20));
@@ -199,6 +206,9 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 			using (DrawingContext drawingContext = drawingVisual2.RenderOpen())
 			{
 				drawingContext.DrawRectangle(Brushes.White, null, rect);
+                drawingContext.PushClip(new RectangleGeometry(new Rect(
+                    DriverAlreadyOffsetsPrintableArea ? 0 : num8,
+                    DriverAlreadyOffsetsPrintableArea ? 0 : num9, num12, num13)));
 				if (flag)
 				{
 					RenderOptions.SetBitmapScalingMode(drawingVisual2, BitmapScalingMode.HighQuality);
@@ -245,10 +255,11 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 						drawingContext.DrawText(formattedText, new Point(num25 + 4.0, num26 + 4.0));
 					}
 				}
+				drawingContext.Pop();
 			}
 			stopwatch.Stop();
 			PdfPerfLogger.Log($"Print page {actualPageNumber + 1} total: {stopwatch.ElapsedMilliseconds} ms");
-			PrintProgress?.Report(new PrintProgressInfo($"Da render trang {actualPageNumber + 1}", pageNumber + 1, PageCount));
+			PrintProgress?.Report(new PrintProgressInfo($"Đã tạo ảnh trang {actualPageNumber + 1}", pageNumber + 1, PageCount));
 			return new DocumentPage(drawingVisual2, pageSize, rect, rect);
 		}
 		finally

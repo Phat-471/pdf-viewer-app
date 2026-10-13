@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +20,19 @@ internal sealed class PdfRenderSession : IDisposable
 	private int _disposed;
 
 	public PdfRenderSession(string path) => _path = path;
+
+    public System.Windows.Size GetPageSizePoints(int pageIndex)
+    {
+        lock (PdfiumEngine.SyncRoot)
+        {
+            if (Volatile.Read(ref _disposed) != 0) throw new ObjectDisposedException(nameof(PdfRenderSession));
+            PdfiumEngine.Initialize();
+            if (_document == IntPtr.Zero) _document = PdfiumEngine.FPDF_LoadDocument(_path, null);
+            if (_document == IntPtr.Zero || !PdfiumEngine.TryGetPageSizeByIndex(_document, pageIndex, out double w, out double h))
+                throw new InvalidOperationException("Không đọc được kích thước trang PDF.");
+            return new System.Windows.Size(w, h);
+        }
+    }
 
 	public BitmapSource? RenderSnapshot(PdfSnapshotSelection snapshot, int longEdge = 900, int maxPixels = 8000000)
 	{

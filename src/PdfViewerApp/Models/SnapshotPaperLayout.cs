@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -6,7 +6,7 @@ using System.Windows.Media.Imaging;
 namespace PdfViewerApp;
 
 internal sealed record SnapshotPaperLayout(string PaperKey, bool Landscape, bool FitToPage,
-    double ScalePercent = 100, double MarginMm = 10)
+    double ScalePercent = 100, double MarginMm = 10, bool Center = true, Rect? PrintableAreaMm = null)
 {
     internal Size PaperSizeMm
     {
@@ -25,24 +25,38 @@ internal sealed record SnapshotPaperLayout(string PaperKey, bool Landscape, bool
         }
     }
 
+    internal Rect ContentAreaMm
+    {
+        get
+        {
+            Size paper = PaperSizeMm;
+            Rect area = new(MarginMm, MarginMm, paper.Width - 2 * MarginMm, paper.Height - 2 * MarginMm);
+            if (PrintableAreaMm is { } printable) area.Intersect(printable);
+            return area;
+        }
+    }
+
     internal Rect ImageBoundsMm(Size cropPoints)
     {
-        Size paper = PaperSizeMm;
+        Rect area = ContentAreaMm;
+        if (area.IsEmpty || area.Width <= 0 || area.Height <= 0)
+            throw new InvalidOperationException("Máy in không có vùng in phù hợp với lề đã chọn.");
         double width = cropPoints.Width * 25.4 / 72;
         double height = cropPoints.Height * 25.4 / 72;
         double scale = FitToPage
-            ? Math.Min((paper.Width - MarginMm * 2) / width, (paper.Height - MarginMm * 2) / height)
+            ? Math.Min(area.Width / width, area.Height / height)
             : ScalePercent / 100;
         width *= scale;
         height *= scale;
-        return new Rect((paper.Width - width) / 2, (paper.Height - height) / 2, width, height);
+        return new Rect(area.X + (Center ? (area.Width - width) / 2 : 0),
+            area.Y + (Center ? (area.Height - height) / 2 : 0), width, height);
     }
 
     internal bool IsClipped(Size cropPoints)
     {
         Rect bounds = ImageBoundsMm(cropPoints);
-        Size paper = PaperSizeMm;
-        return bounds.Width > paper.Width - MarginMm * 2 + 0.01 || bounds.Height > paper.Height - MarginMm * 2 + 0.01;
+        Rect area = ContentAreaMm;
+        return bounds.Width > area.Width + 0.01 || bounds.Height > area.Height + 0.01;
     }
 
     internal BitmapSource Compose(BitmapSource crop, Size cropPoints, int longEdge, bool showGuides = false)
@@ -52,8 +66,9 @@ internal sealed record SnapshotPaperLayout(string PaperKey, bool Landscape, bool
         int width = Math.Max(1, (int)Math.Round(paper.Width * pixelsPerMm));
         int height = Math.Max(1, (int)Math.Round(paper.Height * pixelsPerMm));
         Rect bounds = ImageBoundsMm(cropPoints);
-        Rect clip = new Rect(MarginMm * pixelsPerMm, MarginMm * pixelsPerMm,
-            (paper.Width - 2 * MarginMm) * pixelsPerMm, (paper.Height - 2 * MarginMm) * pixelsPerMm);
+        Rect area = ContentAreaMm;
+        Rect clip = new Rect(area.X * pixelsPerMm, area.Y * pixelsPerMm,
+            area.Width * pixelsPerMm, area.Height * pixelsPerMm);
         var visual = new DrawingVisual();
         using (DrawingContext dc = visual.RenderOpen())
         {

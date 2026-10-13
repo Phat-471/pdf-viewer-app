@@ -2165,12 +2165,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			bool fit = options.FitToPrintableArea, center = options.AutoCenter;
 			bool separateJobs = options.NativeSeparatePageJobs, reverse = options.ReversePageOrder;
 			bool rasterize = options.OptimizeCadDrawings;
+			int[] pageIndices = options.PageIndices;
+			double scalePercent = options.ScalePercent;
 			var annotations = Annotations.ToList();
 			var progressDialog = new PrintProgressDialog { Owner = Window.GetWindow(this) };
 			IProgress<PrintProgressInfo> progress = new Progress<PrintProgressInfo>(progressDialog.UpdateProgress);
 			var cancellation = progressDialog.CancellationToken;
 			progressDialog.Show();
-			progress.Report(new PrintProgressInfo("Preparing printer...", 0, 0, IsIndeterminate: true));
+			progress.Report(new PrintProgressInfo("Đang chuẩn bị máy in…", 0, 0, IsIndeterminate: true));
 			try
 			{
 				await PrintWorker.RunAsync(() =>
@@ -2193,7 +2195,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						if (annotations.Count > 0) LogToDesktop("Native printing excludes app overlay annotations. WPF Bitmap includes them.");
 						NativePdfPrinter.Print(pdfPath, printerName, devMode, startPage, endPage, copies, fit, center,
 							driverOffsets, profile.RightSafetyPadding, profile.BottomSafetyPadding, separateJobs,
-							reverse, rasterize, progress, cancellation, printDpi);
+							reverse, rasterize, progress, cancellation, printDpi, scalePercent, pageIndices);
 					}
 					else if (engine == "PdfDirect" || engine == "PdfDirect_Optimized")
 					{
@@ -2203,7 +2205,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 					else
 					{
-						progress.Report(new PrintProgressInfo("Reading printer capabilities...", 0, 0, IsIndeterminate: true));
+						progress.Report(new PrintProgressInfo("Đang đọc vùng in của máy in…", 0, 0, IsIndeterminate: true));
 						PrintCapabilities capabilities = queue.GetPrintCapabilities(workerTicket);
 						double width = capabilities.OrientedPageMediaWidth ?? workerTicket.PageMediaSize?.Width ?? 816;
 						double height = capabilities.OrientedPageMediaHeight ?? workerTicket.PageMediaSize?.Height ?? 1056;
@@ -2215,6 +2217,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						{
 							StartPage = testFrame ? 0 : startPage, EndPage = testFrame ? 0 : endPage,
 							AutoCenter = center, FitToPrintableArea = fit, PrintDpi = printDpi,
+							PageIndices = testFrame ? new[] { 0 } : pageIndices, ScalePercent = scalePercent,
 							ReversePageOrder = reverse, PrintProgress = progress, CancellationToken = cancellation,
 							BottomSafetyPadding = profile.BottomSafetyPadding, RightSafetyPadding = profile.RightSafetyPadding,
 							DriverAlreadyOffsetsPrintableArea = driverOffsets, PrintTestFrame = testFrame,
