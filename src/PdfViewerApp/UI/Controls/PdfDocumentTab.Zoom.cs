@@ -13,6 +13,7 @@ namespace PdfViewerApp
 		private readonly ScaleTransform _zoomPreviewScale = new();
 		public void ChangeZoom(double factor, Point? viewportAnchor = null)
 		{
+			if (IsDrawingSnapshot) return;
 			if (PageCount <= 0)
 			{
 				return;
@@ -59,6 +60,7 @@ namespace PdfViewerApp
 
 		public void FitWidth()
 		{
+			if (IsDrawingSnapshot) return;
 			if (PageCount > 0 && _pageDimensions.Count != 0)
 			{
 				double num = DocumentScrollViewer.ViewportWidth;

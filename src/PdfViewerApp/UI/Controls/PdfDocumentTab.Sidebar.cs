@@ -14,7 +14,7 @@ namespace PdfViewerApp
 		{
 			_isSidebarVisible = isVisible;
 			SidebarBorder.Visibility = ((!isVisible) ? Visibility.Collapsed : Visibility.Visible);
-			SidebarColumn.Width = (isVisible ? new GridLength(260.0) : new GridLength(0.0));
+			SidebarColumn.Width = (isVisible ? new GridLength(200.0) : new GridLength(0.0));
 			SplitterColumn.Width = (isVisible ? new GridLength(4.0) : new GridLength(0.0));
 			if (isVisible && PageCount > 0)
 			{
@@ -477,7 +477,7 @@ namespace PdfViewerApp
 				{
 					bool isActive = num == SelectedPageNumber;
 					bool isSelected = _selectedPages.Contains(num);
-					border.BorderBrush = (isActive ? Brushes.DeepSkyBlue : isSelected ? new SolidColorBrush(Color.FromRgb(20, 184, 166)) : Brushes.Gray);
+					border.BorderBrush = (isActive || isSelected ? new SolidColorBrush(Color.FromRgb(20, 184, 166)) : Brushes.Gray);
 					border.BorderThickness = (isActive ? new Thickness(3.0) : isSelected ? new Thickness(2.0) : new Thickness(1.0));
 					border.Background = (isSelected ? new SolidColorBrush(Color.FromRgb(220, 252, 231)) : Brushes.White);
 				}

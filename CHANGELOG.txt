@@ -1,3 +1,2 @@
-﻿- Hoàn thiện bộ cài và gói cập nhật cho mỗi phiên bản.
-- Kiểm tra đầy đủ tệp phát hành trước khi thông báo cập nhật.
-- Giữ bản đang cài khi mở hoặc hủy trình cài đặt.
+﻿- Giao diện mới với thanh công cụ gọn và biểu tượng rõ ràng.
+- Snapshot hiển thị rõ vùng chọn và giữ khung khi thu phóng.

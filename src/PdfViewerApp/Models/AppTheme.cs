@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace PdfViewerApp;
 
@@ -101,12 +101,12 @@ internal static class AppThemeRegistry
 			Name                  = Dark,
 			DisplayName           = "Tối",
 			Icon                  = "🌑",
-			WindowBackground      = "#0B0F19",
+			WindowBackground      = "#0F172A",
 			TitleBarBackground    = "#0F172A",
-			PanelBackground       = "#111827",
-			SurfaceBackground     = "#0B1220",
+			PanelBackground       = "#1E293B",
+			SurfaceBackground     = "#182333",
 			HoverBackground       = "#1E293B",
-			BorderColor           = "#1E293B",
+			BorderColor           = "#334155",
 			AccentColor           = "#14B8A6",
 			AccentDark            = "#0F766E",
 			ForegroundPrimary     = "#F8FAFC",

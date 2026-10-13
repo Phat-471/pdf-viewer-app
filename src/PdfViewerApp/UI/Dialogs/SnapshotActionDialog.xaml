@@ -120,6 +120,7 @@
     </Grid.RowDefinitions>
     <StackPanel Margin="0,0,0,16">
       <TextBlock Text="Xem trước vùng chọn" FontSize="21" FontWeight="SemiBold" Foreground="#38BDF8" />
+      <TextBlock Text="Chọn vùng  ›  Xem trước  ›  Chỉnh giấy và tỉ lệ  ›  In / copy / lưu" Foreground="#94A3B8" Margin="0,6,0,0" TextWrapping="Wrap" />
       <TextBlock Name="SnapshotInfoText" Margin="0,6,0,0" Foreground="#CBD5E1" TextWrapping="Wrap" />
     </StackPanel>
     <Grid Grid.Row="1">

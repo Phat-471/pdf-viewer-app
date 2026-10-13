@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -75,7 +75,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private Rectangle? _tempRect;
 
-	// Gi盻ｯ vﾃｹng snapshot cﾅｩ ﾄ黛ｻ・ngﾆｰ盻拱 dﾃｹng bi蘯ｿt vﾃｹng ﾄ妥｣ ch盻･p
+	// Snapshot display references; the bounds live in page coordinates.
 	private Rectangle? _lastSnapshotOverlay;
 	private Canvas? _lastSnapshotCanvas;
 
@@ -636,13 +636,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			canvas.CaptureMouse();
 			if (ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot")
 			{
-				_tempRect = new Rectangle
-				{
-					Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0F766E")),
-					StrokeThickness = 2.0,
-					Fill = new SolidColorBrush(Color.FromArgb(40, 15, 118, 110))
-				};
-				canvas.Children.Add(_tempRect);
+				_drawStartPoint = ClampSnapshotPoint(canvas, _drawStartPoint);
+				BeginSnapshotSelection(canvas);
 			}
 			else if (ActiveTool == "ShapeRect" || ActiveTool == "TextBox")
 			{
@@ -990,6 +985,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		else if (_isDrawing)
 		{
 			Point position6 = e.GetPosition(canvas);
+			if (ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot")
+			{
+				position6 = ClampSnapshotPoint(canvas, position6);
+				_drawStartPoint = new Point(_snapshotDragStart.X * canvas.Width, _snapshotDragStart.Y * canvas.Height);
+			}
 			if ((ActiveTool == "TextBox" || ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot" || ActiveTool == "ShapeRect") && _tempRect != null)
 			{
 				double length = Math.Min(_drawStartPoint.X, position6.X);
@@ -1000,6 +1000,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				Canvas.SetTop(_tempRect, length2);
 				_tempRect.Width = width;
 				_tempRect.Height = height;
+				if (ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot") UpdateSnapshotSelectionLabel(canvas, length, length2, width, height);
 			}
 			else if (ActiveTool == "ShapeOval" && _tempEllipse != null)
 			{
@@ -1135,6 +1136,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			_isDrawing = false;
 			Point position = e.GetPosition(canvas);
+			if (ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot")
+				_drawStartPoint = new Point(_snapshotDragStart.X * canvas.Width, _snapshotDragStart.Y * canvas.Height);
 			if (ActiveTool == "TextBox" && _tempRect != null)
 			{
 				canvas.Children.Remove(_tempRect);
@@ -1147,10 +1150,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			else if (ActiveTool == "Snapshot" && _tempRect != null)
 			{
+				position = ClampSnapshotPoint(canvas, position);
 				double x2 = Math.Min(_drawStartPoint.X, position.X);
 				double y2 = Math.Min(_drawStartPoint.Y, position.Y);
-				double w2 = Math.Max(10.0, Math.Abs(_drawStartPoint.X - position.X));
-				double h2 = Math.Max(10.0, Math.Abs(_drawStartPoint.Y - position.Y));
+				double w2 = Math.Abs(_drawStartPoint.X - position.X);
+				double h2 = Math.Abs(_drawStartPoint.Y - position.Y);
 				Rectangle tempRect = _tempRect;
 				_tempRect = null;
 				if (!IsContinuousTool(ActiveTool))
@@ -1158,18 +1162,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					ActiveTool = "Select";
 				}
 				EndMouseInteraction(canvas);
-				// Xﾃｳa overlay cﾅｩ trﾆｰ盻嫩 khi v蘯ｽ m盻嬖
+				// Replace the previous selected region.
 				ClearLastSnapshotOverlay();
-				// Gi盻ｯ overlay m盻嬖 trﾃｪn canvas ﾄ黛ｻ・ngﾆｰ盻拱 dﾃｹng bi蘯ｿt vﾃｹng ﾄ妥｣ ch盻･p
+				// Keep the final boundary while the preview is open.
 				KeepSnapshotOverlay(canvas, tempRect, x2, y2, w2, h2);
 				PrintSnapshotSelection(canvas, null, x2, y2, w2, h2, num);
 			}
 			else if (ActiveTool == "AiSnapshot" && _tempRect != null)
 			{
+				position = ClampSnapshotPoint(canvas, position);
 				double x3 = Math.Min(_drawStartPoint.X, position.X);
 				double y3 = Math.Min(_drawStartPoint.Y, position.Y);
-				double w3 = Math.Max(10.0, Math.Abs(_drawStartPoint.X - position.X));
-				double h3 = Math.Max(10.0, Math.Abs(_drawStartPoint.Y - position.Y));
+				double w3 = Math.Abs(_drawStartPoint.X - position.X);
+				double h3 = Math.Abs(_drawStartPoint.Y - position.Y);
 				Rectangle tempRect2 = _tempRect;
 				_tempRect = null;
 				if (!IsContinuousTool(ActiveTool))
@@ -1178,6 +1183,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				EndMouseInteraction(canvas);
 				RequestAiSnapshot(canvas, tempRect2, x3, y3, w3, h3, num);
+				ClearSnapshotDragLabel();
 			}
 			else if (ActiveTool == "ShapeRect" && _tempRect != null)
 			{
@@ -1360,50 +1366,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-
-	/// <summary>
-	/// Xﾃｳa vﾃｹng snapshot cﾅｩ kh盻淑 canvas (g盻絞 khi ngﾆｰ盻拱 dﾃｹng b蘯ｯt ﾄ黛ｺｧu v蘯ｽ vﾃｹng m盻嬖).
-	/// </summary>
-	private void ClearLastSnapshotOverlay()
-	{
-		if (_lastSnapshotOverlay != null && _lastSnapshotCanvas != null)
-		{
-			_lastSnapshotCanvas.Children.Remove(_lastSnapshotOverlay);
-			_lastSnapshotOverlay = null;
-			_lastSnapshotCanvas = null;
-		}
-	}
-
-	/// <summary>
-	/// Gi盻ｯ vﾃｹng snapshot hi盻ハ th盻・m盻・trﾃｪn canvas sau khi ngﾆｰ盻拱 dﾃｹng ﾄ妥｣ ch盻･p,
-	/// ﾄ黛ｻ・h盻・bi蘯ｿt vﾃｹng nﾃo v盻ｫa ﾄ柁ｰ盻｣c x盻ｭ lﾃｽ.
-	/// </summary>
-	private void KeepSnapshotOverlay(Canvas canvas, Rectangle drawnRect, double x, double y, double w, double h)
-	{
-		// T蘯｡o overlay m盻嬖 ki盻ブ dashed border mﾃu teal m盻・
-		var overlay = new Rectangle
-		{
-			Stroke = new SolidColorBrush(Color.FromArgb(180, 15, 118, 110)),
-			StrokeThickness = 2.0,
-			StrokeDashArray = new DoubleCollection { 6.0, 3.0 },
-			Fill = new SolidColorBrush(Color.FromArgb(20, 15, 118, 110)),
-			Width = w,
-			Height = h,
-			IsHitTestVisible = false
-		};
-		Canvas.SetLeft(overlay, x);
-		Canvas.SetTop(overlay, y);
-
-		// N蘯ｿu drawnRect v蘯ｫn cﾃｲn trong canvas (chﾆｰa b盻・remove), ﾄ黛ｺｷt overlay thay th蘯ｿ
-		if (canvas.Children.Contains(drawnRect))
-		{
-			canvas.Children.Remove(drawnRect);
-		}
-		canvas.Children.Add(overlay);
-
-		_lastSnapshotOverlay = overlay;
-		_lastSnapshotCanvas = canvas;
-	}
 
 	private void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 	{
@@ -1631,6 +1593,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void EndMouseInteraction(Canvas canvas)
 	{
+		ClearSnapshotDragLabel();
 		_isDraggingAnn = false;
 		_isDraggingArrowHandle = false;
 		_isDraggingLineStart = false;
@@ -2034,24 +1997,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		SetZoomPercent(100.0);
 	}
 
-	private void ContextFitPage_Click(object sender, RoutedEventArgs e)
+	private void ContextFitPage_Click(object sender, RoutedEventArgs e) => FitPage();
+
+	public void FitPage()
 	{
-		if (PageCount > 0 && _pageDimensions.Count != 0)
-		{
-			double value = (DocumentScrollViewer.ViewportHeight - 60.0) / (_pageDimensions[0].Height * 1.33);
-			CurrentZoom = Math.Clamp(value, 0.1, 4.0);
-			_baseZoomForLayout = CurrentZoom;
-			_targetZoom = CurrentZoom;
-			_smoothZoomTimer?.Stop();
-			ResetZoomPreviewTransform();
-			_pendingZoomContentPoint = null;
-			_pendingZoomHostPoint = null;
-			_pendingZoomViewportPoint = null;
-			_resetScrollAfterRender = true;
-			ReportZoomChanged();
-			RenderPdfPages();
-			LogStatus("V盻ｫa khﾃｭt trang");
-		}
+		if (PageCount <= 0 || !TryGetPageSize(SelectedPageNumber, out Size size)) return;
+		double width = size.Width, height = size.Height;
+		if (_pageRotations.TryGetValue(SelectedPageNumber, out int rotation) && rotation % 180 != 0)
+			(width, height) = (height, width);
+		double zoom = Math.Min((DocumentScrollViewer.ViewportWidth - 40) / (width * 1.33),
+			(DocumentScrollViewer.ViewportHeight - 40) / (height * 1.33));
+		if (!double.IsFinite(zoom) || zoom <= 0) return;
+		SetZoomPercent(zoom * 100);
 	}
 
 	private void ContextFitWidth_Click(object sender, RoutedEventArgs e)
@@ -3538,6 +3495,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 		_cacheManager = new Services.Cache.PdfCacheManager(MaxBitmapCacheBytes);
 		InitializeComponent();
+		SetSidebarVisibility(true);
 		RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
 		_zoomTimer = new DispatcherTimer();
 		_zoomTimer.Interval = TimeSpan.FromMilliseconds(160.0);
@@ -3630,6 +3588,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public async void LoadDocument(string path, bool clearPendingTextEdits = true)
 	{
+		CancelSnapshotSelection();
 		Stopwatch totalSw = Stopwatch.StartNew();
 		int loadGeneration = ++_loadGeneration;
 		_documentOpening = true;

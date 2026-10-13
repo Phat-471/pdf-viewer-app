@@ -981,6 +981,7 @@ public partial class PdfDocumentTab
 		}
 		DrawTextSelectionHighlights(canvas, pageNumber);
 		DrawEditTextSelectionBorder(canvas, pageNumber);
+		DrawSnapshotOverlay(canvas, pageNumber);
 	}
 
 	private void DrawEndTick(Canvas canvas, Point p1, Point p2, Color color)

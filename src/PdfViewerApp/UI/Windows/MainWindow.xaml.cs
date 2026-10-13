@@ -577,15 +577,7 @@ exit 0
 		}
 		if (AppStatusBar != null)
 		{
-			var statusGrad = new LinearGradientBrush
-			{
-				StartPoint = new Point(0.0, 0.0),
-				EndPoint = new Point(1.0, 0.0)
-			};
-			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.StatusBarStart), 0.0));
-			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.StatusBarMid), 0.4));
-			statusGrad.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(theme.AccentDark), 1.0));
-			AppStatusBar.Background = statusGrad;
+			AppStatusBar.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
 			AppStatusBar.Foreground = isDark ? Brushes.White : Brushes.Black;
 		}
 		var fgBrush = isDark ? Brushes.White : Brushes.Black;
@@ -669,6 +661,7 @@ exit 0
 
 		if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None && ActiveTool != "Select")
 		{
+			GetActiveTab()?.CancelSnapshotSelection();
 			ActiveTool = "Select";
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab != null)
@@ -1252,6 +1245,7 @@ exit 0
 			_updatingStatusControls = true;
 			PageJumpTextBox.Text = activeTab.SelectedPageNumber.ToString();
 			PageTotalText.Text = $"/ {activeTab.PageCount}";
+			PageSizeText.Text = activeTab.CurrentPageSizeLabel;
 			_updatingStatusControls = false;
 		}
 		else
@@ -1259,6 +1253,7 @@ exit 0
 			_updatingStatusControls = true;
 			PageJumpTextBox.Text = string.Empty;
 			PageTotalText.Text = "/ 0";
+			PageSizeText.Text = string.Empty;
 			_updatingStatusControls = false;
 		}
 	}
@@ -2684,6 +2679,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 
 	private void CancelMode_Click(object sender, RoutedEventArgs e)
 	{
+		GetActiveTab()?.CancelSnapshotSelection();
 		ActiveTool = "Select";
 		PdfDocumentTab activeTab = GetActiveTab();
 		if (activeTab != null)
@@ -2850,7 +2846,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Snapshot";
 		}
-		LogStatus("Đã chuyển sang công cụ Snapshot. Kéo chọn một vùng trên bản vẽ đểin phóng ra A3.");
+		LogStatus("Snapshot: kéo chọn vùng màu xanh; thả chuột để xem trước và chỉnh giấy, tỉ lệ.");
 	}
 
 	private void AiSnapshotTool_Click(object sender, RoutedEventArgs e)
@@ -3284,6 +3280,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.ZoomInRequested += ZoomIn_Click;
 		_mainRibbon.ZoomOutRequested += ZoomOut_Click;
 		_mainRibbon.FitWidthRequested += FitWidth_Click;
+		_mainRibbon.FitPageRequested += (_, _) => GetActiveTab()?.FitPage();
 		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
 		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
 		_mainRibbon.EditOriginalFontRequested += EditOriginalFont_Click;

@@ -12,6 +12,14 @@
    - **Lưu PNG**: chọn nơi lưu ảnh.
 5. Hộp thoại vẫn mở sau khi in, copy hoặc lưu. **Chọn lại vùng** quay về trang PDF để kéo vùng mới.
 
+## Hiển thị vùng chọn
+
+- Lúc kéo chuột: vùng chọn có nền xanh trong suốt, viền xanh và kích thước tính bằng mm trên trang PDF.
+- Thả chuột: giữ viền đứt nét đen, bỏ màu phủ để đọc rõ nội dung bên trong. Khung bám theo trang khi cuộn, zoom, xoay hoặc vẽ lại chú thích.
+- Điểm kéo được giới hạn trong trang; vùng quá nhỏ không tự nới rộng mà yêu cầu chọn lại.
+- **Esc** trên trang PDF hoặc **Hủy / Thoát chế độ** bỏ khung. Bắt đầu chọn vùng mới thay thế khung cũ.
+- Khung và nhãn chỉ xuất hiện trên giao diện, không nằm trong ảnh xuất hoặc bản in.
+
 ## Ảnh xuất
 
 - **Theo bố cục giấy** giữ khổ giấy, tỷ lệ và lề đã chọn; PNG có thông tin DPI tương ứng kích thước giấy.

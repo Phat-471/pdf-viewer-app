@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -51,6 +51,8 @@ public partial class MainRibbon : UserControl
 	public event RoutedEventHandler? ZoomInRequested;
 
 	public event RoutedEventHandler? ZoomOutRequested;
+
+	public event RoutedEventHandler? FitPageRequested;
 
 	public event RoutedEventHandler? FitWidthRequested;
 
@@ -210,21 +212,31 @@ public partial class MainRibbon : UserControl
 	internal void ApplyTheme(AppThemeDefinition theme)
 	{
 		_currentTheme = theme;
+		Resources["RibbonIconBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		var accent = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
+		var foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		var hover = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.HoverBackground));
+		foreach (string key in new[] { "Fluent.Ribbon.Brushes.Accent", "Fluent.Ribbon.Brushes.AccentBase" })
+			MyRibbon.Resources[key] = accent;
+		var selectedBackground = theme.IsLight ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCFBF1")) : accent;
+		foreach (string key in new[] { "Fluent.Ribbon.Brushes.ToggleButton.Checked.Background", "Fluent.Ribbon.Brushes.ToggleButton.CheckedMouseOver.Background", "Fluent.Ribbon.Brushes.RibbonTabItem.Active.Background" })
+			MyRibbon.Resources[key] = selectedBackground;
+		foreach (string key in new[] { "Fluent.Ribbon.Brushes.RibbonTabItem.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.MouseOver.Foreground", "Fluent.Ribbon.Brushes.RibbonTabControl.Content.Foreground" })
+			MyRibbon.Resources[key] = foreground;
+		MyRibbon.Resources["Fluent.Ribbon.Brushes.RibbonGroupBox.Header.Foreground"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
+		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.MouseOver.Background"] = hover;
+		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.Pressed.Background"] = accent;
 		bool isDark = !theme.IsLight;
 		PdfPerfLogger.Log($"ApplyTheme: Starting theme update to {theme.Name} (isDark={isDark}, AccentColor={theme.AccentColor})");
 
 		if (ThemeToggleIcon != null)
 		{
-			// Đổi font chữ sang font Emoji của Windows
-			ThemeToggleIcon.FontFamily = new FontFamily("Segoe UI Emoji");
+			ThemeToggleIcon.FontFamily = new FontFamily("Segoe MDL2 Assets");
 			
-			// Gọi thuộc tính Icon (chứa Emoji "🌅") thay vì Glyph
-			ThemeToggleIcon.Text = theme.Icon; 
+			ThemeToggleIcon.Text = theme.ThemeBadgeIconGlyph;
 			
-			// Giữ nguyên dòng này hoặc bỏ đi đều được vì Emoji thường có màu sẵn
 			ThemeToggleIcon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ThemeBadgeIconColor));
 			
-			PdfPerfLogger.Log("ApplyTheme: ThemeToggleIcon updated with Emoji.");
 		}
 
 		if (ThemeIconBadge != null)
@@ -292,7 +304,7 @@ public partial class MainRibbon : UserControl
 
 			// CRITICAL FIX: Schedule icon color update via Dispatcher to ensure all tabs are rendered first.
 			// Fluent Ribbon uses virtualization - tabs not yet activated may not have visual tree.
-			var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentColor));
+			var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
 			Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
 			{
 				ApplyIconColors(accentBrush);
@@ -311,32 +323,17 @@ public partial class MainRibbon : UserControl
 			int updatedIconsCount = 0;
 			foreach (var tb in textBlocks)
 			{
-				// Bỏ qua ThemeToggleIcon - để giữ đúng emoji màu gốc của theme
 				if (tb.Name == "ThemeToggleIcon" || tb.Tag?.ToString() == "ThemeToggleIcon" || tb == ThemeToggleIcon) continue;
 
 				string? fontSource = tb.FontFamily?.Source;
 				if (fontSource == null) continue;
 
 				bool isMdl2 = fontSource.IndexOf("Segoe MDL2 Assets", StringComparison.OrdinalIgnoreCase) >= 0;
-				bool isSegoeUi = fontSource.IndexOf("Segoe UI", StringComparison.OrdinalIgnoreCase) >= 0;
-
 				if (isMdl2)
 				{
 					// Segoe MDL2 Assets = all icon font, always update foreground
 					tb.Foreground = accentBrush;
 					updatedIconsCount++;
-				}
-				else if (isSegoeUi && !string.IsNullOrEmpty(tb.Text))
-				{
-					// Segoe UI: only update if text contains unicode symbols (code point > U+00FF)
-					// Skip plain ASCII labels like "REV", "0", text descriptions, etc.
-					bool hasUnicodeSymbol = false;
-					foreach (char c in tb.Text) { if (c > 0xFF) { hasUnicodeSymbol = true; break; } }
-					if (hasUnicodeSymbol)
-					{
-						tb.Foreground = accentBrush;
-						updatedIconsCount++;
-					}
 				}
 			}
 			PdfPerfLogger.Log($"ApplyIconColors: Successfully updated {updatedIconsCount} icon TextBlock foregrounds.");
@@ -351,8 +348,7 @@ public partial class MainRibbon : UserControl
 	{
 		if (MyRibbon != null)
 		{
-			// Tab index changes due to insertion of a new tab
-			MyRibbon.SelectedTabIndex = 4;
+			MyRibbon.SelectedTabItem = MeasureSignTab;
 		}
 	}
 
@@ -370,6 +366,12 @@ public partial class MainRibbon : UserControl
 
 	public void SetActiveTool(string activeTool)
 	{
+		HomeSelectToolBtn.IsChecked = activeTool == "Select";
+		HomeTextToolBtn.IsChecked = activeTool == "TextBox";
+		HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
+		HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
+		HomeDistanceToolBtn.IsChecked = activeTool == "MeasureDistance";
+		HomeAreaToolBtn.IsChecked = activeTool == "MeasureArea";
 		if (SelectTextToolBtn != null)
 		{
 			SelectTextToolBtn.IsChecked = activeTool == "SelectText";
@@ -459,6 +461,8 @@ public partial class MainRibbon : UserControl
 		ApplyProButtonState(ReversePageOrderBtn, opacity, toolTip);
 		ApplyProButtonState(ResetPageOrderBtn, opacity, toolTip);
 		ApplyProButtonState(DeletePageBtn, opacity, toolTip);
+		ApplyProButtonState(HomeDeletePageBtn, opacity, toolTip);
+		ApplyProButtonState(HomeInsertPageBtn, opacity, toolTip);
 		ApplyProButtonState(InsertBlankPageBtn, opacity, toolTip);
 		ApplyProButtonState(SplitCurrentPageBtn, opacity, toolTip);
 		ApplyProButtonState(ExtractPagesBtn, opacity, toolTip);
@@ -658,6 +662,8 @@ public partial class MainRibbon : UserControl
 	}
 
 	private void OcrText_Click(object sender, RoutedEventArgs e) => OcrTextRequested?.Invoke(this, e);
+
+	private void FitPage_Click(object sender, RoutedEventArgs e) => FitPageRequested?.Invoke(this, e);
 
 	private void ExportOcrText_Click(object sender, RoutedEventArgs e) => ExportOcrTextRequested?.Invoke(this, e);
 

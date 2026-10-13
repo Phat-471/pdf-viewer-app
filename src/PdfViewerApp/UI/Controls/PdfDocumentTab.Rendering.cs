@@ -377,6 +377,7 @@ public partial class PdfDocumentTab
 				};
 				grid.Children.Add(image);
 				grid.Children.Add(canvas);
+				DrawSnapshotOverlay(canvas, pageNumber);
 				if (_pageRotations.TryGetValue(pageNumber, out var value) && value != 0)
 				{
 					grid.LayoutTransform = new RotateTransform(value);
