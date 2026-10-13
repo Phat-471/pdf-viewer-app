@@ -1,4 +1,8 @@
 using System;
+using System.IO;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using System.Printing;
@@ -75,6 +79,17 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	private bool _loadingPrinterDefaults;
 	private System.Threading.CancellationTokenSource? _printerSelectionCts;
 	private PdfSnapshotSelection? _snapshotSelection;
+	private bool _dialogReady;
+	private bool _dialogClosed;
+	private bool _printerQueryInProgress;
+	private CancellationTokenSource? _previewCts;
+	private readonly SemaphoreSlim _previewGate = new(1, 1);
+	private readonly Dictionary<PdfSnapshotSelection, BitmapSource> _previewSources = new();
+	private PdfRenderSession? _previewSession;
+	private PrintQueue? _selectedPrintQueue;
+	[Obfuscation(Exclude = true, ApplyToMembers = true)]
+	private sealed record PrinterChoice(string FullName);
+	public string? SelectedPrinterName => (PrinterComboBox.SelectedItem as PrinterChoice)?.FullName ?? _selectedPrintQueue?.FullName;
 
 	public int StartPageIndex { get; private set; }
 	public int EndPageIndex { get; private set; }
@@ -82,7 +97,16 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	public double PrintDpi { get; private set; } = 600.0;
 	public string PaperSizeKey { get; private set; } = "A3";
 	public string OrientationKey { get; private set; } = "Landscape";
-	public PrintQueue? SelectedPrintQueue { get; private set; }
+	public PrintQueue? SelectedPrintQueue
+	{
+		get
+		{
+			if (_selectedPrintQueue == null && SelectedPrinterName is string name)
+				_selectedPrintQueue = new PrintQueue(new LocalPrintServer(), name, Array.Empty<string>());
+			return _selectedPrintQueue;
+		}
+		private set => _selectedPrintQueue = value;
+	}
 	public PrintTicket? SelectedPrintTicket { get; private set; }
 	public byte[]? NativeDevModeBytes { get; private set; }
 
@@ -150,7 +174,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	{
 	}
 
-	public PrintOptionsDialog(int pageCount, int currentPageNumber, string? pdfPath)
+	public PrintOptionsDialog(int pageCount, int currentPageNumber, string? pdfPath, BitmapSource? cachedPreview = null)
 	{
 		InitializeComponent();
 		_pageCount = Math.Max(1, pageCount);
@@ -164,8 +188,26 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		PageRangeTextBox.Text = $"1-{_pageCount}";
 		StartPageIndex = 0;
 		EndPageIndex = _pageCount - 1;
-		LoadPrinters();
-		UpdatePreview();
+		if (!string.IsNullOrEmpty(pdfPath))
+		{
+			_previewSession = new PdfRenderSession(pdfPath);
+			if (cachedPreview != null && cachedPreview.IsFrozen)
+				_previewSources[new PdfSnapshotSelection(pdfPath, _previewPageNumber - 1, 0, 0, 1, 1)] = cachedPreview;
+		}
+		ContentRendered += async (_, _) =>
+		{
+			if (_dialogReady) return;
+			_dialogReady = true;
+			UpdatePreview();
+			await LoadPrintersAsync();
+		};
+		Closed += (_, _) =>
+		{
+			_dialogClosed = true;
+			_previewCts?.Cancel();
+			_printerSelectionCts?.Cancel();
+			_previewSession?.Dispose();
+		};
 	}
 
 	private static (DEVMODEW? DevModeStruct, byte[]? DevModeBytes) GetNativePrinterDevModeInfo(string printerName)
@@ -232,37 +274,59 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		};
 	}
 
-	private void UpdatePreview()
+	private async void UpdatePreview()
 	{
+		if (!_dialogReady || _dialogClosed) return;
+		_previewCts?.Cancel();
+		var request = new CancellationTokenSource();
+		_previewCts = request;
 		ReadPreviewSettingsFromUi();
 		PageCounterOverlayText.Text = SnapshotSelection == null ? $"{_previewPageNumber} / {_pageCount}" : "Snapshot";
-		PreviewInfoText.Text = SnapshotSelection == null
-			? $"Trang {_previewPageNumber} / {_pageCount}"
-			: $"Vung chon trang {SnapshotSelection.PageIndex + 1} - {PaperSizeKey}/{OrientationKey}";
-
-		if (string.IsNullOrEmpty(_pdfPath) || !System.IO.File.Exists(_pdfPath))
-		{
-			PreviewPlaceholderText.Visibility = Visibility.Visible;
-			PreviewImage.Source = null;
-			return;
-		}
-
+		PreviewInfoText.Text = $"Trang {_previewPageNumber} / {_pageCount}";
+		if (string.IsNullOrEmpty(_pdfPath) || _previewSession == null) return;
+		var snapshot = SnapshotSelection ?? new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
+		bool acquired = false;
 		try
 		{
-			var snapshot = SnapshotSelection ?? new PdfSnapshotSelection(_pdfPath, _previewPageNumber - 1, 0, 0, 1, 1);
-			var snapshotBitmap = PdfSnapshotImageRenderer.RenderSnapshotToBitmap(snapshot, SnapshotSelection == null ? 600 : 900, 1600000);
-			var bitmap = RenderSnapshotOnPreviewPaper(snapshotBitmap);
-			PreviewImage.Source = bitmap;
+			if (!_previewSources.TryGetValue(snapshot, out BitmapSource? source))
+			{
+				PreviewPlaceholderText.Text = "Đang tạo bản xem trước…";
+				PreviewPlaceholderText.Visibility = Visibility.Visible;
+				await Task.Delay(150, request.Token);
+				await _previewGate.WaitAsync(request.Token);
+				acquired = true;
+				if (!_previewSources.TryGetValue(snapshot, out source))
+				{
+					PdfRenderSession session = _previewSession;
+					source = await Task.Run(() => session.RenderSnapshot(snapshot), request.Token);
+					if (source != null && !_dialogClosed)
+					{
+						if (_previewSources.Count >= 2) _previewSources.Clear();
+						_previewSources[snapshot] = source;
+					}
+				}
+			}
+			if (_dialogClosed || request.IsCancellationRequested || source == null) return;
+			PreviewImage.Source = RenderSnapshotOnPreviewPaper(source);
 			PreviewPlaceholderText.Visibility = Visibility.Collapsed;
 			PrevPageButton.IsEnabled = SnapshotSelection == null && _previewPageNumber > 1;
 			NextPageButton.IsEnabled = SnapshotSelection == null && _previewPageNumber < _pageCount;
 		}
+		catch (OperationCanceledException) { }
 		catch (Exception ex)
 		{
-			PreviewPlaceholderText.Text = "ERR";
-			PreviewPlaceholderText.Visibility = Visibility.Visible;
-			PreviewImage.Source = null;
-			System.Diagnostics.Debug.WriteLine($"Failed to render print preview: {ex}");
+			if (!_dialogClosed && !request.IsCancellationRequested)
+			{
+				PreviewPlaceholderText.Text = "Không tạo được bản xem trước. Vẫn có thể chọn máy in.";
+				PreviewPlaceholderText.Visibility = Visibility.Visible;
+			}
+			PdfPerfLogger.Log("Print preview failed: " + ex.Message);
+		}
+		finally
+		{
+			if (acquired) _previewGate.Release();
+			if (ReferenceEquals(_previewCts, request)) _previewCts = null;
+			request.Dispose();
 		}
 	}
 
@@ -418,154 +482,99 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		}
 	}
 
-	private void LoadPrinters()
+	private async Task LoadPrintersAsync()
 	{
-		List<PrintQueue> list = new List<PrintQueue>();
+		PrinterDefaultText.Text = "Đang tải danh sách máy in…";
 		try
 		{
-			list = new LocalPrintServer().GetPrintQueues(new[] 
-			{ 
-				EnumeratedPrintQueueTypes.Local, 
-				EnumeratedPrintQueueTypes.Connections 
-			}).OrderBy(q => q.FullName).ToList();
-		}
-		catch
-		{
-			try
+			var result = await Task.Run(() =>
 			{
-				list = new LocalPrintServer().GetPrintQueues(new[] 
-				{ 
-					EnumeratedPrintQueueTypes.Local 
-				}).OrderBy(q => q.FullName).ToList();
-			}
-			catch
-			{
+				using var server = new LocalPrintServer();
+				var names = new List<string>();
 				try
 				{
-					PrintQueue defaultQueue = LocalPrintServer.GetDefaultPrintQueue();
-					if (defaultQueue != null)
-					{
-						list.Add(defaultQueue);
-					}
+					using var queues = server.GetPrintQueues(new[] { "Name" }, new[] { EnumeratedPrintQueueTypes.Local, EnumeratedPrintQueueTypes.Connections });
+					foreach (PrintQueue queue in queues) { names.Add(queue.FullName); queue.Dispose(); }
 				}
-				catch (Exception ex)
+				catch
 				{
-					ValidationText.Text = "Không đọc được danh sách máy in: " + ex.Message;
+					using var queues = server.GetPrintQueues(new[] { "Name" }, new[] { EnumeratedPrintQueueTypes.Local });
+					foreach (PrintQueue queue in queues) { names.Add(queue.FullName); queue.Dispose(); }
 				}
-			}
+				string? defaultName = null;
+				try { using var queue = LocalPrintServer.GetDefaultPrintQueue(); defaultName = queue.FullName; }
+				catch { }
+				return (Names: names.Distinct().OrderBy(n => n).ToArray(), Default: defaultName);
+			});
+			if (_dialogClosed) return;
+			var choices = result.Names.Select(name => new PrinterChoice(name)).ToList();
+			PrinterComboBox.ItemsSource = choices;
+			PrinterComboBox.SelectedItem = choices.FirstOrDefault(q => q.FullName == LastSelectedPrinterName)
+				?? choices.FirstOrDefault(q => q.FullName == result.Default) ?? choices.FirstOrDefault();
+			if (choices.Count == 0) ValidationText.Text = "Không tìm thấy máy in nào được cài đặt trên máy tính.";
 		}
-
-		if (list.Count > 0)
+		catch (Exception ex)
 		{
-			PrinterComboBox.ItemsSource = list;
-			if (!string.IsNullOrEmpty(LastSelectedPrinterName))
-			{
-				PrintQueue? lastQueue = list.FirstOrDefault((PrintQueue q) => q.FullName == LastSelectedPrinterName);
-				if (lastQueue != null)
-				{
-					PrinterComboBox.SelectedItem = lastQueue;
-					return;
-				}
-			}
-			try
-			{
-				PrintQueue defaultQueue = LocalPrintServer.GetDefaultPrintQueue();
-				PrinterComboBox.SelectedItem = list.FirstOrDefault((PrintQueue q) => q.FullName == defaultQueue.FullName) ?? list.FirstOrDefault();
-			}
-			catch
-			{
-				PrinterComboBox.SelectedItem = list.FirstOrDefault();
-			}
-		}
-		else
-		{
-			ValidationText.Text = "Không tìm thấy máy in nào được cài đặt trên máy tính.";
+			if (!_dialogClosed) ValidationText.Text = "Không đọc được danh sách máy in: " + ex.Message;
 		}
 	}
 
 	private async void PrinterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 	{
-		if (_loadingPrinterDefaults || !(PrinterComboBox.SelectedItem is PrintQueue printQueue))
-		{
-			return;
-		}
-
-		// Hủy các tác vụ đọc máy in cũ nếu người dùng chuyển máy in liên tục
+		if (_loadingPrinterDefaults || PrinterComboBox.SelectedItem is not PrinterChoice choice) return;
 		_printerSelectionCts?.Cancel();
-		_printerSelectionCts = new System.Threading.CancellationTokenSource();
-		System.Threading.CancellationToken ct = _printerSelectionCts.Token;
-
-		SelectedPrintQueue = printQueue;
-		LastSelectedPrinterName = printQueue.FullName;
-
-		string printerName = printQueue.FullName;
-		int schemaVersion = printQueue.ClientPrintSchemaVersion;
-		PrintTicket? fallbackTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket);
-
-		// Phản hồi UI tức thì
-		if (PrinterDefaultText != null)
-		{
-			PrinterDefaultText.Text = $"Đang đọc thuộc tính {printQueue.FullName}...";
-		}
-
+		var request = new CancellationTokenSource();
+		_printerSelectionCts = request;
+		_selectedPrintQueue = null;
+		SelectedPrintTicket = null;
+		NativeDevModeBytes = null;
+		LastSelectedPrinterName = choice.FullName;
+		_printerQueryInProgress = true;
+		PrinterDefaultText.Text = $"Đang đọc thuộc tính {choice.FullName}…";
 		try
 		{
-			// Đẩy việc giao tiếp Win32 Driver (DocumentProperties RPC) & PrintTicketConverter ra Thread ngầm
-			(DEVMODEW? nativeDevMode, byte[]? devModeBytes, PrintTicket? printTicket) = await System.Threading.Tasks.Task.Run<(DEVMODEW?, byte[]?, PrintTicket?)>(() =>
+			var result = await Task.Run(() =>
 			{
-				if (ct.IsCancellationRequested) return (null, null, null);
-
-				(DEVMODEW? devStruct, byte[]? devBytes) = GetNativePrinterDevModeInfo(printerName);
-				PrintTicket? ticket = null;
-
-				if (devBytes != null && devBytes.Length > 0)
+				request.Token.ThrowIfCancellationRequested();
+				using var server = new LocalPrintServer();
+				using var queue = new PrintQueue(server, choice.FullName);
+				PrintTicket? ticket = queue.UserPrintTicket ?? queue.DefaultPrintTicket;
+				var (devMode, bytes) = GetNativePrinterDevModeInfo(choice.FullName);
+				if (bytes?.Length > 0)
 				{
 					try
 					{
-						using var converter = new PrintTicketConverter(printerName, schemaVersion);
-						ticket = converter.ConvertDevModeToPrintTicket(devBytes);
+						using var converter = new PrintTicketConverter(choice.FullName, queue.ClientPrintSchemaVersion);
+						ticket = converter.ConvertDevModeToPrintTicket(bytes);
 					}
-					catch
-					{
-						ticket = fallbackTicket;
-					}
+					catch { }
 				}
-				else
-				{
-					ticket = fallbackTicket;
-				}
-
-				return (devStruct, devBytes, ticket);
-			}, ct);
-
-			if (ct.IsCancellationRequested) return;
-
-			NativeDevModeBytes = devModeBytes;
-			SelectedPrintTicket = printTicket ?? fallbackTicket;
-
-			if (nativeDevMode.HasValue && SelectedPrintTicket != null)
-			{
-				string nativePaperKey = ParsePaperKeyFromDevMode(nativeDevMode.Value);
-				string nativeOrientationKey = ParseOrientationKeyFromDevMode(nativeDevMode.Value);
-
-				if (nativePaperKey == "A3") SelectedPrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA3);
-				else if (nativePaperKey == "A4") SelectedPrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
-
-				if (nativeOrientationKey == "Landscape") SelectedPrintTicket.PageOrientation = PageOrientation.Landscape;
-				else if (nativeOrientationKey == "Portrait") SelectedPrintTicket.PageOrientation = PageOrientation.Portrait;
-			}
-
-			ApplyTicketDefaultsToUi(SelectedPrintTicket, nativeDevMode);
+				using var xml = ticket?.GetXmlStream();
+				return (DevMode: devMode, Bytes: bytes, Ticket: xml?.ToArray());
+			}, request.Token);
+			if (_dialogClosed || request.IsCancellationRequested) return;
+			NativeDevModeBytes = result.Bytes;
+			SelectedPrintTicket = result.Ticket == null ? new PrintTicket() : new PrintTicket(new MemoryStream(result.Ticket));
+			ApplyTicketDefaultsToUi(SelectedPrintTicket, result.DevMode);
 		}
-		catch (System.OperationCanceledException)
-		{
-			// Đã bị hủy do chuyển máy in khác nhanh
-		}
+		catch (OperationCanceledException) { }
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error querying printer background: {ex.Message}");
-			SelectedPrintTicket = fallbackTicket;
-			ApplyTicketDefaultsToUi(SelectedPrintTicket);
+			if (!_dialogClosed && !request.IsCancellationRequested)
+			{
+				SelectedPrintTicket = new PrintTicket();
+				PrinterDefaultText.Text = "Không đọc được mặc định máy in; có thể chọn khổ giấy và hướng in thủ công.";
+			}
+			PdfPerfLogger.Log("Printer defaults failed: " + ex.Message);
+		}
+		finally
+		{
+			if (ReferenceEquals(_printerSelectionCts, request))
+			{
+				_printerSelectionCts = null;
+				_printerQueryInProgress = false;
+			}
+			request.Dispose();
 		}
 	}
 
@@ -584,7 +593,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	private void PrinterProperties_Click(object sender, RoutedEventArgs e)
 	{
 		PrintDialog printDialog = new PrintDialog();
-		if (PrinterComboBox.SelectedItem is PrintQueue printQueue)
+		if (SelectedPrintQueue is PrintQueue printQueue)
 		{
 			printDialog.PrintQueue = printQueue;
 			printDialog.PrintTicket = CloneTicket(SelectedPrintTicket ?? printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket);
@@ -593,7 +602,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		{
 			SelectedPrintQueue = printDialog.PrintQueue;
 			SelectedPrintTicket = CloneTicket(printDialog.PrintTicket);
-			PrinterComboBox.SelectedItem = SelectedPrintQueue;
+			PrinterComboBox.SelectedItem = (PrinterComboBox.ItemsSource as IEnumerable<PrinterChoice>)?.FirstOrDefault(p => p.FullName == SelectedPrintQueue?.FullName);
 			ApplyTicketDefaultsToUi(SelectedPrintTicket);
 		}
 	}
@@ -606,7 +615,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			sb.AppendLine("=== KẾT QUẢ KIỂM TRA THÔNG TIN MÁY IN NATIVE (WIN32 + PRINTTICKET) ===");
 			sb.AppendLine();
 
-			PrintQueue? queue = PrinterComboBox.SelectedItem as PrintQueue;
+			PrintQueue? queue = SelectedPrintQueue;
 			if (queue == null)
 			{
 				try
@@ -694,7 +703,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	private void Ok_Click(object sender, RoutedEventArgs e)
 	{
 		ValidationText.Text = string.Empty;
-		if (!(PrinterComboBox.SelectedItem is PrintQueue printQueue))
+		if (string.IsNullOrEmpty(SelectedPrinterName))
 		{
 			ValidationText.Text = "Vui lòng chọn máy in.";
 			return;
@@ -732,12 +741,12 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			PrintDpi = result2;
 		}
 		
-		SelectedPrintQueue = printQueue;
-		
-		if (SelectedPrintTicket == null)
+		if (_printerQueryInProgress)
 		{
-			SelectedPrintTicket = CloneTicket(printQueue.UserPrintTicket ?? printQueue.DefaultPrintTicket) ?? new PrintTicket();
+			ValidationText.Text = "Đang đọc cấu hình máy in. Vui lòng đợi hoàn tất.";
+			return;
 		}
+		SelectedPrintTicket ??= new PrintTicket();
 		
 		PageMediaSize pageMediaSize = CreatePageMediaSize();
 		if (pageMediaSize != null)

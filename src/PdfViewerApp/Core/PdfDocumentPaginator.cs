@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
@@ -10,9 +11,9 @@ using System.Windows.Media.Imaging;
 
 namespace PdfViewerApp;
 
-public class PdfDocumentPaginator : DocumentPaginator
+public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 {
-	private readonly nint _document;
+	private nint _document;
 
 	private readonly int _originalPageCount;
 
@@ -32,7 +33,7 @@ public class PdfDocumentPaginator : DocumentPaginator
 
 	public double PrintDpi { get; set; } = 400.0;
 
-	public long PrintMaxPixels { get; set; } = 500000000L;
+	public long PrintMaxPixels { get; set; } = 64000000L;
 
 	public bool AutoCenter { get; set; } = true;
 
@@ -41,6 +42,8 @@ public class PdfDocumentPaginator : DocumentPaginator
 	public bool PrintTestFrame { get; set; }
 
 	public IProgress<PrintProgressInfo>? PrintProgress { get; set; }
+
+	public CancellationToken CancellationToken { get; set; }
 
 	public List<PdfAnnotation> Annotations { get; } = new List<PdfAnnotation>();
 
@@ -92,28 +95,32 @@ public class PdfDocumentPaginator : DocumentPaginator
 
 	public PdfDocumentPaginator(string pdfPath)
 	{
-		PdfiumEngine.Initialize();
-		_document = PdfiumEngine.FPDF_LoadDocument(pdfPath, null);
-		if (_document == IntPtr.Zero)
+		lock (PdfiumEngine.SyncRoot)
 		{
-			throw new Exception("Unable to load document for printing.");
-		}
-		_originalPageCount = PdfiumEngine.FPDF_GetPageCount(_document);
-		if (_originalPageCount > 0)
-		{
-			nint num = PdfiumEngine.FPDF_LoadPage(_document, 0);
-			if (num != IntPtr.Zero)
+			PdfiumEngine.Initialize();
+			_document = PdfiumEngine.FPDF_LoadDocument(pdfPath, null);
+			if (_document == IntPtr.Zero) throw new InvalidOperationException("Unable to load document for printing.");
+			_originalPageCount = PdfiumEngine.FPDF_GetPageCount(_document);
+			if (_originalPageCount > 0)
 			{
-				double num2 = PdfiumEngine.FPDF_GetPageWidth(num);
-				double num3 = PdfiumEngine.FPDF_GetPageHeight(num);
-				_pageSize = new Size(num2 / 72.0 * 96.0, num3 / 72.0 * 96.0);
-				PdfiumEngine.FPDF_ClosePage(num);
+				if (PdfiumEngine.TryGetPageSizeByIndex(_document, 0, out double width, out double height))
+					_pageSize = new Size(width / 72 * 96, height / 72 * 96);
+				EndPage = _originalPageCount - 1;
 			}
-			EndPage = _originalPageCount - 1;
 		}
 	}
 
 	public override DocumentPage GetPage(int pageNumber)
+	{
+		lock (PdfiumEngine.SyncRoot)
+		{
+			if (_document == IntPtr.Zero) throw new ObjectDisposedException(nameof(PdfDocumentPaginator));
+			CancellationToken.ThrowIfCancellationRequested();
+			return GetPageCore(pageNumber);
+		}
+	}
+
+	private DocumentPage GetPageCore(int pageNumber)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		int actualPageNumber = (ReversePageOrder ? (EndPage - pageNumber) : (StartPage + pageNumber));
@@ -185,7 +192,8 @@ public class PdfDocumentPaginator : DocumentPaginator
 			PdfPerfLogger.Log($"Kích thước bản vẽ sau Zoom: {num16}x{num17}");
 			PdfPerfLogger.Log($"Tọa độ vẽ bù gốc in (Draw Offset): X={num18}, Y={num19}");
 			PdfPerfLogger.Log($"Độ phân giải Bitmap kết xuất: {num21}x{num22} pixels");
-			bool flag = (long)num21 * (long)num22 > 32000000;
+			PdfiumEngine.ClampRenderDimensions(ref num21, ref num22, PrintMaxPixels);
+			bool flag = (long)num21 * num22 > TiledPrintPixelThreshold;
 			PdfPerfLogger.Log($"Tiled bitmap print: {flag}");
 			DrawingVisual drawingVisual2 = new DrawingVisual();
 			using (DrawingContext drawingContext = drawingVisual2.RenderOpen())
@@ -194,11 +202,11 @@ public class PdfDocumentPaginator : DocumentPaginator
 				if (flag)
 				{
 					RenderOptions.SetBitmapScalingMode(drawingVisual2, BitmapScalingMode.HighQuality);
-					DrawPdfTiles(drawingContext, actualPageNumber, num21, num22, num18, num19, num16, num17);
+					DrawPdfTiles(drawingContext, num, num21, num22, num18, num19, num16, num17);
 				}
 				else
 				{
-					BitmapSource bitmapSource = PdfiumEngine.RenderPageToBitmap(_document, actualPageNumber, num21, num22, PrintMaxPixels);
+					BitmapSource bitmapSource = PdfiumEngine.RenderLoadedPageToBitmap(num, num21, num22, 0, 0, num21, num22, false);
 					if (bitmapSource != null)
 					{
 						RenderOptions.SetBitmapScalingMode(drawingVisual2, BitmapScalingMode.HighQuality);
@@ -249,7 +257,7 @@ public class PdfDocumentPaginator : DocumentPaginator
 		}
 	}
 
-	private void DrawPdfTiles(DrawingContext dc, int pageIndex, int renderWidth, int renderHeight, double drawX, double drawY, double finalWidth, double finalHeight)
+	private void DrawPdfTiles(DrawingContext dc, nint page, int renderWidth, int renderHeight, double drawX, double drawY, double finalWidth, double finalHeight)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();
 		double num = finalWidth / (double)Math.Max(1, renderWidth);
@@ -261,7 +269,8 @@ public class PdfDocumentPaginator : DocumentPaginator
 			for (int j = 0; j < renderWidth; j += 2048)
 			{
 				int num5 = Math.Min(2048, renderWidth - j);
-				BitmapSource bitmapSource = PdfiumEngine.RenderPageTileToBitmap(_document, pageIndex, renderWidth, renderHeight, j, i, num5, num4);
+				CancellationToken.ThrowIfCancellationRequested();
+				BitmapSource bitmapSource = PdfiumEngine.RenderLoadedPageToBitmap(page, renderWidth, renderHeight, j, i, num5, num4, false);
 				if (bitmapSource != null)
 				{
 					Rect rectangle = new Rect(drawX + (double)j * num, drawY + (double)i * num2, (double)num5 * num, (double)num4 * num2);
@@ -368,11 +377,18 @@ public class PdfDocumentPaginator : DocumentPaginator
 		}
 	}
 
-	~PdfDocumentPaginator()
+	public void Dispose()
 	{
-		if (_document != IntPtr.Zero)
+		lock (PdfiumEngine.SyncRoot)
 		{
-			PdfiumEngine.FPDF_CloseDocument(_document);
+			if (_document != IntPtr.Zero)
+			{
+				PdfiumEngine.FPDF_CloseDocument(_document);
+				_document = IntPtr.Zero;
+			}
 		}
+		GC.SuppressFinalize(this);
 	}
+
+	~PdfDocumentPaginator() { Dispose(); }
 }

@@ -3,6 +3,7 @@ param(
     [string]$ApiUrl,
 
     [string]$CurrentVersion = "0.0.0",
+    [string]$ExpectedVersion = "",
     [switch]$CheckDownload,
     [int]$TimeoutSeconds = 30
 )
@@ -18,20 +19,19 @@ if ($endpoint -notmatch '/wp-json/pdfpro/v1/update-check$') {
     $endpoint = "$endpoint/wp-json/pdfpro/v1/update-check"
 }
 
-$payload = @{
-    current_version = $CurrentVersion
-} | ConvertTo-Json
-
 Write-Host "Checking update endpoint: $endpoint" -ForegroundColor Cyan
+$requestUrl = "$endpoint`?current_version=$([Uri]::EscapeDataString($CurrentVersion))&release_check=$([Guid]::NewGuid().ToString('N'))"
 $response = Invoke-RestMethod `
-    -Uri $endpoint `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body $payload `
+    -Uri $requestUrl `
+    -Method Get `
     -TimeoutSec $TimeoutSeconds
 
 if ($null -eq $response -or $response.success -ne $true) {
     throw "Update endpoint did not return success=true."
+}
+
+if ($ExpectedVersion -and [string]$response.latest_version -ne $ExpectedVersion) {
+    throw "Update endpoint version mismatch. Expected=$ExpectedVersion, actual=$($response.latest_version)."
 }
 
 foreach ($field in @("latest_version", "download_url", "sha256", "file_size")) {

@@ -1,7 +1,23 @@
 # package_project.ps1
 # Automates the build and zipping of PDF Pro using VERSION.txt as the release source of truth
 
+param(
+    [switch]$SkipPublish,
+    [switch]$SkipLocalDeploy
+)
+
 $ErrorActionPreference = "Stop"
+
+function Invoke-PackageCommand {
+    param([string]$Command, [string[]]$Arguments)
+    $savedPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $Command @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
+        $commandExitCode = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $savedPreference }
+    if ($commandExitCode -ne 0) { throw "$Command failed with exit code $commandExitCode." }
+}
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
@@ -61,7 +77,7 @@ Write-Host "=== PDF HPhat: Packaging Version $version ===" -ForegroundColor Cyan
 # 1. Compile Rust core
 Write-Host "`n[1/4] Compiling Rust core (src/PdfCore)..." -ForegroundColor Yellow
 cd src/PdfCore
-cargo build --release
+Invoke-PackageCommand -Command cargo -Arguments @('build', '--release')
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Rust core compilation failed!"
     exit 1
@@ -79,9 +95,9 @@ Copy-Item "src/PdfCore/target/release/pdf_core.dll" -Destination "libs/pdf_core.
 # 3. Publish C# WPF App (self-contained, win-x64)
 Write-Host "`n[3/4] Publishing WPF application..." -ForegroundColor Yellow
 cd src/PdfViewerApp
-dotnet clean PdfViewerApp.csproj -c Release -r win-x64
-dotnet restore PdfViewerApp.csproj -r win-x64
-dotnet publish PdfViewerApp.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishReadyToRun=false
+Invoke-PackageCommand -Command dotnet -Arguments @('restore', 'PdfViewerApp.csproj', '-r', 'win-x64')
+Invoke-PackageCommand -Command dotnet -Arguments @('clean', 'PdfViewerApp.csproj', '-c', 'Release', '-r', 'win-x64')
+Invoke-PackageCommand -Command dotnet -Arguments @('publish', 'PdfViewerApp.csproj', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '/p:PublishSingleFile=true', '/p:PublishReadyToRun=false')
 if ($LASTEXITCODE -ne 0) {
     Write-Error "WPF application publish failed!"
     exit 2
@@ -193,7 +209,7 @@ $summary | Set-Content -LiteralPath $packageSummaryPath -Encoding UTF8
 
 # 4.5. Optional Auto-Publish to WordPress REST API
 $publishSettingsFile = Join-Path $scriptDir "publish_settings.json"
-if (Test-Path $publishSettingsFile) {
+if (-not $SkipPublish -and (Test-Path $publishSettingsFile)) {
     Write-Host "`n[Auto-Publish] Found publish_settings.json. Proceeding to sync with WordPress API..." -ForegroundColor Yellow
     $pubSettings = Get-Content -LiteralPath $publishSettingsFile | ConvertFrom-Json
     $token = $pubSettings.publish_token
@@ -275,7 +291,7 @@ $localInstallDir = "$env:LOCALAPPDATA\PDF Pro"
 $newDll = Join-Path $scriptDir "src\PdfCore\target\release\pdf_core.dll"
 $newExe = Join-Path $publishOut "PdfViewerApp.exe"
 
-if (Test-Path $localInstallDir) {
+if (-not $SkipLocalDeploy -and (Test-Path $localInstallDir)) {
     # Stop app if running
     $proc = Get-Process -Name "PdfViewerApp" -ErrorAction SilentlyContinue
     if ($proc) {

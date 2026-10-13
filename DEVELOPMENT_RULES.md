@@ -79,7 +79,8 @@ Mỗi khi hoàn thành công việc sửa đổi mã nguồn:
 > 4. **Tự động Commit & Push lên Git:**
 >    - Thực hiện lưu trữ tất cả tệp thay đổi và tệp manifest cập nhật:
 >      ```powershell
->      git add .
+>      # Chỉ stage các tệp thuộc đợt sửa; xem danh sách tệp trước khi commit.
+>      # Có thể dùng tools/release.ps1 -ChangedPaths với danh sách tệp cụ thể.
 >      git commit -m "Update: [Tóm tắt thay đổi] - Phiên bản v[Phiên bản mới]"
 >      ```
 >    - Tạo thẻ Git Tag mới khớp với phiên bản vừa tăng:
@@ -92,3 +93,11 @@ Mỗi khi hoàn thành công việc sửa đổi mã nguồn:
 >      git push origin "v[Phiên bản mới]"
 >      ```
 >      *(Việc đẩy tag `v*` sẽ tự động kích hoạt tiến trình GitHub Actions CI/CD để xây dựng ứng dụng và phát hành bản cập nhật lên máy chủ bản quyền WordPress).*
+
+> 5. **Xác nhận phát hành hoàn tất:**
+>    - Theo dõi workflow `.github/workflows/release.yml` đến khi thành công.
+>    - Xác nhận GitHub Release có ZIP và manifest đúng phiên bản.
+>    - Đọc API `GET /wp-json/pdfpro/v1/update-check`, kiểm tra phiên bản, URL, kích thước và SHA-256 của gói tải thực tế.
+>    - Chỉ báo hoàn tất khi người dùng có thể nhận được cập nhật từ API. Gói local hoặc tag trên Git chưa đủ.
+>    - Không commit token hoặc cấu hình bí mật; không thay thế tag đã phát hành.
+>    - Đóng gói với `-SkipPublish -SkipLocalDeploy` khi phát hành qua GitHub; CI thông báo máy chủ sau khi đăng file tải.

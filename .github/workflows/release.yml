@@ -31,8 +31,13 @@ jobs:
       id: package
       shell: pwsh
       run: |
+        $ErrorActionPreference = 'Stop'
+        $version = (Get-Content VERSION.txt -Raw).Trim()
+        if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Release tag $env:GITHUB_REF_NAME does not match VERSION.txt ($version)."
+        }
         # Run the existing packaging script
-        .\package_project.ps1
+        .\package_project.ps1 -SkipPublish -SkipLocalDeploy
         
         # Return to repository root directory to ensure paths are correct
         Set-Location $env:GITHUB_WORKSPACE
@@ -41,6 +46,9 @@ jobs:
         $manifestPath = "releases/update-manifest.json"
         if (Test-Path $manifestPath) {
             $manifest = Get-Content $manifestPath | ConvertFrom-Json
+            $manifest.download_url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$($manifest.file)"
+            $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+            .\tools\verify_update_manifest.ps1 -RequireDownloadUrl
             echo "version=$($manifest.version)" >> $env:GITHUB_OUTPUT
             echo "zip_file=$($manifest.file)" >> $env:GITHUB_OUTPUT
             echo "sha256=$($manifest.sha256)" >> $env:GITHUB_OUTPUT
@@ -66,15 +74,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Notify WordPress Licensing Server
-      continue-on-error: true
       shell: pwsh
       env:
         SITE_URL: ${{ secrets.PDFPRO_UPDATE_SITE_URL }}
         TOKEN: ${{ secrets.PDFPRO_PUBLISH_TOKEN }}
       run: |
+        $ErrorActionPreference = 'Stop'
         if ([string]::IsNullOrEmpty($env:SITE_URL) -or [string]::IsNullOrEmpty($env:TOKEN)) {
-            Write-Warning "PDFPRO_UPDATE_SITE_URL or PDFPRO_PUBLISH_TOKEN secret is not set. Skipping WordPress server update notification."
-            exit 0
+            throw "PDFPRO_UPDATE_SITE_URL and PDFPRO_PUBLISH_TOKEN must be configured to publish an app update."
         }
 
         # Build download URL pointing to the GitHub Release asset
@@ -100,6 +107,7 @@ jobs:
             sha256 = "${{ steps.package.outputs.sha256 }}"
             size = [int]("${{ steps.package.outputs.size }}")
             release_date = "${{ steps.package.outputs.release_date }}"
+            mandatory = [bool]$manifest.mandatory
             changelog = $changelog
         }
 
@@ -115,6 +123,9 @@ jobs:
             Write-Host "Attempt $attempt of $maxRetries..."
             try {
                 $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Body $jsonBody -ContentType "application/json" -TimeoutSec 30 -ErrorAction Stop
+                if ($response.success -ne $true) {
+                    throw "WordPress did not confirm the update publication."
+                }
                 Write-Host "WordPress Server Response:"
                 $response | ConvertTo-Json | Write-Host
                 $success = $true
@@ -137,6 +148,16 @@ jobs:
         }
         
         if (-not $success) {
-            Write-Warning "Failed to notify WordPress server after $maxRetries attempts. The GitHub Release was created successfully - you can update the WordPress server manually."
-            exit 1
+            throw "The GitHub Release exists, but WordPress update publication failed."
         }
+
+        $checkUrl = "$($env:SITE_URL.TrimEnd('/'))/wp-json/pdfpro/v1/update-check?release_check=$env:GITHUB_RUN_ID"
+        $published = Invoke-RestMethod -Uri $checkUrl -Method Get -TimeoutSec 30
+        if ($published.success -ne $true -or
+            $published.latest_version -ne "${{ steps.package.outputs.version }}" -or
+            $published.download_url -ne $downloadUrl -or
+            $published.sha256 -ne "${{ steps.package.outputs.sha256 }}" -or
+            [int64]$published.file_size -ne [int64]"${{ steps.package.outputs.size }}") {
+            throw "The update endpoint does not match the published release."
+        }
+        .\tools\check_update_endpoint.ps1 -ApiUrl $env:SITE_URL -ExpectedVersion "${{ steps.package.outputs.version }}" -CheckDownload -TimeoutSeconds 120

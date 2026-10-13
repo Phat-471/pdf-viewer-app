@@ -124,7 +124,9 @@ namespace PdfViewerApp.Services.Cache
 						_bitmapCacheOrder.Remove(node);
 						_bitmapCacheOrder.AddFirst(node);
 					}
+					_bitmapCacheBytes += EstimateBitmapBytes(bitmap) - EstimateBitmapBytes(_bitmapCache[key]);
 					_bitmapCache[key] = bitmap;
+					TrimBitmapCache();
 				}
 				else
 				{
@@ -148,14 +150,14 @@ namespace PdfViewerApp.Services.Cache
 			}
 		}
 
-		public BitmapSource? FindAnyCachedBitmapForPage(int pageNumber, bool isThumbnail)
+		public BitmapSource? FindAnyCachedBitmapForPage(int pageNumber, bool isThumbnail, bool inverted = false)
 		{
 			string prefix = isThumbnail ? $"thumb:{pageNumber}:" : $"page:{pageNumber}:";
 			lock (_bitmapCache)
 			{
 				foreach (var kvp in _bitmapCache)
 				{
-					if (kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+					if (kvp.Key.StartsWith(prefix, StringComparison.Ordinal) && kvp.Key.EndsWith(":dark", StringComparison.Ordinal) == inverted)
 					{
 						return kvp.Value;
 					}

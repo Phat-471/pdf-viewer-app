@@ -162,6 +162,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private bool _isSidebarVisible;
 
 	private nint _documentHandle = IntPtr.Zero;
+	private PdfRenderSession? _renderSession;
 
 	private Point? _pendingZoomContentPoint;
 
@@ -176,6 +177,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private int _renderGeneration;
 
 	private int _loadGeneration;
+	private bool _documentOpening;
 
 	private bool _renderInProgress;
 
@@ -1403,7 +1405,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_lastSnapshotCanvas = canvas;
 	}
 
-	private void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
+	private async void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath))
@@ -1458,13 +1460,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			Owner = Window.GetWindow(this),
 			SnapshotSelection = snapshot
 		};
-		if (printOptionsDialog.ShowDialog() != true || printOptionsDialog.SelectedPrintQueue == null)
+		if (printOptionsDialog.ShowDialog() != true || string.IsNullOrEmpty(printOptionsDialog.SelectedPrinterName))
 		{
 			return;
 		}
 		try
 		{
-			PrintTicket printTicket = printOptionsDialog.SelectedPrintTicket ?? printOptionsDialog.SelectedPrintQueue.UserPrintTicket ?? printOptionsDialog.SelectedPrintQueue.DefaultPrintTicket ?? new PrintTicket();
+			PrintTicket printTicket = printOptionsDialog.SelectedPrintTicket?.Clone() ?? new PrintTicket();
 			PageMediaSize pageMediaSize = printOptionsDialog.CreatePageMediaSize();
 			if (pageMediaSize != null)
 			{
@@ -1478,8 +1480,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			int num = Math.Clamp((int)Math.Round(printOptionsDialog.PrintDpi), 72, 1200);
 			printTicket.PageResolution = new PageResolution(num, num);
 			printTicket.CopyCount = printOptionsDialog.Copies;
-			PrinterPrintProfile printerPrintProfile = PrinterPrintProfile.Resolve(printOptionsDialog.SelectedPrintQueue);
-			PdfSnapshotPrinter.PrintSnapshot(snapshot, printOptionsDialog.SelectedPrintQueue, printTicket, printerPrintProfile.RightSafetyPadding, printerPrintProfile.BottomSafetyPadding);
+			string printerName = printOptionsDialog.SelectedPrinterName!;
+			using var xml = printTicket.GetXmlStream();
+			byte[] ticketBytes = xml.ToArray();
+			LogStatus("Preparing snapshot print...");
+			await PrintWorker.RunAsync(() =>
+			{
+				using var server = new LocalPrintServer();
+				using var queue = new PrintQueue(server, printerName, Array.Empty<string>());
+				var workerTicket = new PrintTicket(new System.IO.MemoryStream(ticketBytes));
+				var profile = PrinterPrintProfile.Resolve(queue);
+				PdfSnapshotPrinter.PrintSnapshot(snapshot, queue, workerTicket, profile.RightSafetyPadding, profile.BottomSafetyPadding);
+			});
 			LogStatus("Snapshot print job sent");
 		}
 		catch (Exception ex)
@@ -2277,260 +2289,118 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public async void PrintPdf()
 	{
-		if (string.IsNullOrEmpty(CurrentPdfPath))
+		string? pdfPath = CurrentPdfPath;
+		if (string.IsNullOrEmpty(pdfPath))
 		{
-			MessageBox.Show("Open a PDF first.", "Info", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Open a PDF first.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
 			return;
 		}
+		if (App.IsPrinting) return;
 		App.IsPrinting = true;
 		try
 		{
-			PrintOptionsDialog optionsDialog = new PrintOptionsDialog(PageCount, SelectedPageNumber, CurrentPdfPath)
-		{
-			Owner = Window.GetWindow(this)
-		};
-		if (optionsDialog.ShowDialog() != true)
-		{
-			return;
-		}
-		LogStatus("Preparing print...");
-		PrintProgressDialog progressDialog = new PrintProgressDialog
-		{
-			Owner = Window.GetWindow(this)
-		};
-		IProgress<PrintProgressInfo> printProgress = new Progress<PrintProgressInfo>(progressDialog.UpdateProgress);
-		progressDialog.Show();
-		printProgress.Report(new PrintProgressInfo("Dang chuan bi lenh in...", 0, 0, IsIndeterminate: true));
-		await base.Dispatcher.InvokeAsync(delegate
-		{
-		}, DispatcherPriority.Background);
-		try
-		{
-			var selectedQueue = optionsDialog.SelectedPrintQueue;
-			if (selectedQueue == null)
+			var options = new PrintOptionsDialog(PageCount, SelectedPageNumber, pdfPath,
+				_isReverseView ? null : _cacheManager.FindAnyCachedBitmapForPage(SelectedPageNumber, false))
+			{ Owner = Window.GetWindow(this) };
+			if (options.ShowDialog() != true) return;
+			string printerName = options.SelectedPrinterName ?? throw new InvalidOperationException("Select a printer first.");
+			PrintTicket ticket = options.SelectedPrintTicket?.Clone() ?? new PrintTicket();
+			ticket.CopyCount = options.Copies;
+			ticket.PageMediaSize = options.CreatePageMediaSize();
+			ticket.PageOrientation = options.CreatePageOrientation();
+			ApplyRequestedPageResolution(ticket, options.PrintDpi);
+			using var ticketXml = ticket.GetXmlStream();
+			byte[] ticketBytes = ticketXml.ToArray();
+			int copies = options.Copies;
+			double printDpi = options.PrintDpi;
+			string engine = options.PrintEngineMode;
+			string offsetMode = options.PrintOffsetMode;
+			bool testFrame = options.PrintTestFrame;
+			int startPage = options.StartPageIndex, endPage = options.EndPageIndex;
+			bool fit = options.FitToPrintableArea, center = options.AutoCenter;
+			bool separateJobs = options.NativeSeparatePageJobs, reverse = options.ReversePageOrder;
+			bool rasterize = options.OptimizeCadDrawings;
+			var annotations = Annotations.ToList();
+			var progressDialog = new PrintProgressDialog { Owner = Window.GetWindow(this) };
+			IProgress<PrintProgressInfo> progress = new Progress<PrintProgressInfo>(progressDialog.UpdateProgress);
+			var cancellation = progressDialog.CancellationToken;
+			progressDialog.Show();
+			progress.Report(new PrintProgressInfo("Preparing printer...", 0, 0, IsIndeterminate: true));
+			try
 			{
-				throw new InvalidOperationException("Vui lﾃｲng ch盻肱 mﾃ｡y in h盻｣p l盻・");
-			}
-
-			// Capture options from UI thread
-			var baseTicket = optionsDialog.SelectedPrintTicket ?? selectedQueue.UserPrintTicket ?? selectedQueue.DefaultPrintTicket ?? new PrintTicket();
-			int copies = optionsDialog.Copies;
-			PageMediaSize pageMediaSize = optionsDialog.CreatePageMediaSize();
-			PageOrientation? pageOrientation = optionsDialog.CreatePageOrientation();
-			double printDpi = optionsDialog.PrintDpi;
-			string printEngineMode = optionsDialog.PrintEngineMode;
-			string printOffsetMode = optionsDialog.PrintOffsetMode;
-			bool printTestFrame = optionsDialog.PrintTestFrame;
-			int startPageIndex = optionsDialog.StartPageIndex;
-			int endPageIndex = optionsDialog.EndPageIndex;
-			bool fitToPrintableArea = optionsDialog.FitToPrintableArea;
-			bool autoCenter = optionsDialog.AutoCenter;
-			bool separatePageJobs = optionsDialog.NativeSeparatePageJobs;
-			bool reversePageOrder = optionsDialog.ReversePageOrder;
-			bool forceRasterize = optionsDialog.OptimizeCadDrawings;
-			var annotationsList = Annotations.ToList();
-
-			// Capture print settings/objects on UI thread to avoid thread affinity exceptions on background thread
-			var printerProfile = PrinterPrintProfile.Resolve(selectedQueue);
-			string printerName = selectedQueue.FullName;
-			int clientSchemaVersion = selectedQueue.ClientPrintSchemaVersion;
-			var cancellationToken = progressDialog.CancellationToken;
-
-			// Get Capabilities on UI thread to avoid invalid printer name exceptions for network/shared printers on the background thread
-			printProgress.Report(new PrintProgressInfo("ﾄ紳ng truy v蘯･n c蘯･u hﾃｬnh mﾃ｡y in...", 0, 0, IsIndeterminate: true));
-			PrintCapabilities printCapabilities = selectedQueue.GetPrintCapabilities(baseTicket);
-
-			// 1. C蘯･u hﾃｬnh PrintTicket trﾃｪn UI thread ﾄ黛ｻ・trﾃ｡nh Thread Affinity exceptions
-			PrintTicket printTicket = baseTicket.Clone();
-			printTicket.CopyCount = copies;
-			if (pageMediaSize != null)
-			{
-				printTicket.PageMediaSize = pageMediaSize;
-			}
-			if (pageOrientation.HasValue)
-			{
-				printTicket.PageOrientation = pageOrientation;
-			}
-			ApplyRequestedPageResolution(printTicket, printDpi);
-
-			// Capture pageMediaSize values safely to avoid accessing the object on the background thread
-			string pageMediaSizeName = pageMediaSize?.PageMediaSizeName?.ToString() ?? "Unknown";
-			double pageMediaSizeWidth = pageMediaSize?.Width ?? 0.0;
-			double pageMediaSizeHeight = pageMediaSize?.Height ?? 0.0;
-			int? resolutionX = printTicket.PageResolution?.X;
-			int? resolutionY = printTicket.PageResolution?.Y;
-
-			// Calculate oriented page dimensions on UI thread
-			double orientedWidth = printCapabilities.OrientedPageMediaWidth ?? pageMediaSize?.Width ?? 8.5 * 96.0;
-			double orientedHeight = printCapabilities.OrientedPageMediaHeight ?? pageMediaSize?.Height ?? 11.0 * 96.0;
-			if (pageOrientation == PageOrientation.Landscape)
-			{
-				double num3 = Math.Max(orientedWidth, orientedHeight);
-				double num4 = Math.Min(orientedWidth, orientedHeight);
-				orientedWidth = num3;
-				orientedHeight = num4;
-			}
-			else if (pageOrientation == PageOrientation.Portrait)
-			{
-				double num5 = Math.Min(orientedWidth, orientedHeight);
-				double num6 = Math.Max(orientedWidth, orientedHeight);
-				orientedWidth = num5;
-				orientedHeight = num6;
-			}
-
-			// Pre-convert PrintTicket to DevMode on UI thread for native engines
-			byte[] devModeBytes = null;
-			if (printEngineMode == "NativePdfium" || printEngineMode == "NativePdfium_Optimized")
-			{
-				try
+				await PrintWorker.RunAsync(() =>
 				{
-					PrintTicket singleTicket = printTicket.Clone();
-					singleTicket.CopyCount = 1;
-					using PrintTicketConverter printTicketConverter = new PrintTicketConverter(printerName, clientSchemaVersion);
-					devModeBytes = printTicketConverter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
-				}
-				catch (Exception ex)
-				{
-					LogToDesktop("Warning: Failed to convert PrintTicket to DevMode on UI thread: " + ex.Message + ". Using default printer settings.");
-				}
-			}
-
-			await Task.Run(async delegate
-			{
-				printProgress.Report(new PrintProgressInfo("ﾄ紳ng c蘯･u hﾃｬnh mﾃ｡y in...", 0, 0, IsIndeterminate: true));
-
-				LogToDesktop("Profile: " + printerProfile.Name);
-
-				bool driverAlreadyOffsetsPrintableArea = printOffsetMode == "WpfOffset" ||
-					(!(printOffsetMode == "Physical") && printerProfile.DriverAlreadyOffsetsPrintableArea);
-
-				LogToDesktop("\n=================== B蘯ｮT ﾄ雪ｺｦU CH蘯ｨN ﾄ唇ﾃ¨ L盻・H IN ===================");
-				LogToDesktop("T盻㎝ ﾄ疎ng in: " + CurrentPdfPath);
-				LogToDesktop("Mﾃ｡y in m盻･c tiﾃｪu: " + printerName);
-				LogToDesktop($"S盻・b蘯｣n in (Copies): {copies}");
-				LogToDesktop($"Trang b蘯ｯt ﾄ黛ｺｧu: {startPageIndex + 1}, Trang k蘯ｿt thﾃｺc: {endPageIndex + 1}");
-				LogToDesktop($"T盻ｱ ﾄ黛ｻ冢g cﾄハ gi盻ｯa (AutoCenter): {autoCenter}, Kh盻孅 kh盻・gi蘯･y (FitToPrintableArea): {fitToPrintableArea}");
-				LogToDesktop($"Hﾆｰ盻嬾g xoay gi蘯･y: {pageOrientation}");
-				LogToDesktop($"Kh盻・gi蘯･y ﾄ妥｣ ch盻肱: {pageMediaSizeName} (R盻冢g: {pageMediaSizeWidth} x Cao: {pageMediaSizeHeight})");
-				LogToDesktop($"DPI in ﾄ妥｣ ch盻肱: {printDpi}; PrintTicket.PageResolution={resolutionX}x{resolutionY}");
-				LogToDesktop("Ch蘯ｿ ﾄ黛ｻ・in ﾄ妥｣ ch盻肱: " + printEngineMode);
-				LogToDesktop($"Native separate page jobs: {separatePageJobs}");
-				LogToDesktop($"Reverse page order: {reversePageOrder}");
-
-				if (printEngineMode == "NativePdfium" && !printTestFrame)
-				{
-					if (annotationsList.Count > 0)
+					cancellation.ThrowIfCancellationRequested();
+					// Create all System.Printing objects on this worker, including the driver queries.
+					using var server = new LocalPrintServer();
+					using var queue = new PrintQueue(server, printerName, Array.Empty<string>());
+					var workerTicket = new PrintTicket(new System.IO.MemoryStream(ticketBytes));
+					var profile = PrinterPrintProfile.Resolve(queue);
+					bool driverOffsets = offsetMode == "WpfOffset" ||
+						(offsetMode != "Physical" && profile.DriverAlreadyOffsetsPrintableArea);
+					LogToDesktop($"Print: {pdfPath}; printer={printerName}; engine={engine}; DPI={printDpi}; raster={rasterize}");
+					if ((engine == "NativePdfium" || engine == "NativePdfium_Optimized") && !testFrame)
 					{
-						LogToDesktop("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+						PrintTicket singleTicket = workerTicket.Clone();
+						singleTicket.CopyCount = 1;
+						using var converter = new PrintTicketConverter(printerName, queue.ClientPrintSchemaVersion);
+						byte[] devMode = converter.ConvertPrintTicketToDevMode(singleTicket, BaseDevModeType.UserDefault);
+						if (annotations.Count > 0) LogToDesktop("Native printing excludes app overlay annotations. WPF Bitmap includes them.");
+						NativePdfPrinter.Print(pdfPath, printerName, devMode, startPage, endPage, copies, fit, center,
+							driverOffsets, profile.RightSafetyPadding, profile.BottomSafetyPadding, separateJobs,
+							reverse, rasterize, progress, cancellation, printDpi);
 					}
-
-					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.Print(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
-					nativeSubmitSw.Stop();
-					LogToDesktop($"Native print submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
-					progressDialog.MarkCompleted("Da gui lenh in vao may in.");
-					LogStatus("Print job sent");
-				}
-				else if (printEngineMode == "NativePdfium_Optimized" && !printTestFrame)
-				{
-					if (annotationsList.Count > 0)
+					else if (engine == "PdfDirect" || engine == "PdfDirect_Optimized")
 					{
-						LogToDesktop("Native PDFium print note: app overlay annotations are not rendered by the native printer path. Use WPF Bitmap if those annotations must be printed.");
+						string name = "PDF Pro - " + System.IO.Path.GetFileName(pdfPath);
+						if (engine == "PdfDirect_Optimized") NativePdfPrinter.PrintPdfDirectOptimized(pdfPath, printerName, name, cancellation);
+						else NativePdfPrinter.PrintPdfDirect(pdfPath, printerName, name, cancellation);
 					}
-
-					Stopwatch nativeSubmitSw = Stopwatch.StartNew();
-					NativePdfPrinter.PrintOptimized(CurrentPdfPath, printerName, devModeBytes, startPageIndex, endPageIndex, copies, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, printerProfile.RightSafetyPadding, printerProfile.BottomSafetyPadding, separatePageJobs, reversePageOrder, forceRasterize, printProgress, cancellationToken, printDpi);
-					nativeSubmitSw.Stop();
-					LogToDesktop($"Native print (Optimized) submit total: {nativeSubmitSw.ElapsedMilliseconds} ms");
-					progressDialog.MarkCompleted("Da gui lenh in (Toi uu) vao may in.");
-					LogStatus("Print job sent");
-				}
-				else if (printEngineMode == "PdfDirect")
-				{
-					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
-					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirect(CurrentPdfPath, printerName, docName, cancellationToken);
-					progressDialog.MarkCompleted("Da gui truc tiep file PDF vao may in.");
-					LogStatus("Print job sent");
-				}
-				else if (printEngineMode == "PdfDirect_Optimized")
-				{
-					string docName = "PDF Pro - " + System.IO.Path.GetFileName(CurrentPdfPath);
-					progressDialog.UpdateProgress(new PrintProgressInfo("Dang in truc tiep PDF (Toi uu)...", 0, 1, IsIndeterminate: true));
-					NativePdfPrinter.PrintPdfDirectOptimized(CurrentPdfPath, printerName, docName, cancellationToken);
-					progressDialog.MarkCompleted("Da gui truc tiep file PDF (Toi uu) vao may in.");
-					LogStatus("Print job sent");
-				}
-				else
-				{
-					// WPF Paginator requires UI thread for Visuals creation
-					await base.Dispatcher.InvokeAsync(delegate
+					else
 					{
-						PdfDocumentPaginator paginator = new PdfDocumentPaginator(CurrentPdfPath);
-						paginator.Annotations.AddRange(annotationsList);
-						paginator.StartPage = startPageIndex;
-						paginator.EndPage = endPageIndex;
-						paginator.AutoCenter = autoCenter;
-						paginator.FitToPrintableArea = fitToPrintableArea;
-						paginator.PrintDpi = printDpi;
-						paginator.ReversePageOrder = reversePageOrder;
-						paginator.PrintProgress = printProgress;
-						paginator.BottomSafetyPadding = printerProfile.BottomSafetyPadding;
-						paginator.RightSafetyPadding = printerProfile.RightSafetyPadding;
-						paginator.DriverAlreadyOffsetsPrintableArea = driverAlreadyOffsetsPrintableArea;
-						paginator.PrintTestFrame = printTestFrame;
-
-						if (printTestFrame)
+						progress.Report(new PrintProgressInfo("Reading printer capabilities...", 0, 0, IsIndeterminate: true));
+						PrintCapabilities capabilities = queue.GetPrintCapabilities(workerTicket);
+						double width = capabilities.OrientedPageMediaWidth ?? workerTicket.PageMediaSize?.Width ?? 816;
+						double height = capabilities.OrientedPageMediaHeight ?? workerTicket.PageMediaSize?.Height ?? 1056;
+						if (workerTicket.PageOrientation == PageOrientation.Landscape)
+							(width, height) = (Math.Max(width, height), Math.Min(width, height));
+						else if (workerTicket.PageOrientation == PageOrientation.Portrait)
+							(width, height) = (Math.Min(width, height), Math.Max(width, height));
+						using var paginator = new PdfDocumentPaginator(pdfPath)
 						{
-							paginator.StartPage = 0;
-							paginator.EndPage = 0;
-							LogToDesktop("Print test frame enabled: forcing a single diagnostic page.");
-						}
-
-						paginator.PageSize = new Size(Math.Max(1.0, orientedWidth), Math.Max(1.0, orientedHeight));
-						LogToDesktop($"Kﾃｭch thﾆｰ盻嫩 trang ﾄ妥ｭch (PageSize): {paginator.PageSize.Width}x{paginator.PageSize.Height}");
-
-						if (printCapabilities.PageImageableArea != null)
-						{
-							double originWidth = printCapabilities.PageImageableArea.OriginWidth;
-							double originHeight = printCapabilities.PageImageableArea.OriginHeight;
-							double value = Math.Max(0.0, orientedWidth - originWidth - printCapabilities.PageImageableArea.ExtentWidth);
-							double value2 = Math.Max(0.0, orientedHeight - originHeight - printCapabilities.PageImageableArea.ExtentHeight);
-							paginator.ImageableArea = new Rect(originWidth, originHeight, printCapabilities.PageImageableArea.ExtentWidth, printCapabilities.PageImageableArea.ExtentHeight);
-							LogToDesktop($"Vﾃｹng in ﾄ柁ｰ盻｣c c盻ｧa mﾃ｡y in (Raw PageImageableArea): G盻祖=({originWidth}, {originHeight}) Kﾃｭch thﾆｰ盻嫩=({printCapabilities.PageImageableArea.ExtentWidth}x{printCapabilities.PageImageableArea.ExtentHeight})");
-							LogToDesktop($"Kho蘯｣ng l盻・biﾃｪn kﾃｩo gi蘯･y tﾃｭnh toﾃ｡n: Ph蘯｣i={value}, Dﾆｰ盻嬖={value2}");
-							LogToDesktop($"T盻溝 ﾄ黛ｻ・vﾃｹng in truy盻］ cho Paginator (ImageableArea): G盻祖=({paginator.ImageableArea.X}, {paginator.ImageableArea.Y}) Kﾃｭch thﾆｰ盻嫩=({paginator.ImageableArea.Width}x{paginator.ImageableArea.Height})");
-						}
-
-						LogToDesktop("Using WPF Bitmap print pipeline.");
-						Stopwatch printSubmitSw = Stopwatch.StartNew();
-						printProgress.Report(new PrintProgressInfo("Dang gui lenh in WPF Bitmap...", 0, Math.Max(1, paginator.PageCount), IsIndeterminate: true));
-
-						PrintDialog printDialog = new PrintDialog();
-						printDialog.PrintQueue = selectedQueue;
-						printDialog.PrintTicket = printTicket;
-						printDialog.PrintDocument(paginator, System.IO.Path.GetFileName(CurrentPdfPath));
-						printSubmitSw.Stop();
-						LogToDesktop($"PrintDocument submit total: {printSubmitSw.ElapsedMilliseconds} ms");
-						progressDialog.MarkCompleted("Da gui lenh in vao may in.");
-						LogStatus("Print job sent");
-					});
-				}
-			});
+							StartPage = testFrame ? 0 : startPage, EndPage = testFrame ? 0 : endPage,
+							AutoCenter = center, FitToPrintableArea = fit, PrintDpi = printDpi,
+							ReversePageOrder = reverse, PrintProgress = progress, CancellationToken = cancellation,
+							BottomSafetyPadding = profile.BottomSafetyPadding, RightSafetyPadding = profile.RightSafetyPadding,
+							DriverAlreadyOffsetsPrintableArea = driverOffsets, PrintTestFrame = testFrame,
+							PageSize = new Size(Math.Max(1, width), Math.Max(1, height))
+						};
+						paginator.Annotations.AddRange(annotations);
+						if (capabilities.PageImageableArea is { } area)
+							paginator.ImageableArea = new Rect(area.OriginWidth, area.OriginHeight, area.ExtentWidth, area.ExtentHeight);
+						new PrintDialog { PrintQueue = queue, PrintTicket = workerTicket }
+							.PrintDocument(paginator, System.IO.Path.GetFileName(pdfPath));
+					}
+				});
+				progressDialog.MarkCompleted("Đã gửi lệnh in vào máy in.");
+				LogStatus("Print job sent");
+			}
+			catch (OperationCanceledException)
+			{
+				progressDialog.MarkFailed("Đã huỷ lệnh in.");
+				LogStatus("Print canceled");
+			}
+			catch (Exception ex)
+			{
+				LogToDesktop("Print failed: " + ex);
+				progressDialog.MarkFailed("In thất bại: " + ex.Message);
+				LogStatus("Print failed");
+			}
 		}
-		catch (OperationCanceledException)
+		catch (Exception ex)
 		{
-			LogToDesktop("Print canceled by user.");
-			progressDialog.MarkFailed("Da huy lenh in.");
-			LogStatus("Print canceled");
-		}
-		catch (Exception ex3)
-		{
-			LogToDesktop($"Print failed: {ex3}");
-			progressDialog.MarkFailed("In that bai: " + ex3.Message);
-			MessageBox.Show("Error while printing: " + ex3.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Print failed");
-		}
+			LogToDesktop("Print setup failed: " + ex);
+			MessageBox.Show("Không chuẩn bị được lệnh in: " + ex.Message, "Lỗi in", MessageBoxButton.OK, MessageBoxImage.Error);
 		}
 		finally
 		{
@@ -3782,16 +3652,16 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		InitializeComponent();
 		RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
 		_zoomTimer = new DispatcherTimer();
-		_zoomTimer.Interval = TimeSpan.FromMilliseconds(120.0);
+		_zoomTimer.Interval = TimeSpan.FromMilliseconds(160.0);
 		_zoomTimer.Tick += delegate
 		{
 			_zoomTimer.Stop();
 			RenderOptions.SetBitmapScalingMode(PagesHost, BitmapScalingMode.HighQuality);
 			SetImagesScalingMode(BitmapScalingMode.HighQuality);
-			RenderPdfPages();
+			CommitZoomLayout();
 		};
 		_smoothZoomTimer = new DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
-		_smoothZoomTimer.Interval = TimeSpan.FromMilliseconds(10.0);
+		_smoothZoomTimer.Interval = TimeSpan.FromMilliseconds(16.0);
 		_smoothZoomTimer.Tick += delegate
 		{
 			if (_targetZoom <= 0.0)
@@ -3821,10 +3691,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_viewportTimer.Tick += delegate
 		{
 			_viewportTimer.Stop();
-			UpdateSelectedPageFromViewport();
+			if (!_zoomPreviewActive) UpdateSelectedPageFromViewport();
+			UpdateRulers();
 		};
 		_smoothScrollTimer = new DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);
-		_smoothScrollTimer.Interval = TimeSpan.FromMilliseconds(10.0);
+		_smoothScrollTimer.Interval = TimeSpan.FromMilliseconds(16.0);
 		_smoothScrollTimer.Tick += SmoothScrollTimer_Tick;
 		DocumentScrollViewer.PreviewMouseWheel += DocumentScrollViewer_PreviewMouseWheel;
 		DocumentScrollViewer.PreviewMouseDown += DocumentScrollViewer_PreviewMouseDown;
@@ -3834,6 +3705,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		PagesHost.SizeChanged += PagesHost_SizeChanged;
 		base.Loaded += delegate
 		{
+			if (_documentHandle == IntPtr.Zero && !_documentOpening && !string.IsNullOrEmpty(CurrentPdfPath))
+			{
+				if (PageCount == 0) LoadDocument(CurrentPdfPath);
+				else _ = ResumeDocumentHandlesAsync();
+			}
 			if (PageCount > 0 && _isFirstLoad)
 			{
 				_isFirstLoad = false;
@@ -3851,6 +3727,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		};
 		base.Unloaded += delegate
 		{
+			_loadGeneration++;
+			_renderGeneration++;
+			_documentOpening = false;
+			_smoothZoomTimer?.Stop();
+			_zoomTimer.Stop();
+			_viewportTimer.Stop();
+			ResetZoomPreviewTransform();
+			ClearRenderQueue();
 			CloseActiveDocument();
 		};
 		LoadDocument(path);
@@ -3860,6 +3744,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		Stopwatch totalSw = Stopwatch.StartNew();
 		int loadGeneration = ++_loadGeneration;
+		_documentOpening = true;
+		_renderGeneration++;
 		CurrentPdfPath = path;
 		PageCount = 0;
 		SelectedPageNumber = 1;
@@ -3901,19 +3787,34 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		try
 		{
 			Stopwatch stopwatch = Stopwatch.StartNew();
-			nint tempDoc = PdfiumEngine.FPDF_LoadDocument(path, null);
+			var opened = await Task.Run(() =>
+			{
+				lock (PdfiumEngine.SyncRoot)
+				{
+					PdfiumEngine.Initialize();
+					nint handle = PdfiumEngine.FPDF_LoadDocument(path, null);
+					if (handle == IntPtr.Zero) return (Handle: handle, Pages: new List<PageInfo>());
+					try { return (Handle: handle, Pages: CollectPageInfo(handle, PdfiumEngine.FPDF_GetPageCount(handle))); }
+					catch { PdfiumEngine.CloseDocument(handle); throw; }
+				}
+			});
 			stopwatch.Stop();
-			LogToDesktop($"FPDF_LoadDocument: {stopwatch.ElapsedMilliseconds} ms");
+			LogToDesktop($"Open document and page metadata: {stopwatch.ElapsedMilliseconds} ms");
+			nint tempDoc = opened.Handle;
+			if (loadGeneration != _loadGeneration)
+			{
+				if (tempDoc != IntPtr.Zero) _ = Task.Run(() => PdfiumEngine.CloseDocument(tempDoc));
+				return;
+			}
 			if (tempDoc == IntPtr.Zero)
 			{
-				MessageBox.Show("Unable to load the selected PDF file.", "Load error", MessageBoxButton.OK, MessageBoxImage.Hand);
 				LogStatus("Failed to load PDF");
-				LogToDesktop("LoadDocument failed: document handle is null");
 				return;
 			}
 			_documentHandle = tempDoc;
+			_renderSession = new PdfRenderSession(path);
 			Stopwatch stopwatch2 = Stopwatch.StartNew();
-			int pageCount = PdfiumEngine.FPDF_GetPageCount(tempDoc);
+			int pageCount = opened.Pages.Count;
 			stopwatch2.Stop();
 			LogToDesktop($"FPDF_GetPageCount: {stopwatch2.ElapsedMilliseconds} ms (pages={pageCount})");
 			if (pageCount < 0)
@@ -3937,7 +3838,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			if (_isFirstLoad && DocumentScrollViewer.ViewportWidth > 100.0 && pageCount > 0)
 			{
 				Stopwatch stopwatch3 = Stopwatch.StartNew();
-				if (PdfiumEngine.TryGetPageSizeByIndex(tempDoc, 0, out var width, out var height) && width > 0.0 && height > 0.0)
+				double width = opened.Pages[0].Size.Width;
+				double height = opened.Pages[0].Size.Height;
+				if (width > 0.0 && height > 0.0)
 				{
 					double val = (DocumentScrollViewer.ViewportWidth - 60.0) / (width * 1.33);
 					double val2 = (DocumentScrollViewer.ViewportHeight - 60.0) / (height * 1.33);
@@ -3956,7 +3859,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				_isFirstLoad = false;
 			}
 			Stopwatch dimensionSw = Stopwatch.StartNew();
-			List<PageInfo> collection = await Task.Run(() => CollectPageInfo(tempDoc, pageCount));
+			List<PageInfo> collection = opened.Pages;
 			dimensionSw.Stop();
 			LogToDesktop($"CollectPageInfo({pageCount}): {dimensionSw.ElapsedMilliseconds} ms");
 			if (loadGeneration == _loadGeneration)
@@ -3988,23 +3891,65 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		finally
 		{
+			if (loadGeneration == _loadGeneration) _documentOpening = false;
 			totalSw.Stop();
 			LogToDesktop($"LoadDocument total: {totalSw.ElapsedMilliseconds} ms");
 		}
 	}
 
+	private async Task ResumeDocumentHandlesAsync()
+	{
+		int generation = _loadGeneration;
+		string path = CurrentPdfPath;
+		_documentOpening = true;
+		_renderSession = new PdfRenderSession(path);
+		_detailViewportKey = string.Empty;
+		try
+		{
+			nint handle = await Task.Run(() =>
+			{
+				lock (PdfiumEngine.SyncRoot)
+				{
+					PdfiumEngine.Initialize();
+					return PdfiumEngine.FPDF_LoadDocument(path, null);
+				}
+			});
+			if (generation != _loadGeneration)
+			{
+				if (handle != IntPtr.Zero) _ = Task.Run(() => PdfiumEngine.CloseDocument(handle));
+				return;
+			}
+			_documentHandle = handle;
+			RequestViewportRefresh();
+		}
+		catch (Exception ex) { LogStatus("Resume document failed: " + ex.Message); }
+		finally { if (generation == _loadGeneration) _documentOpening = false; }
+	}
+
 	private void CloseActiveDocument()
 	{
-		CloseTextPages();
+		_renderSession?.Dispose();
+		_renderSession = null;
+		_detailGeneration++;
+		_detailViewportKey = string.Empty;
 		_smoothScrollTimer?.Stop();
 		_targetVerticalOffset = -1;
 		_targetHorizontalOffset = -1;
-		if (_documentHandle != IntPtr.Zero)
+		var textPages = _textPages.Values.ToArray();
+		var pages = _openedPdfPages.Values.ToArray();
+		_textPages.Clear();
+		_openedPdfPages.Clear();
+		nint document = _documentHandle;
+		_documentHandle = IntPtr.Zero;
+		_ = Task.Run(() =>
 		{
-			PdfiumEngine.CloseDocument(_documentHandle);
-			_documentHandle = IntPtr.Zero;
-			LogToDesktop("CloseActiveDocument closed the cached document handle.");
-		}
+			lock (PdfiumEngine.SyncRoot)
+			{
+				foreach (nint text in textPages) if (text != IntPtr.Zero) PdfiumEngine.FPDFText_ClosePage(text);
+				foreach (nint page in pages) if (page != IntPtr.Zero) PdfiumEngine.FPDF_ClosePage(page);
+				if (document != IntPtr.Zero) PdfiumEngine.CloseDocument(document);
+			}
+		});
 	}
 
 	private static List<PageInfo> CollectPageInfo(nint document, int pageCount)
@@ -4018,6 +3963,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			nint num = IntPtr.Zero;
 			lock (PdfiumEngine.SyncRoot)
 			{
+				if (PdfiumEngine.TryGetPageSizeByIndex(document, i, out width, out height) && width > 0 && height > 0)
+				{
+					list.Add(new PageInfo { Size = new Size(width, height), Rotation = 0 });
+					continue;
+				}
 				num = PdfiumEngine.FPDF_LoadPage(document, i);
 				if (num != IntPtr.Zero)
 				{
@@ -4950,7 +4900,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void ReportZoomChanged()
 	{
 		this.ZoomChanged?.Invoke(this, EventArgs.Empty);
-		UpdateRulers();
+		RequestViewportRefresh();
 	}
 
 	private void ReportPageChanged()

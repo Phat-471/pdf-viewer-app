@@ -10,6 +10,7 @@ namespace PdfViewerApp
 {
 	public partial class PdfDocumentTab
 	{
+		private readonly ScaleTransform _zoomPreviewScale = new();
 		public void ChangeZoom(double factor, Point? viewportAnchor = null)
 		{
 			if (PageCount <= 0)
@@ -39,7 +40,8 @@ namespace PdfViewerApp
 			_resetScrollAfterRender = false;
 			ClearRenderQueue();
 			_renderGeneration++;
-			_loadingPages.Clear();
+			_detailGeneration++;
+			_detailViewportKey = string.Empty;
 			_zoomTimer.Stop();
 			RenderOptions.SetBitmapScalingMode(PagesHost, System.Windows.Media.BitmapScalingMode.LowQuality);
 			SetImagesScalingMode(System.Windows.Media.BitmapScalingMode.LowQuality);
@@ -51,7 +53,7 @@ namespace PdfViewerApp
 			if (!(CurrentZoom <= 0.0))
 			{
 				double num = Math.Clamp(zoomPercent / 100.0, 0.1, 4.0);
-				ChangeZoom(num / CurrentZoom);
+				ChangeZoom(num / Math.Max(0.0001, _targetZoom));
 			}
 		}
 
@@ -86,6 +88,46 @@ namespace PdfViewerApp
 					LogStatus("Fit width applied");
 				}
 			}
+		}
+
+		private async void CommitZoomLayout()
+		{
+			if (PagesHost.Children.Count == 0 || PagesHost.Children[0] is not StackPanel pages)
+			{
+				RenderPdfPages();
+				return;
+			}
+			try
+			{
+				int generation = _renderGeneration;
+				ResetZoomPreviewTransform();
+				_baseZoomForLayout = CurrentZoom;
+				foreach (Border border in pages.Children.OfType<Border>())
+				{
+					if (border.Tag is not int pageNumber || border.Child is not Grid grid || pageNumber > _pageDimensions.Count) continue;
+					Size size = _pageDimensions[pageNumber - 1];
+					double width = size.Width * 1.33 * CurrentZoom;
+					double height = size.Height * 1.33 * CurrentZoom;
+					grid.Width = width;
+					grid.Height = height;
+					Image? image = grid.Children.OfType<Image>().FirstOrDefault();
+					if (image != null) { image.Width = width; image.Height = height; }
+					Canvas? overlay = grid.Children.OfType<Canvas>().FirstOrDefault();
+					if (overlay != null)
+					{
+						overlay.Width = width;
+						overlay.Height = height;
+						if (image?.Source != null) RedrawPageAnnotations(overlay, pageNumber);
+					}
+					ResizeDetailImages(grid, width, height);
+				}
+				await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+				if (generation != _renderGeneration) return;
+				ApplyPendingZoomScroll();
+				UpdateSelectedPageFromViewport();
+				RequestViewportRefresh();
+			}
+			catch (Exception ex) { LogStatus("Zoom layout failed: " + ex.Message); }
 		}
 
 		private Point GetViewportCenter()
@@ -124,7 +166,9 @@ namespace PdfViewerApp
 			if (zoomPreviewContent != null)
 			{
 				zoomPreviewContent.RenderTransformOrigin = new Point(0.0, 0.0);
-				zoomPreviewContent.RenderTransform = new ScaleTransform(ratio, ratio);
+				_zoomPreviewScale.ScaleX = ratio;
+				_zoomPreviewScale.ScaleY = ratio;
+				zoomPreviewContent.RenderTransform = _zoomPreviewScale;
 			}
 			PagesHost.Width = _zoomPreviewBaseHostSize.Width * ratio;
 			PagesHost.Height = _zoomPreviewBaseHostSize.Height * ratio;
@@ -397,7 +441,6 @@ namespace PdfViewerApp
 		private void DocumentScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
 		{
 			RequestViewportRefresh();
-			UpdateRulers();
 			if (_smoothScrollTimer == null || !_smoothScrollTimer.IsEnabled)
 			{
 				_targetVerticalOffset = e.VerticalOffset;

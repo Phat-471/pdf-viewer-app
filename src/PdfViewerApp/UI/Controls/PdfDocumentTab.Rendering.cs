@@ -51,6 +51,8 @@ public partial class PdfDocumentTab
 	private void ClearBitmapCache()
 	{
 		_cacheManager.Clear();
+		_detailViewportKey = string.Empty;
+		_detailGeneration++;
 	}
 
 	private void DrawHorizontalRuler(double pageOriginX)
@@ -349,7 +351,7 @@ public partial class PdfDocumentTab
 					Height = num2,
 					HorizontalAlignment = HorizontalAlignment.Center
 				};
-				if (_cacheManager.FindAnyCachedBitmapForPage(pageNumber, isThumbnail: false) is BitmapSource placeholder)
+				if (_cacheManager.FindAnyCachedBitmapForPage(pageNumber, isThumbnail: false, inverted: _isReverseView) is BitmapSource placeholder)
 				{
 					image.Source = placeholder;
 				}
@@ -553,7 +555,8 @@ public partial class PdfDocumentTab
 		try
 		{
 			Stopwatch stopwatch = Stopwatch.StartNew();
-			nint tempDoc = PdfiumEngine.FPDF_LoadDocument(CurrentPdfPath, null);
+			string path = CurrentPdfPath;
+			nint tempDoc = await Task.Run(() => { lock (PdfiumEngine.SyncRoot) return PdfiumEngine.FPDF_LoadDocument(path, null); });
 			stopwatch.Stop();
 			PdfPerfLogger.Log($"Render open document: {stopwatch.ElapsedMilliseconds} ms");
 			if (tempDoc == IntPtr.Zero)
@@ -620,36 +623,20 @@ public partial class PdfDocumentTab
 			try
 			{
 				Stopwatch stopwatch2 = Stopwatch.StartNew();
-				pageCount = PdfiumEngine.FPDF_GetPageCount(tempDoc);
+				pageCount = await Task.Run(() => { lock (PdfiumEngine.SyncRoot) return PdfiumEngine.FPDF_GetPageCount(tempDoc); });
 				stopwatch2.Stop();
 				PdfPerfLogger.Log($"Render page count: {stopwatch2.ElapsedMilliseconds} ms (pages={pageCount})");
 				PageCount = pageCount;
 				Stopwatch dimensionSw = Stopwatch.StartNew();
-				await Task.Run(delegate
-				{
-					for (int i = 0; i < pageCount; i++)
-					{
-						nint num = PdfiumEngine.FPDF_LoadPage(tempDoc, i);
-						if (num != IntPtr.Zero)
-						{
-							pageDimensions.Add(new Size(PdfiumEngine.FPDF_GetPageWidth(num), PdfiumEngine.FPDF_GetPageHeight(num)));
-							int rot = PdfInterop.Pdfium.FPDFPage_GetRotation(num) * 90;
-							inherentRotations.Add(rot);
-							PdfiumEngine.FPDF_ClosePage(num);
-						}
-						else
-						{
-							pageDimensions.Add(new Size(800.0, 1100.0));
-							inherentRotations.Add(0);
-						}
-					}
-				});
+				var infos = await Task.Run(() => CollectPageInfo(tempDoc, pageCount));
+				foreach (var info in infos) { pageDimensions.Add(info.Size); inherentRotations.Add(info.Rotation); }
+
 				dimensionSw.Stop();
 				PdfPerfLogger.Log($"Render collect dimensions: {dimensionSw.ElapsedMilliseconds} ms");
 			}
 			finally
 			{
-				PdfiumEngine.FPDF_CloseDocument(tempDoc);
+				await Task.Run(() => PdfiumEngine.CloseDocument(tempDoc));
 			}
 			if (renderGeneration != _renderGeneration)
 			{
@@ -674,7 +661,7 @@ public partial class PdfDocumentTab
 
 	private void UpdateSelectedPageFromViewport()
 	{
-		if (PagesHost.Children.Count == 0 || !(PagesHost.Children[0] is StackPanel stackPanel) || stackPanel.Children.Count == 0)
+		if (_zoomPreviewActive || PagesHost.Children.Count == 0 || !(PagesHost.Children[0] is StackPanel stackPanel) || stackPanel.Children.Count == 0)
 		{
 			return;
 		}
@@ -701,6 +688,7 @@ public partial class PdfDocumentTab
 					if (image != null && image.Source != null)
 					{
 						image.Source = null;
+					ClearDetailImages(grid);
 					}
 				}
 				double num5 = Math.Abs(y + border.ActualHeight / 2.0 - num);
@@ -734,6 +722,7 @@ public partial class PdfDocumentTab
 		{
 			QueuePageRender(item2, Math.Abs(item2 - SelectedPageNumber), _renderGeneration);
 		}
+		RequestDetailRefresh();
 		if (highCostRender || _zoomPreviewActive || !(ThumbnailContainer.Parent is ScrollViewer scrollViewer))
 		{
 			return;
@@ -767,13 +756,6 @@ public partial class PdfDocumentTab
 		}
 	}
 
-	private double GetStableRenderScale(double currentZoom)
-	{
-		if (currentZoom <= 1.5) return 1.5;
-		if (currentZoom <= 3.0) return 3.0;
-		return Math.Min(4.0, currentZoom);
-	}
-
 	private async Task LoadPageContent(int pageNumber, Border pageBorder, int renderGeneration)
 	{
 		Grid grid = pageBorder.Child as Grid;
@@ -800,9 +782,14 @@ public partial class PdfDocumentTab
 			}
 			double width = _pageDimensions[pageNumber - 1].Width;
 			double height = _pageDimensions[pageNumber - 1].Height;
-			double stableScale = GetStableRenderScale(currentZoom);
-			int renderWidth = Math.Max(1, (int)(width * 1.33 * stableScale));
-			int renderHeight = Math.Max(1, (int)(height * 1.33 * stableScale));
+			PdfRenderSession? session = _renderSession;
+			if (session == null) return;
+			bool inverted = _isReverseView;
+			DpiScale dpi = VisualTreeHelper.GetDpi(this);
+			double stableScale = Math.Ceiling(currentZoom * Math.Max(dpi.DpiScaleX, dpi.DpiScaleY) * 4.0) / 4.0;
+			int renderWidth = Math.Max(1, (int)(width * (96.0 / 72.0) * stableScale));
+			int renderHeight = Math.Max(1, (int)(height * (96.0 / 72.0) * stableScale));
+			PdfiumEngine.ClampRenderDimensions(ref renderWidth, ref renderHeight, 2500000L);
 			string cacheKey = BuildPageCacheKey(pageNumber, renderWidth, renderHeight, isThumbnail: false);
 			if (TryGetCachedBitmap(cacheKey, out BitmapSource bitmap) && bitmap != null)
 			{
@@ -823,32 +810,17 @@ public partial class PdfDocumentTab
 				return;
 			}
 			Stopwatch renderSw = Stopwatch.StartNew();
-			BitmapSource bitmapSource = await Task.Run(delegate
-			{
-				try
-				{
-					if (_documentHandle != IntPtr.Zero)
-					{
-						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, renderWidth, renderHeight, _isReverseView);
-					}
-					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, renderWidth, renderHeight, _isReverseView);
-				}
-				catch (Exception ex2)
-				{
-					Exception ex3 = ex2;
-					Exception ex4 = ex3;
-					base.Dispatcher.BeginInvoke((Action)delegate
-					{
-						LogStatus("Page render failed: " + ex4.Message);
-					});
-					return (BitmapSource)null;
-				}
-			});
+			BitmapSource? bitmapSource = await Task.Run(() => session.Render(pageNumber - 1,
+				renderWidth, renderHeight, 0, 0, renderWidth, renderHeight, inverted));
 			renderSw.Stop();
-			if (renderGeneration == _renderGeneration && bitmapSource != null)
+			if (session == _renderSession && bitmapSource != null)
 			{
-				PdfPerfLogger.Log($"Page {pageNumber} render miss ({renderWidth}x{renderHeight}) => {renderSw.ElapsedMilliseconds} ms");
 				StoreBitmap(cacheKey, bitmapSource);
+				if (GetPageBorder(pageNumber) != pageBorder || inverted != _isReverseView) return;
+				currentZoom = CurrentZoom;
+				PdfPerfLogger.Log($"Page {pageNumber} render miss ({renderWidth}x{renderHeight}) => {renderSw.ElapsedMilliseconds} ms");
+				if (session.TryGetRotation(pageNumber - 1, out int rotation) && pageNumber <= _inherentPageRotations.Count)
+					_inherentPageRotations[pageNumber - 1] = rotation;
 				image.Source = bitmapSource;
 				image.Width = width * 1.33 * currentZoom;
 				image.Height = height * 1.33 * currentZoom;
@@ -868,6 +840,7 @@ public partial class PdfDocumentTab
 		finally
 		{
 			_loadingPages.Remove(pageNumber);
+			RequestViewportRefresh();
 		}
 	}
 
@@ -899,28 +872,17 @@ public partial class PdfDocumentTab
 				}
 				return;
 			}
-			Stopwatch renderSw = Stopwatch.StartNew();
-			BitmapSource bitmapSource = await Task.Run(delegate
+			if (_cacheManager.FindAnyCachedBitmapForPage(pageNumber, false, inverted: _isReverseView) is BitmapSource fullPage)
 			{
-				try
-				{
-					if (_documentHandle != IntPtr.Zero)
-					{
-						return PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, thumbWidth, thumbHeight, _isReverseView);
-					}
-					return PdfiumEngine.RenderPageToBitmap(pdfPath, pageNumber - 1, thumbWidth, thumbHeight, _isReverseView);
-				}
-				catch (Exception ex2)
-				{
-					Exception ex3 = ex2;
-					Exception ex4 = ex3;
-					base.Dispatcher.BeginInvoke((Action)delegate
-					{
-						LogStatus("Thumbnail render failed: " + ex4.Message);
-					});
-					return (BitmapSource)null;
-				}
-			});
+				if (renderGeneration == _renderGeneration) image.Source = fullPage;
+				return;
+			}
+			PdfRenderSession? session = _renderSession;
+			if (session == null) return;
+			bool inverted = _isReverseView;
+			Stopwatch renderSw = Stopwatch.StartNew();
+			BitmapSource? bitmapSource = await Task.Run(() => session.Render(pageNumber - 1,
+				thumbWidth, thumbHeight, 0, 0, thumbWidth, thumbHeight, inverted));
 			renderSw.Stop();
 			if (renderGeneration == _renderGeneration && bitmapSource != null)
 			{
@@ -1050,6 +1012,7 @@ public partial class PdfDocumentTab
 				if (image != null)
 				{
 					image.Source = null;
+					ClearDetailImages(grid);
 				}
 			}
 		}

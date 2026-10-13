@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,7 +20,7 @@ public partial class UpdateDialog : Window, IComponentConnector
 	private readonly UpdateCheckResponse _updateResponse;
 	private readonly AppUpdateService _updateService;
 
-	private static readonly HttpClient HttpClient = new HttpClient();
+	private static readonly HttpClient HttpClient = HttpHelper.Client;
 
 	public UpdateDialog(UpdateCheckResponse updateResponse, AppUpdateService updateService)
 	{
@@ -364,7 +364,7 @@ try {
     }
 
     Write-Host ""Starting updated executable $AppExe...""
-    $proc = Start-Process -FilePath $AppExe -PassThru
+    $proc = Start-Process -FilePath $AppExe -WorkingDirectory $InstallDir -PassThru
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $confirmed = $false
     while ((Get-Date) -lt $deadline) {
@@ -373,7 +373,10 @@ try {
             break
         }
         if ($proc.HasExited) {
-            break
+            $otherProcs = Get-Process -Name ""PdfViewerApp"" -ErrorAction SilentlyContinue
+            if (-not $otherProcs) {
+                break
+            }
         }
         Start-Sleep -Milliseconds 500
     }

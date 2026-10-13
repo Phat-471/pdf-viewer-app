@@ -55,3 +55,10 @@ if (Test-Path -LiteralPath $assemblyInfoPath) {
 }
 
 Write-Host "Updated version: $currentVersion -> $nextVersion" -ForegroundColor Green
+
+$cargoPath = Join-Path $repoRoot "src\PdfCore\Cargo.toml"
+if (Test-Path -LiteralPath $cargoPath) {
+    $cargo = Get-Content -LiteralPath $cargoPath -Raw -Encoding UTF8
+    $cargo = ([regex]'(?m)^version\s*=\s*"[^"]+"').Replace($cargo, "version = `"$nextVersion`"", 1)
+    [IO.File]::WriteAllText($cargoPath, $cargo, [Text.UTF8Encoding]::new($false))
+}

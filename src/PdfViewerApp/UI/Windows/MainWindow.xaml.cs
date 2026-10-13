@@ -3601,7 +3601,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			LogStatus($"🔄 Đang chuẩn bị cài đặt bản cập nhật v{silentState.TargetVersion}...");
 
-			using var httpClient = new System.Net.Http.HttpClient();
+			var httpClient = HttpHelper.Client;
 			var updateService = new AppUpdateService(httpClient, ActivationLicense.ApiUpdateUrl);
 
 			string baseDirectory = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
@@ -3745,12 +3745,15 @@ try {
     }
 
     Write-Host ""Starting updated executable $AppExe...""
-    $proc = Start-Process -FilePath $AppExe -PassThru
+    $proc = Start-Process -FilePath $AppExe -WorkingDirectory $InstallDir -PassThru
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $confirmed = $false
     while ((Get-Date) -lt $deadline) {
         if (Test-Path -LiteralPath $MarkerPath) { $confirmed = $true; break }
-        if ($proc.HasExited) { break }
+        if ($proc.HasExited) {
+            $otherProcs = Get-Process -Name ""PdfViewerApp"" -ErrorAction SilentlyContinue
+            if (-not $otherProcs) { break }
+        }
         Start-Sleep -Milliseconds 500
     }
 

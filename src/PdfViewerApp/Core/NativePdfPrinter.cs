@@ -139,92 +139,42 @@ internal static class NativePdfPrinter
 				}
 			}
 
-			// Create a bounded blocking collection to limit peak memory usage (max 2 pre-rendered pages in queue)
-			using (var renderQueue = new BlockingCollection<PreRenderedPage>(boundedCapacity: 2))
+			// A single page in flight bounds native memory and avoids producer/consumer deadlocks.
+			foreach (var job in printJobs)
 			{
-				// Launch background producer task to load and pre-render PDF pages
-				var producerTask = Task.Run(() =>
-				{
-					try
-					{
-						foreach (var job in printJobs)
-						{
-							if (cancellationToken.IsCancellationRequested)
-							{
-								break;
-							}
-
-							PreRenderedPage rendered;
-							if (forceRasterize)
-							{
-								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi);
-							}
-							else
-							{
-								rendered = PrepareVectorPage(num, job.pageIndex, job.copy);
-							}
-
-							renderQueue.Add(rendered, cancellationToken);
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						// Normal cancellation path
-					}
-					catch (Exception ex)
-					{
-						PdfPerfLogger.Log($"Producer thread failed: {ex}");
-					}
-					finally
-					{
-						renderQueue.CompleteAdding();
-					}
-				});
-
-				// Consumer: Spool pages to GDI printer context
-				foreach (var rendered in renderQueue.GetConsumingEnumerable(cancellationToken))
+				cancellationToken.ThrowIfCancellationRequested();
+				progress?.Report(new PrintProgressInfo($"Preparing page {job.pageIndex + 1}, copy {job.copy}...", num5, num4));
+				var rendered = forceRasterize
+					? PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi)
+					: PrepareVectorPage(num, job.pageIndex, job.copy);
+				try
 				{
 					cancellationToken.ThrowIfCancellationRequested();
-					progress?.Report(new PrintProgressInfo($"Dang in trang {rendered.PageIndex + 1}, ban {rendered.Copy}...", num5, num4));
 					if (separatePageJobs)
 					{
-						DOCINFO lpdi2 = CreateDocInfo(pdfPath, rendered.PageIndex + 1);
-						Stopwatch stopwatch3 = Stopwatch.StartNew();
-						progress?.Report(new PrintProgressInfo($"Dang mo job trang {rendered.PageIndex + 1}...", num5, num4));
-						if (StartDoc(num2, ref lpdi2) <= 0)
-						{
-							throw new InvalidOperationException($"StartDoc failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
-						}
+						DOCINFO info = CreateDocInfo(pdfPath, rendered.PageIndex + 1);
+						if (StartDoc(num2, ref info) <= 0) throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
 						flag = true;
-						stopwatch3.Stop();
-						PdfPerfLogger.Log($"Native StartDoc page-job {rendered.PageIndex + 1}: {stopwatch3.ElapsedMilliseconds} ms");
 					}
-
-					// Draw to GDI DC
 					SpoolRenderedPage(num2, rendered, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, progress, num5, num4, cancellationToken);
-
 					if (separatePageJobs)
 					{
-						Stopwatch stopwatch4 = Stopwatch.StartNew();
-						progress?.Report(new PrintProgressInfo($"Dang spool trang {rendered.PageIndex + 1}...", num5, num4));
-						if (EndDoc(num2) <= 0)
-						{
-							throw new InvalidOperationException($"EndDoc failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
-						}
+						if (EndDoc(num2) <= 0) throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
 						flag = false;
-						stopwatch4.Stop();
-						PdfPerfLogger.Log($"Native EndDoc page-job {rendered.PageIndex + 1} spool: {stopwatch4.ElapsedMilliseconds} ms");
 					}
-
 					num5++;
-					progress?.Report(new PrintProgressInfo($"Da gui trang {rendered.PageIndex + 1} ({num5}/{num4})", num5, num4));
-
-					GC.Collect(2, GCCollectionMode.Forced, blocking: true);
-					GC.WaitForPendingFinalizers();
+					progress?.Report(new PrintProgressInfo($"Page {rendered.PageIndex + 1} submitted ({num5}/{num4})", num5, num4));
 				}
-
-				// Wait for producer task to finish cleanly
-				producerTask.GetAwaiter().GetResult();
+				finally
+				{
+					if (rendered.PageHandle != IntPtr.Zero)
+					{
+						lock (PdfiumEngine.SyncRoot) PdfiumEngine.FPDF_ClosePage(rendered.PageHandle);
+							rendered.PageHandle = IntPtr.Zero;
+						rendered.PageHandle = IntPtr.Zero;
+					}
+					rendered.BitmapBuffer = null;
+				}
 			}
 
 			if (!separatePageJobs)
@@ -265,227 +215,9 @@ internal static class NativePdfPrinter
 
 	public static void PrintOptimized(string pdfPath, string printQueueName, byte[]? devMode, int startPageIndex, int endPageIndex, int copies, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, double rightSafetyPaddingDips, double bottomSafetyPaddingDips, bool separatePageJobs, bool reversePageOrder, bool forceRasterize, IProgress<PrintProgressInfo>? progress = null, CancellationToken cancellationToken = default(CancellationToken), double printDpi = 600.0)
 	{
-		Stopwatch stopwatch = Stopwatch.StartNew();
-		PdfPerfLogger.Log("Native PDFium print (Optimized) start with Parallel Rendering");
-		progress?.Report(new PrintProgressInfo("Dang chuan bi PDFium...", 0, 0, IsIndeterminate: true));
-		PdfiumEngine.Initialize();
-		
-		cancellationToken.ThrowIfCancellationRequested();
-		nint num = IntPtr.Zero;
-		lock (PdfiumEngine.SyncRoot)
-		{
-			num = PdfiumEngine.FPDF_LoadDocument(pdfPath, null);
-		}
-		if (num == IntPtr.Zero)
-		{
-			throw new InvalidOperationException("Unable to load PDF for native printing.");
-		}
-		nint num2 = IntPtr.Zero;
-		bool flag = false;
-		try
-		{
-			int num3 = 0;
-			lock (PdfiumEngine.SyncRoot)
-			{
-				num3 = PdfiumEngine.FPDF_GetPageCount(num);
-			}
-			if (num3 <= 0)
-			{
-				throw new InvalidOperationException("PDF has no printable pages.");
-			}
-			startPageIndex = Math.Clamp(startPageIndex, 0, num3 - 1);
-			endPageIndex = Math.Clamp(endPageIndex, startPageIndex, num3 - 1);
-			copies = Math.Clamp(copies, 1, 999);
-			int num4 = Math.Max(1, endPageIndex - startPageIndex + 1) * copies;
-			int num5 = 0;
-			progress?.Report(new PrintProgressInfo("Dang tao ket noi may in...", 0, num4, IsIndeterminate: true));
-			num2 = CreatePrinterDc(printQueueName, devMode);
-			if (num2 == IntPtr.Zero)
-			{
-				throw new InvalidOperationException("Cannot create printer DC for " + printQueueName + ".");
-			}
-			int num6 = Math.Max(1, GetDeviceCaps(num2, 8));
-			int num7 = Math.Max(1, GetDeviceCaps(num2, 10));
-			int num8 = Math.Max(72, GetDeviceCaps(num2, 88));
-			int num9 = Math.Max(72, GetDeviceCaps(num2, 90));
-			int num10 = Math.Max(0, GetDeviceCaps(num2, 112));
-			int num11 = Math.Max(0, GetDeviceCaps(num2, 113));
-			int num12 = DipsToDevicePixels(rightSafetyPaddingDips, num8);
-			int num13 = DipsToDevicePixels(bottomSafetyPaddingDips, num9);
-			int num14 = Math.Max(1, num6 - num12);
-			int num15 = Math.Max(1, num7 - num13);
-			PdfPerfLogger.Log($"Native printer DC: printable={num6}x{num7}, dpi={num8}x{num9}, physicalOffset={num10},{num11}");
-			PdfPerfLogger.Log($"Native safe area: {num14}x{num15}, rightPaddingPx={num12}, bottomPaddingPx={num13}");
-			// FPDF_PRINTING (0x800) = tối ưu chất lượng in, FPDF_ANNOT (0x01) = hiển thị annotation
-			int flags = 0x800 | 0x01; // FPDF_PRINTING | FPDF_ANNOT
-			if (!separatePageJobs)
-			{
-				DOCINFO lpdi = CreateDocInfo(pdfPath, null);
-				Stopwatch stopwatch2 = Stopwatch.StartNew();
-				progress?.Report(new PrintProgressInfo("Dang mo lenh in...", num5, num4, IsIndeterminate: true));
-				if (StartDoc(num2, ref lpdi) <= 0)
-				{
-					throw new InvalidOperationException("StartDoc failed: " + GetLastErrorMessage());
-				}
-				flag = true;
-				stopwatch2.Stop();
-				PdfPerfLogger.Log($"Native StartDoc: {stopwatch2.ElapsedMilliseconds} ms");
-			}
-
-			// Generate the list of print jobs
-			var printJobs = new List<(int pageIndex, int copy)>();
-			for (int i = 1; i <= copies; i++)
-			{
-				int num16 = ((!reversePageOrder) ? 1 : (-1));
-				int num17 = (reversePageOrder ? endPageIndex : startPageIndex);
-				int num18 = (reversePageOrder ? startPageIndex : endPageIndex);
-				for (int j = num17; reversePageOrder ? (j >= num18) : (j <= num18); j += num16)
-				{
-					printJobs.Add((j, i));
-				}
-			}
-
-			// Create a bounded blocking collection to limit peak memory usage (max 2 pre-rendered pages in queue)
-			using (var renderQueue = new BlockingCollection<PreRenderedPage>(boundedCapacity: 2))
-			{
-				// Launch background producer task to load and pre-render PDF pages
-				var producerTask = Task.Run(() =>
-				{
-					try
-					{
-						foreach (var job in printJobs)
-						{
-							if (cancellationToken.IsCancellationRequested)
-							{
-								break;
-							}
-
-							PreRenderedPage rendered;
-							if (forceRasterize)
-							{
-								rendered = PreRenderPageToBitmap(num, job.pageIndex, job.copy, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, printDpi);
-							}
-							else
-							{
-								rendered = PrepareVectorPage(num, job.pageIndex, job.copy);
-							}
-
-							renderQueue.Add(rendered, cancellationToken);
-						}
-					}
-					catch (OperationCanceledException)
-					{
-						// Normal cancellation path
-					}
-					catch (Exception ex)
-					{
-						PdfPerfLogger.Log($"Producer thread failed: {ex}");
-					}
-					finally
-					{
-						renderQueue.CompleteAdding();
-					}
-				});
-
-				try
-				{
-					// Consumer: Spool pages to GDI printer context
-					foreach (var rendered in renderQueue.GetConsumingEnumerable(cancellationToken))
-					{
-						cancellationToken.ThrowIfCancellationRequested();
-						progress?.Report(new PrintProgressInfo($"Dang in trang {rendered.PageIndex + 1}, ban {rendered.Copy}...", num5, num4));
-						if (separatePageJobs)
-						{
-							DOCINFO lpdi2 = CreateDocInfo(pdfPath, rendered.PageIndex + 1);
-							Stopwatch stopwatch3 = Stopwatch.StartNew();
-							progress?.Report(new PrintProgressInfo($"Dang mo job trang {rendered.PageIndex + 1}...", num5, num4));
-							if (StartDoc(num2, ref lpdi2) <= 0)
-							{
-								throw new InvalidOperationException($"StartDoc failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
-							}
-							flag = true;
-							stopwatch3.Stop();
-							PdfPerfLogger.Log($"Native StartDoc page-job {rendered.PageIndex + 1}: {stopwatch3.ElapsedMilliseconds} ms");
-						}
-
-						// Draw to GDI DC
-						SpoolRenderedPage(num2, rendered, num6, num7, num14, num15, num8, num9, num10, num11, fitToPrintableArea, autoCenter, driverAlreadyOffsetsPrintableArea, flags, progress, num5, num4, cancellationToken);
-
-						if (separatePageJobs)
-						{
-							Stopwatch stopwatch4 = Stopwatch.StartNew();
-							progress?.Report(new PrintProgressInfo($"Dang spool trang {rendered.PageIndex + 1}...", num5, num4));
-							if (EndDoc(num2) <= 0)
-							{
-								throw new InvalidOperationException($"EndDoc failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
-							}
-							flag = false;
-							stopwatch4.Stop();
-							PdfPerfLogger.Log($"Native EndDoc page-job {rendered.PageIndex + 1} spool: {stopwatch4.ElapsedMilliseconds} ms");
-						}
-
-						num5++;
-						progress?.Report(new PrintProgressInfo($"Da gui trang {rendered.PageIndex + 1} ({num5}/{num4})", num5, num4));
-
-						GC.Collect(2, GCCollectionMode.Forced, blocking: true);
-						GC.WaitForPendingFinalizers();
-					}
-				}
-				finally
-				{
-					// Dọn dẹp các PageHandle còn lại trong queue nếu in bị hủy hoặc lỗi để tránh rò rỉ bộ nhớ/tài nguyên
-					while (renderQueue.TryTake(out var extraPage))
-					{
-						if (extraPage.PageHandle != IntPtr.Zero)
-						{
-							lock (PdfiumEngine.SyncRoot)
-							{
-								PdfiumEngine.FPDF_ClosePage(extraPage.PageHandle);
-							}
-							extraPage.PageHandle = IntPtr.Zero;
-						}
-					}
-				}
-
-				// Wait for producer task to finish cleanly
-				producerTask.GetAwaiter().GetResult();
-			}
-
-			if (!separatePageJobs)
-			{
-				Stopwatch stopwatch5 = Stopwatch.StartNew();
-				progress?.Report(new PrintProgressInfo("Dang ket thuc va spool lenh in...", num5, num4, IsIndeterminate: true));
-				if (EndDoc(num2) <= 0)
-				{
-					throw new InvalidOperationException("EndDoc failed: " + GetLastErrorMessage());
-				}
-				flag = false;
-				stopwatch5.Stop();
-				PdfPerfLogger.Log($"Native EndDoc spool: {stopwatch5.ElapsedMilliseconds} ms");
-			}
-
-			// Ghi log đơn giản – KHÔNG dùng LocalPrintServer/PrintQueue trên background thread
-			// vì System.Printing objects có thread affinity → gây crash "The calling thread cannot access this object"
-			PdfPerfLogger.Log("Print job sent to spooler successfully.");
-			progress?.Report(new PrintProgressInfo("Hoan tat gui lenh in.", num4, num4));
-		}
-		finally
-		{
-			if (flag && num2 != IntPtr.Zero)
-			{
-				AbortDoc(num2);
-			}
-			if (num2 != IntPtr.Zero)
-			{
-				DeleteDC(num2);
-			}
-			lock (PdfiumEngine.SyncRoot)
-			{
-				PdfiumEngine.FPDF_CloseDocument(num);
-			}
-			stopwatch.Stop();
-			PdfPerfLogger.Log($"Native PDFium print total: {stopwatch.ElapsedMilliseconds} ms");
-		}
+		Print(pdfPath, printQueueName, devMode, startPageIndex, endPageIndex, copies, fitToPrintableArea,
+			autoCenter, driverAlreadyOffsetsPrintableArea, rightSafetyPaddingDips, bottomSafetyPaddingDips,
+			separatePageJobs, reversePageOrder, forceRasterize, progress, cancellationToken, printDpi);
 	}
 
 	private static PreRenderedPage PreRenderPageToBitmap(nint document, int pageIndex, int copy, int safeWidth, int safeHeight, int dpiX, int dpiY, int physicalOffsetX, int physicalOffsetY, bool fitToPrintableArea, bool autoCenter, bool driverAlreadyOffsetsPrintableArea, int flags, double printDpi = 600.0)
@@ -498,7 +230,7 @@ internal static class NativePdfPrinter
 		if (num == IntPtr.Zero)
 		{
 			PdfPerfLogger.Log($"Native print page {pageIndex + 1}: FPDF_LoadPage failed.");
-			return new PreRenderedPage { PageIndex = pageIndex, Copy = copy, IsRasterized = true };
+			throw new InvalidOperationException($"Unable to load PDF page {pageIndex + 1}.");
 		}
 		try
 		{
@@ -539,20 +271,6 @@ internal static class NativePdfPrinter
 			double targetDpiX = Math.Min(dpiX, printDpi);
 			double targetDpiY = Math.Min(dpiY, printDpi);
 			
-			// Adaptive DPI: Giới hạn độ phân giải tối đa dựa trên chất lượng được chọn để tránh mất nét trên bản vẽ lớn (CAD/Revit)
-			double maxPrintPixels = 16000000.0; // Mặc định 16MP cho 300 DPI
-			if (printDpi >= 1200.0) maxPrintPixels = 400000000.0;      // 400MP cho Siêu nét (1200 DPI)
-			else if (printDpi >= 600.0) maxPrintPixels = 100000000.0;  // 100MP cho Rất nét (600 DPI)
-			else if (printDpi >= 400.0) maxPrintPixels = 36000000.0;   // 36MP cho Nét (400 DPI)
-
-			double currentPrintPixels = (num2 / 72.0 * targetDpiX) * (num3 / 72.0 * targetDpiY);
-			if (currentPrintPixels > maxPrintPixels)
-			{
-				double adpScale = Math.Sqrt(maxPrintPixels / currentPrintPixels);
-				targetDpiX *= adpScale;
-				targetDpiY *= adpScale;
-				PdfPerfLogger.Log($"Native print page {pageIndex + 1} - Adaptive DPI active: scaled down resolution by {adpScale:F2}x (Target DPI: {targetDpiX:F1}x{targetDpiY:F1})");
-			}
 
 			double bmpWidth = num2 / 72.0 * targetDpiX;
 			double bmpHeight = num3 / 72.0 * targetDpiY;
@@ -569,46 +287,28 @@ internal static class NativePdfPrinter
 
 			int width = Math.Max(1, (int)Math.Round(bmpWidth));
 			int height = Math.Max(1, (int)Math.Round(bmpHeight));
-
-			int stride = width * 4;
-			byte[] array = new byte[stride * height];
-			GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
+			// Apply the budget after fitting to the destination paper. Keep the aspect ratio.
+			int requestedWidth = width;
+			PdfiumEngine.ClampRenderDimensions(ref width, ref height, 48000000L);
+			if (width != requestedWidth) PdfPerfLogger.Log($"Raster print memory limit: {width}x{height}; effective DPI={targetDpiX * width / requestedWidth:F1}");
+			int stride24 = checked((width * 3 + 3) / 4 * 4);
+			byte[] array24 = new byte[checked(stride24 * height)];
+			GCHandle pinned = GCHandle.Alloc(array24, GCHandleType.Pinned);
 			try
 			{
-				nint first_scan = gCHandle.AddrOfPinnedObject();
-				nint num5_bmp = IntPtr.Zero;
 				lock (PdfiumEngine.SyncRoot)
 				{
-					num5_bmp = PdfiumEngine.FPDFBitmap_CreateEx(width, height, 4, first_scan, stride);
-					if (num5_bmp != IntPtr.Zero)
+					nint bitmap = PdfiumEngine.FPDFBitmap_CreateEx(width, height, 2, pinned.AddrOfPinnedObject(), stride24);
+					if (bitmap == IntPtr.Zero) throw new InvalidOperationException("Unable to allocate print bitmap.");
+					try
 					{
-						PdfiumEngine.FPDFBitmap_FillRect(num5_bmp, 0, 0, width, height, uint.MaxValue);
-						PdfiumEngine.FPDF_RenderPageBitmap(num5_bmp, num, 0, 0, width, height, 0, flags);
-						PdfiumEngine.FPDFBitmap_Destroy(num5_bmp);
+						PdfiumEngine.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, uint.MaxValue);
+						PdfiumEngine.FPDF_RenderPageBitmap(bitmap, num, 0, 0, width, height, 0, flags);
 					}
+					finally { PdfiumEngine.FPDFBitmap_Destroy(bitmap); }
 				}
 			}
-			finally
-			{
-				gCHandle.Free();
-			}
-
-			// Chuyển đổi từ BGRA 32-bit (4 bytes/pixel) sang BGR 24-bit (3 bytes/pixel) để giảm 25% dung lượng spool
-			int stride24 = ((width * 3 + 3) / 4) * 4; // Căn chỉnh stride 4-byte cho Windows GDI
-			byte[] array24 = new byte[stride24 * height];
-			for (int y = 0; y < height; y++)
-			{
-				int srcRowOffset = y * stride;
-				int destRowOffset = y * stride24;
-				for (int x = 0; x < width; x++)
-				{
-					int srcIndex = srcRowOffset + x * 4;
-					int destIndex = destRowOffset + x * 3;
-					array24[destIndex] = array[srcIndex];       // B
-					array24[destIndex + 1] = array[srcIndex + 1]; // G
-					array24[destIndex + 2] = array[srcIndex + 2]; // R
-				}
-			}
+			finally { pinned.Free(); }
 
 			return new PreRenderedPage
 			{
@@ -641,6 +341,7 @@ internal static class NativePdfPrinter
 		{
 			num = PdfiumEngine.FPDF_LoadPage(document, pageIndex);
 		}
+		if (num == IntPtr.Zero) throw new InvalidOperationException($"Unable to load PDF page {pageIndex + 1}.");
 		return new PreRenderedPage
 		{
 			PageIndex = pageIndex,
@@ -698,7 +399,7 @@ internal static class NativePdfPrinter
 						);
 						if (result == -1)
 						{
-							PdfPerfLogger.Log($"Native StretchDIBits failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
+							throw new InvalidOperationException($"Native StretchDIBits failed on page {rendered.PageIndex + 1}: {GetLastErrorMessage()}");
 						}
 					}
 					finally
@@ -755,6 +456,7 @@ internal static class NativePdfPrinter
 						lock (PdfiumEngine.SyncRoot)
 						{
 							PdfiumEngine.FPDF_ClosePage(rendered.PageHandle);
+							rendered.PageHandle = IntPtr.Zero;
 						}
 					}
 				}

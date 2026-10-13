@@ -20,7 +20,6 @@ public static class PdfiumEngine
 	private static bool _initialized;
 
 	private static readonly object RenderLock = new object();
-	private static readonly ReaderWriterLockSlim LockSlim = new ReaderWriterLockSlim();
 
 	public static object SyncRoot => RenderLock;
 
@@ -78,267 +77,267 @@ public static class PdfiumEngine
 
 	public static void FPDF_InitLibrary()
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_InitLibrary();
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDF_DestroyLibrary()
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_DestroyLibrary();
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static nint FPDF_LoadDocument(string file_path, string? password)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDF_LoadDocument(file_path, password);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDF_CloseDocument(nint document)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_CloseDocument(document);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static int FPDF_GetPageCount(nint document)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDF_GetPageCount(document);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static nint FPDF_LoadPage(nint document, int page_index)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDF_LoadPage(document, page_index);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDF_ClosePage(nint page)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_ClosePage(page);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static double FPDF_GetPageWidth(nint page)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDF_GetPageWidth(page);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static double FPDF_GetPageHeight(nint page)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDF_GetPageHeight(page);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static nint FPDFBitmap_CreateEx(int width, int height, int format, nint first_scan, int stride)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFBitmap_CreateEx(width, height, format, first_scan, stride);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDFBitmap_FillRect(nint bitmap, int left, int top, int width, int height, uint color)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDFBitmap_FillRect(bitmap, left, top, width, height, color);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDF_RenderPageBitmap(nint bitmap, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_RenderPageBitmap(bitmap, page, start_x, start_y, size_x, size_y, rotate, flags);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDF_RenderPage(nint dc, nint page, int start_x, int start_y, int size_x, int size_y, int rotate, int flags)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_RenderPage(dc, page, start_x, start_y, size_x, size_y, rotate, flags);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDFBitmap_Destroy(nint bitmap)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDFBitmap_Destroy(bitmap);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static nint FPDFText_LoadPage(nint page)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_LoadPage(page);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void FPDFText_ClosePage(nint text_page)
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDFText_ClosePage(text_page);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static int FPDFText_CountChars(nint text_page)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_CountChars(text_page);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static int FPDFText_GetText(nint text_page, int start_index, int count, StringBuilder result)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_GetText(text_page, start_index, count, result);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static int FPDFText_GetCharIndexAtPos(nint text_page, double x, double y, double xTolerance, double yTolerance)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_GetCharIndexAtPos(text_page, x, y, xTolerance, yTolerance);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static bool FPDFText_GetCharBox(nint text_page, int index, out double left, out double right, out double bottom, out double top)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_GetCharBox(text_page, index, out left, out right, out bottom, out top);
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static double FPDFText_GetFontSize(nint text_page, int index)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_GetFontSize(text_page, index);
@@ -353,13 +352,13 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static int FPDFText_GetFontWeight(nint text_page, int index)
 	{
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			return Native.FPDFText_GetFontWeight(text_page, index);
@@ -374,14 +373,14 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static string FPDFText_GetFontName(nint text_page, int index, out int flags)
 	{
 		flags = 0;
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			uint length = Native.FPDFText_GetFontInfo(text_page, index, IntPtr.Zero, 0, out flags);
@@ -411,7 +410,7 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
@@ -422,7 +421,7 @@ public static class PdfiumEngine
 
 	public static void Initialize()
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			if (!_initialized)
@@ -433,13 +432,13 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
 	public static void Shutdown()
 	{
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			if (_initialized)
@@ -450,7 +449,7 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
@@ -460,14 +459,14 @@ public static class PdfiumEngine
 		{
 			return;
 		}
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			Native.FPDF_CloseDocument(document);
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
@@ -479,7 +478,7 @@ public static class PdfiumEngine
 	public static BitmapSource? RenderPageToBitmap(string filePath, int pageIndex, int targetWidth, int targetHeight, long maxPixels, bool invertColors = false)
 	{
 		Initialize();
-		LockSlim.EnterWriteLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			nint num = Native.FPDF_LoadDocument(filePath, null);
@@ -498,7 +497,7 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitWriteLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 
@@ -510,190 +509,87 @@ public static class PdfiumEngine
 	public static BitmapSource? RenderPageToBitmap(nint document, int pageIndex, int targetWidth, int targetHeight, long maxPixels, bool invertColors = false)
 	{
 		Initialize();
-		targetWidth = Math.Max(1, Math.Min(targetWidth, 40000));
-		targetHeight = Math.Max(1, Math.Min(targetHeight, 40000));
-		long num = (long)targetWidth * (long)targetHeight;
-		if (num > maxPixels)
+		ClampRenderDimensions(ref targetWidth, ref targetHeight, maxPixels);
+		lock (RenderLock)
 		{
-			double num2 = Math.Sqrt((double)maxPixels / (double)num);
-			targetWidth = Math.Max(1, (int)((double)targetWidth * num2));
-			targetHeight = Math.Max(1, (int)((double)targetHeight * num2));
+			nint page = Native.FPDF_LoadPage(document, pageIndex);
+			if (page == IntPtr.Zero) return null;
+			try { return RenderLoadedPageToBitmap(page, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight, invertColors); }
+			finally { Native.FPDF_ClosePage(page); }
 		}
-		LockSlim.EnterWriteLock();
-		try
-		{
-			nint num3 = Native.FPDF_LoadPage(document, pageIndex);
-			if (num3 == IntPtr.Zero)
-			{
-				return null;
-			}
-			try
-			{
-				int num4 = targetWidth * 4;
-				byte[] array;
-				try
-				{
-					array = new byte[num4 * targetHeight];
-				}
-				catch (OutOfMemoryException)
-				{
-					return null;
-				}
-				GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
-				try
-				{
-					nint first_scan = gCHandle.AddrOfPinnedObject();
-					nint num5 = Native.FPDFBitmap_CreateEx(targetWidth, targetHeight, 4, first_scan, num4);
-					if (num5 != IntPtr.Zero)
-					{
-						Native.FPDFBitmap_FillRect(num5, 0, 0, targetWidth, targetHeight, uint.MaxValue);
-						int renderFlags = 3;
-						if (EnhanceThinLines)
-						{
-							renderFlags |= 0x4000; // FPDF_RENDER_NO_SMOOTHPATH
-						}
-						Native.FPDF_RenderPageBitmap(num5, num3, 0, 0, targetWidth, targetHeight, 0, renderFlags);
-						Native.FPDFBitmap_Destroy(num5);
-					}
-				}
-				finally
-				{
-					gCHandle.Free();
-				}
+	}
 
-				if (invertColors)
-				{
-					unsafe
-					{
-						fixed (byte* p = array)
-						{
-							uint* pCol = (uint*)p;
-							int len = array.Length / 4;
-							int j = 0;
-							for (; j <= len - 4; j += 4)
-							{
-								pCol[j] ^= 0x00FFFFFF;
-								pCol[j + 1] ^= 0x00FFFFFF;
-								pCol[j + 2] ^= 0x00FFFFFF;
-								pCol[j + 3] ^= 0x00FFFFFF;
-							}
-							for (; j < len; j++)
-							{
-								pCol[j] ^= 0x00FFFFFF;
-							}
-						}
-					}
-				}
-
-				BitmapSource bitmapSource = BitmapSource.Create(targetWidth, targetHeight, 96.0, 96.0, PixelFormats.Bgra32, null, array, num4);
-				bitmapSource.Freeze();
-				return bitmapSource;
-			}
-			finally
-			{
-				Native.FPDF_ClosePage(num3);
-			}
-		}
-		finally
-		{
-			LockSlim.ExitWriteLock();
-		}
+	internal static void ClampRenderDimensions(ref int width, ref int height, long maxPixels)
+	{
+		width = Math.Max(1, width);
+		height = Math.Max(1, height);
+		double scale = Math.Min(1.0, 40000.0 / Math.Max(width, height));
+		scale = Math.Min(scale, Math.Sqrt(Math.Max(1L, maxPixels) / ((double)width * height)));
+		width = Math.Max(1, (int)(width * scale));
+		height = Math.Max(1, (int)(height * scale));
 	}
 
 	public static BitmapSource? RenderPageTileToBitmap(nint document, int pageIndex, int fullWidth, int fullHeight, int tileX, int tileY, int tileWidth, int tileHeight, bool invertColors = false)
 	{
 		Initialize();
-		fullWidth = Math.Max(1, Math.Min(fullWidth, 40000));
-		fullHeight = Math.Max(1, Math.Min(fullHeight, 40000));
-		tileX = Math.Max(0, tileX);
-		tileY = Math.Max(0, tileY);
-		tileWidth = Math.Max(1, Math.Min(tileWidth, fullWidth - tileX));
-		tileHeight = Math.Max(1, Math.Min(tileHeight, fullHeight - tileY));
-		LockSlim.EnterWriteLock();
-		try
+		lock (RenderLock)
 		{
-			nint num = Native.FPDF_LoadPage(document, pageIndex);
-			if (num == IntPtr.Zero)
-			{
-				return null;
-			}
+			nint page = Native.FPDF_LoadPage(document, pageIndex);
+			if (page == IntPtr.Zero) return null;
+			try { return RenderLoadedPageToBitmap(page, fullWidth, fullHeight, tileX, tileY, tileWidth, tileHeight, invertColors); }
+			finally { Native.FPDF_ClosePage(page); }
+		}
+	}
+
+	internal static BitmapSource? RenderLoadedPageToBitmap(nint page, int fullWidth, int fullHeight,
+		int tileX, int tileY, int tileWidth, int tileHeight, bool invertColors)
+	{
+		lock (RenderLock)
+		{
+			if (page == IntPtr.Zero || fullWidth < 1 || fullHeight < 1 ||
+				fullWidth > 40000 || fullHeight > 40000 || tileX < 0 || tileY < 0 ||
+				tileX >= fullWidth || tileY >= fullHeight) return null;
+			tileWidth = Math.Min(tileWidth, fullWidth - tileX);
+			tileHeight = Math.Min(tileHeight, fullHeight - tileY);
+			if (tileWidth < 1 || tileHeight < 1) return null;
+			int stride = checked(tileWidth * 4);
+			byte[] pixels;
+			try { pixels = new byte[checked(stride * tileHeight)]; }
+			catch (OutOfMemoryException) { return null; }
+			GCHandle pin = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+			nint bitmap = IntPtr.Zero;
 			try
 			{
-				int num2 = tileWidth * 4;
-				byte[] array;
-				try
-				{
-					array = new byte[num2 * tileHeight];
-				}
-				catch (OutOfMemoryException)
-				{
-					return null;
-				}
-				GCHandle gCHandle = GCHandle.Alloc(array, GCHandleType.Pinned);
-				try
-				{
-					nint first_scan = gCHandle.AddrOfPinnedObject();
-					nint num3 = Native.FPDFBitmap_CreateEx(tileWidth, tileHeight, 4, first_scan, num2);
-					if (num3 != IntPtr.Zero)
-					{
-						Native.FPDFBitmap_FillRect(num3, 0, 0, tileWidth, tileHeight, uint.MaxValue);
-						int renderFlags = 3;
-						if (EnhanceThinLines)
-						{
-							renderFlags |= 0x4000; // FPDF_RENDER_NO_SMOOTHPATH
-						}
-						Native.FPDF_RenderPageBitmap(num3, num, -tileX, -tileY, fullWidth, fullHeight, 0, renderFlags);
-						Native.FPDFBitmap_Destroy(num3);
-					}
-				}
-				finally
-				{
-					gCHandle.Free();
-				}
-
-				if (invertColors)
-				{
-					unsafe
-					{
-						fixed (byte* p = array)
-						{
-							uint* pCol = (uint*)p;
-							int len = array.Length / 4;
-							int j = 0;
-							for (; j <= len - 4; j += 4)
-							{
-								pCol[j] ^= 0x00FFFFFF;
-								pCol[j + 1] ^= 0x00FFFFFF;
-								pCol[j + 2] ^= 0x00FFFFFF;
-								pCol[j + 3] ^= 0x00FFFFFF;
-							}
-							for (; j < len; j++)
-							{
-								pCol[j] ^= 0x00FFFFFF;
-							}
-						}
-					}
-				}
-
-				BitmapSource bitmapSource = BitmapSource.Create(tileWidth, tileHeight, 96.0, 96.0, PixelFormats.Bgra32, null, array, num2);
-				bitmapSource.Freeze();
-				return bitmapSource;
+				bitmap = Native.FPDFBitmap_CreateEx(tileWidth, tileHeight, FPDF_BGRA, pin.AddrOfPinnedObject(), stride);
+				if (bitmap == IntPtr.Zero) return null;
+				Native.FPDFBitmap_FillRect(bitmap, 0, 0, tileWidth, tileHeight, uint.MaxValue);
+				// Retain antialiasing for small text and thin drawing paths.
+				Native.FPDF_RenderPageBitmap(bitmap, page, -tileX, -tileY, fullWidth, fullHeight, 0, FPDF_ANNOT | FPDF_LCD_TEXT);
 			}
 			finally
 			{
-				Native.FPDF_ClosePage(num);
+				if (bitmap != IntPtr.Zero) Native.FPDFBitmap_Destroy(bitmap);
+				pin.Free();
 			}
-		}
-		finally
-		{
-			LockSlim.ExitWriteLock();
+			if (invertColors)
+			{
+				for (int i = 0; i < pixels.Length; i += 4)
+				{
+					pixels[i] ^= 255;
+					pixels[i + 1] ^= 255;
+					pixels[i + 2] ^= 255;
+				}
+			}
+			BitmapSource source = BitmapSource.Create(tileWidth, tileHeight, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+			source.Freeze();
+			return source;
 		}
 	}
 
 	public static bool TryGetPageSizeByIndex(nint document, int pageIndex, out double width, out double height)
 	{
 		Initialize();
-		LockSlim.EnterReadLock();
+		Monitor.Enter(RenderLock);
 		try
 		{
 			try
@@ -709,7 +605,7 @@ public static class PdfiumEngine
 		}
 		finally
 		{
-			LockSlim.ExitReadLock();
+			Monitor.Exit(RenderLock);
 		}
 	}
 }
