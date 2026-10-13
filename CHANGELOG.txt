@@ -1,3 +1,3 @@
-﻿- Đã đổi màn hình in với bản xem trước lớn và thiết lập rõ ràng.
-- Đã thêm tỉ lệ tuỳ chỉnh, chọn nhiều khoảng trang và cảnh báo nội dung bị cắt.
-- Đã đồng bộ bố cục in Snapshot và cải thiện thông báo tiến trình in.
+﻿- Đã khôi phục các lựa chọn in file PDF nặng.
+- Đã mở tuỳ chọn nâng cao phù hợp khi in Snapshot.
+- Đã sửa chọn trang, số bản và huỷ lệnh khi in trực tiếp PDF.

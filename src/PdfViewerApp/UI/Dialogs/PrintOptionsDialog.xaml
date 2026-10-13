@@ -298,6 +298,8 @@
           </Grid>
           <TextBlock Text="Ví dụ: 1–3, 5" Foreground="#94A3B8" FontSize="11" Margin="0,5,0,0"/>
           <Border Height="1" Background="#334155" Margin="0,14"/>
+          <TextBlock x:Name="DirectPrintNoticeText" Visibility="Collapsed" Foreground="#FBBF24" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12" Text="In trực tiếp PDF cần máy in hỗ trợ PDF. Khổ giấy, tỉ lệ, màu và độ phân giải do máy in xử lý. Bản xem trước hiển thị trang PDF gốc."/>
+          <StackPanel x:Name="LayoutSettingsPanel">
           <TextBlock Text="Giấy và bố cục" FontWeight="SemiBold" Margin="0,0,0,8"/>
           <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -341,24 +343,32 @@
             </StackPanel>
           </Grid>
           <TextBlock Text="400 DPI khuyên dùng khi in ảnh. In PDF gốc giữ nét vector." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0"/>
+          </StackPanel>
+          <StackPanel x:Name="HeavyFilePanel" Margin="0,10,0,0">
+            <CheckBox x:Name="OptimizeCadCheckBox" Content="Tối ưu bản vẽ CAD/Revit (file nặng)" Margin="0,6" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
+            <TextBlock Text="Chuyển vector thành ảnh theo DPI đã chọn để giảm tải cho driver." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap"/>
+          </StackPanel>
           <Expander Header="Nâng cao" Foreground="#CBD5E1" Margin="0,16,0,0" IsExpanded="False">
             <StackPanel Margin="0,12,0,0">
               <TextBlock Text="Phương thức in" Foreground="#94A3B8" Margin="0,0,0,5"/>
               <ComboBox x:Name="PrintEngineComboBox" Height="32" SelectedIndex="0" Style="{StaticResource ModernComboBox}" SelectionChanged="PrintPreviewSettings_SelectionChanged">
-                <ComboBoxItem Content="PDF gốc · Khuyên dùng" Tag="NativePdfium_Optimized"/><ComboBoxItem Content="Ảnh · Kèm chú thích trong ứng dụng" Tag="WpfBitmap"/>
+                <ComboBoxItem Content="PDF gốc · Khuyên dùng" Tag="NativePdfium_Optimized"/><ComboBoxItem x:Name="BitmapEngineItem" Content="Ảnh · Kèm chú thích trong ứng dụng" Tag="WpfBitmap"/>
+                <ComboBoxItem x:Name="DirectPdfEngineItem" Content="In trực tiếp PDF · Máy in có hỗ trợ" Tag="PdfDirect_Optimized"/>
               </ComboBox>
               <TextBlock x:Name="EngineAdviceText" Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,8" Text="In PDF gốc giữ nét vector. Chọn in ảnh để kèm chú thích trong ứng dụng."/>
-              <CheckBox x:Name="OptimizeCadCheckBox" Content="In bản vẽ CAD dưới dạng ảnh" Margin="0,6"/>
-              <TextBlock Text="Dùng khi driver xử lý bản vẽ phức tạp chậm. Chất lượng ảnh theo DPI đã chọn." Foreground="#94A3B8" FontSize="11" TextWrapping="Wrap"/>
               <CheckBox x:Name="NativeSeparateJobsCheckBox" Content="Gửi từng trang thành lệnh riêng" Margin="0,10"/>
+              <StackPanel x:Name="PrintOrderPanel">
               <TextBlock Text="Thứ tự in" Foreground="#94A3B8" Margin="0,4,0,5"/>
               <ComboBox x:Name="PrintOrderComboBox" Height="32" SelectedIndex="0" Style="{StaticResource ModernComboBox}">
                 <ComboBoxItem Content="Theo thứ tự trang" Tag="Forward"/><ComboBoxItem Content="Đảo thứ tự trang" Tag="Reverse"/>
               </ComboBox>
+              </StackPanel>
+              <StackPanel x:Name="PrintOffsetPanel">
               <TextBlock Text="Bù lề máy in" Foreground="#94A3B8" Margin="0,10,0,5"/>
               <ComboBox x:Name="PrintOffsetModeComboBox" Height="32" SelectedIndex="0" Style="{StaticResource ModernComboBox}" SelectionChanged="PrintPreviewSettings_SelectionChanged">
                 <ComboBoxItem Content="Tự động" Tag="Auto"/><ComboBoxItem Content="Driver tự bù lề" Tag="WpfOffset"/><ComboBoxItem Content="Ứng dụng bù lề" Tag="Physical"/>
               </ComboBox>
+              </StackPanel>
               <CheckBox x:Name="TestFrameCheckBox" Content="Chỉ in khung kiểm tra lề (1 trang)" Margin="0,12,0,8" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
               <Button Content="Thông tin máy in…" Height="30" HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}" Click="TestPrinter_Click"/>
             </StackPanel>

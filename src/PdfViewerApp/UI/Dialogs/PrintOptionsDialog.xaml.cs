@@ -115,11 +115,12 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 	public int[] PageIndices { get; private set; } = Array.Empty<int>();
 	public double ScalePercent { get; private set; } = 100;
 	internal SnapshotPaperLayout? SnapshotLayout => _snapshotLayout;
+	internal bool IsDirectPdf => PrintEngineMode is "PdfDirect" or "PdfDirect_Optimized";
 	public bool AutoCenter => AutoCenterCheckBox.IsChecked == true;
 	public bool FitToPrintableArea => FitMarginsRadio.IsChecked == true;
-	public bool PrintTestFrame => TestFrameCheckBox.IsChecked == true;
-	public bool NativeSeparatePageJobs => NativeSeparateJobsCheckBox.IsChecked == true;
-	public bool OptimizeCadDrawings => OptimizeCadCheckBox.IsChecked == true;
+	public bool PrintTestFrame => !IsDirectPdf && TestFrameCheckBox.IsChecked == true;
+	public bool NativeSeparatePageJobs => !IsDirectPdf && NativeSeparateJobsCheckBox.IsChecked == true;
+	public bool OptimizeCadDrawings => !IsDirectPdf && OptimizeCadCheckBox.IsChecked == true;
 
 	public bool ReversePageOrder
 	{
@@ -195,9 +196,11 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
         AllPagesRadio.IsEnabled = CurrentViewRadio.IsEnabled = CustomPagesRadio.IsEnabled = false;
         PageRangeTextBox.IsEnabled = false;
         PrintScopeText.Text = "Vùng Snapshot";
-        PrintEngineComboBox.IsEnabled = OptimizeCadCheckBox.IsEnabled = NativeSeparateJobsCheckBox.IsEnabled = false;
-        PrintOrderComboBox.IsEnabled = PrintOffsetModeComboBox.IsEnabled = TestFrameCheckBox.IsEnabled = false;
-        EngineAdviceText.Text = "Snapshot chỉ in vùng đã chọn, theo bố cục đang xem trước.";
+        BitmapEngineItem.Content = "Ảnh Snapshot · Theo DPI đã chọn";
+        DirectPdfEngineItem.Visibility = Visibility.Collapsed;
+        PrintOrderPanel.Visibility = Visibility.Collapsed;
+        NativeSeparateJobsCheckBox.Content = "Gửi từng bản in thành lệnh riêng";
+        EngineAdviceText.Text = "Snapshot chỉ in vùng đã chọn. Bật tối ưu CAD/Revit khi driver xử lý file nặng chậm. Snapshot có một trang nên không cần đảo thứ tự trang.";
         foreach (ComboBoxItem item in PaperSizeComboBox.Items)
             if (Equals(item.Tag, "Default")) item.IsEnabled = false;
         foreach (ComboBoxItem item in OrientationComboBox.Items)
@@ -321,6 +324,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 		_previewCts = request;
 		_previewInProgress = true;
 		ReadPreviewSettingsFromUi();
+		UpdateEngineControls();
 		UpdateSummary();
 		int[] previewPages = TryGetSelectedPages(out var selectedPages) ? selectedPages : new[] { _previewPageNumber - 1 };
 		if (!previewPages.Contains(_previewPageNumber - 1)) _previewPageNumber = previewPages[0] + 1;
@@ -362,9 +366,20 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
                 _previewPageSizes[snapshot.PageIndex] = cropPoints;
             }
 			if (_dialogClosed || request.IsCancellationRequested) return;
+			PreviewPlaceholderText.Visibility = Visibility.Collapsed;
+			PrevPageButton.IsEnabled = SnapshotSelection == null && previewIndex > 0;
+			NextPageButton.IsEnabled = SnapshotSelection == null && previewIndex < previewPages.Length - 1;
+			if (IsDirectPdf)
+			{
+				PreviewImage.Source = source;
+				ApplyPreviewZoom();
+				PreviewInfoText.Text = $"Trang {_previewPageNumber} · PDF gốc {cropPoints.Width * 25.4 / 72:N1} × {cropPoints.Height * 25.4 / 72:N1} mm";
+				PreviewWarningText.Text = "Máy in tự xử lý khổ giấy và tỉ lệ. Xem trước này không mô phỏng bản in. Chú thích trong ứng dụng không được kèm.";
+				UpdateSummary();
+				return;
+			}
 			PreviewImage.Source = ComposePrintPreview(source, cropPoints, EstimatedGeometry());
 			ApplyPreviewZoom();
-			PreviewPlaceholderText.Visibility = Visibility.Collapsed;
 			var geometry = await ReadPreviewGeometryAsync(request.Token);
             if (_dialogClosed || request.IsCancellationRequested) return;
             PreviewImage.Source = ComposePrintPreview(source, cropPoints, geometry);
@@ -591,6 +606,7 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
 			}
 		}
 		UpdateSummary();
+		if (_dialogReady && !_loadingPrinterDefaults) UpdatePreview();
 	}
 
 	private void PrinterProperties_Click(object sender, RoutedEventArgs e)
@@ -679,7 +695,8 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
             ValidationText.Text = $"Nhập trang từ 1 đến {_pageCount}. Có thể dùng dấu phẩy và khoảng trang, ví dụ: 1–3, 5.";
             return;
         }
-        if (!TryReadScale(out double percent))
+        double percent = 100;
+        if (!IsDirectPdf && !TryReadScale(out percent))
         {
             ValidationText.Text = "Nhập tỉ lệ từ 10% đến 400%.";
             return;
@@ -688,6 +705,17 @@ public partial class PrintOptionsDialog : Window, IComponentConnector
         StartPageIndex = pages.Min();
         EndPageIndex = pages.Max();
         ScalePercent = percent;
+		if (IsDirectPdf)
+		{
+			if (SnapshotSelection != null)
+			{
+				ValidationText.Text = "In trực tiếp PDF dùng cho toàn trang. Chọn PDF gốc hoặc ảnh khi in vùng Snapshot.";
+				return;
+			}
+			Copies = result;
+			DialogResult = true;
+			return;
+		}
 		PaperSizeKey = (PaperSizeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "A3";
 		OrientationKey = (OrientationComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Landscape";
 

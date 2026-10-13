@@ -223,6 +223,10 @@ public partial class SnapshotActionDialog : Window
             string printerName = options.SelectedPrinterName!;
             using var xml = ticket.GetXmlStream();
             byte[] ticketBytes = xml.ToArray();
+            bool rasterize = options.PrintEngineMode == "WpfBitmap" || options.OptimizeCadDrawings;
+            bool separateCopies = options.NativeSeparatePageJobs;
+            bool testFrame = options.PrintTestFrame;
+            string offsetMode = options.PrintOffsetMode;
             var token = printCancellation.Token;
             await PrintWorker.RunAsync(() =>
             {
@@ -231,8 +235,11 @@ public partial class SnapshotActionDialog : Window
                 using var queue = new PrintQueue(server, printerName, Array.Empty<string>());
                 var workerTicket = new PrintTicket(new MemoryStream(ticketBytes));
                 var profile = PrinterPrintProfile.Resolve(queue);
+                bool driverOffsets = offsetMode == "WpfOffset" ||
+                    (offsetMode != "Physical" && profile.DriverAlreadyOffsetsPrintableArea);
+                var settings = new SnapshotPrintSettings(rasterize, separateCopies, testFrame, driverOffsets);
                 PdfSnapshotPrinter.PrintSnapshot(_snapshot, queue, workerTicket,
-                    profile.RightSafetyPadding, profile.BottomSafetyPadding, layout, token, progress);
+                    profile.RightSafetyPadding, profile.BottomSafetyPadding, layout, token, progress, settings);
             });
             progressDialog.MarkCompleted("Đã gửi lệnh in Snapshot tới máy in.");
             if (!_closed) StatusText.Text = "Đã gửi lệnh in Snapshot tới máy in. Có thể tiếp tục copy hoặc lưu ảnh.";

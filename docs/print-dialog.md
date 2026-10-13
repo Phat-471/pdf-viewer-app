@@ -18,6 +18,18 @@ Snapshot dùng cùng màn hình in. Khổ giấy, hướng giấy, tỉ lệ và
 cho bố cục copy/lưu sau khi xác nhận in. Ảnh xuất theo bố cục giấy có lề tối thiểu
 10 mm và giới hạn vùng in của máy in đã chọn. Xuất riêng vùng chọn giữ nguyên ảnh cắt.
 
+## In file nặng
+
+- Bật **Tối ưu bản vẽ CAD/Revit (file nặng)** ở ngay trên mục Nâng cao để chuyển
+  vector thành ảnh theo DPI đã chọn. Tuỳ chọn này cũng dùng được khi in Snapshot.
+- Trong **Nâng cao → Phương thức in**, chọn **In trực tiếp PDF** khi máy in hỗ trợ PDF.
+  Các trang đã chọn, số bản và thứ tự trang được áp dụng. Khổ giấy, tỉ lệ, màu sắc
+  và DPI do máy in xử lý; bản xem trước chỉ hiển thị trang PDF gốc.
+- In trực tiếp PDF dùng cho toàn trang. Snapshot dùng phương thức PDF gốc hoặc ảnh
+  để giữ đúng vùng chọn, khổ giấy và tỉ lệ.
+- Snapshot cho phép gửi từng bản in thành lệnh riêng, bù lề và in khung kiểm tra.
+  Mục đảo thứ tự trang được ẩn vì Snapshot chỉ có một trang.
+
 ## Giới hạn
 
 - Khi chưa đọc được driver, bản xem trước ghi rõ lề tạm tính. Kết quả in phụ thuộc driver.

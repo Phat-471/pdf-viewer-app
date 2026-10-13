@@ -23,6 +23,22 @@ public partial class PrintOptionsDialog
     private bool _paperEdited;
     private bool _orientationEdited;
 
+    private void UpdateEngineControls()
+    {
+        bool direct = IsDirectPdf;
+        LayoutSettingsPanel.Visibility = HeavyFilePanel.Visibility = PrintOffsetPanel.Visibility =
+            NativeSeparateJobsCheckBox.Visibility = TestFrameCheckBox.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
+        DirectPrintNoticeText.Visibility = direct ? Visibility.Visible : Visibility.Collapsed;
+        ShowMarginsCheckBox.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
+        EngineAdviceText.Text = direct
+            ? "Gửi PDF theo từng khối dữ liệu, không tạo ảnh. Chỉ dùng khi máy in có hỗ trợ PDF; các trang đã chọn và số bản vẫn được áp dụng."
+            : SnapshotSelection != null
+                ? "Snapshot chỉ in vùng đã chọn. Có thể in PDF gốc hoặc ảnh. Snapshot có một trang nên không cần đảo thứ tự trang."
+                : "In PDF gốc giữ nét vector. Chọn in ảnh để kèm chú thích trong ứng dụng.";
+        if (!direct && OptimizeCadDrawings)
+            EngineAdviceText.Text = "Đang tối ưu CAD/Revit: vùng PDF sẽ được chuyển thành ảnh theo DPI đã chọn trước khi gửi tới driver.";
+    }
+
     private bool TryReadScale(out double percent)
     {
         percent = 100;
@@ -108,6 +124,8 @@ public partial class PrintOptionsDialog
         ticket.PageMediaSize = CreatePageMediaSize();
         ticket.PageOrientation = CreatePageOrientation();
         ticket.PageScalingFactor = 100;
+        if (QualityComboBox.SelectedItem is ComboBoxItem { Tag: string dpiText } && int.TryParse(dpiText, out int dpi))
+            ticket.PageResolution = new PageResolution(dpi, dpi);
         ApplyColorToTicket(ticket);
         using var xml = ticket.GetXmlStream();
         byte[] bytes = xml.ToArray();
@@ -179,6 +197,7 @@ public partial class PrintOptionsDialog
             safe = new Rect(content.X * 96 / 25.4, content.Y * 96 / 25.4, content.Width * 96 / 25.4, content.Height * 96 / 25.4);
             Rect mm = _snapshotLayout.ImageBoundsMm(cropPoints);
             imageBounds = new Rect(mm.X * 96 / 25.4, mm.Y * 96 / 25.4, mm.Width * 96 / 25.4, mm.Height * 96 / 25.4);
+            if (!geometry.DriverOffsets) imageBounds.Offset(geometry.SafeArea.X, geometry.SafeArea.Y);
             clipped = safe.IsEmpty || !safe.Contains(imageBounds);
         }
         else
@@ -216,8 +235,11 @@ public partial class PrintOptionsDialog
                 if (PrintTestFrame)
                 {
                     dc.DrawRectangle(null, new Pen(Brushes.Black, 1), safe);
-                    dc.DrawLine(new Pen(Brushes.OrangeRed, 1), new Point(paper.Width / 2, 0), new Point(paper.Width / 2, paper.Height));
-                    dc.DrawLine(new Pen(Brushes.OrangeRed, 1), new Point(0, paper.Height / 2), new Point(paper.Width, paper.Height / 2));
+                    double centerX = _snapshotLayout != null ? safe.X + safe.Width / 2 : paper.Width / 2;
+                    double centerY = _snapshotLayout != null ? safe.Y + safe.Height / 2 : paper.Height / 2;
+                    Brush ink = _snapshotLayout != null ? Brushes.Black : Brushes.OrangeRed;
+                    dc.DrawLine(new Pen(ink, 1), new Point(centerX, 0), new Point(centerX, paper.Height));
+                    dc.DrawLine(new Pen(ink, 1), new Point(0, centerY), new Point(paper.Width, centerY));
                 }
                 else dc.DrawImage(source, imageBounds);
                 dc.Pop();
@@ -251,7 +273,8 @@ public partial class PrintOptionsDialog
         string copies = int.TryParse(CopiesTextBox.Text, out int value) && value is >= 1 and <= 999 ? value.ToString() : "?";
         string paper = PaperSizeKey == "Default" ? "Theo máy in" : PaperSizeKey;
         string orientation = CreatePageOrientation() == PageOrientation.Landscape ? "Ngang" : "Dọc";
-        PrintSummaryText.Text = $"{paper} · {orientation} · {count} trang · {copies} bản · {_effectiveScale:N1}%";
+        PrintSummaryText.Text = IsDirectPdf ? $"In trực tiếp PDF · {count} trang · {copies} bản · Máy in tự xử lý bố cục"
+            : $"{paper} · {orientation} · {count} trang · {copies} bản · {_effectiveScale:N1}%";
         PrintButton.Content = count > 0 ? $"In {count} trang" : "In";
     }
 

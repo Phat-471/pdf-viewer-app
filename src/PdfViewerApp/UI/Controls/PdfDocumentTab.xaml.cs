@@ -2166,6 +2166,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			bool separateJobs = options.NativeSeparatePageJobs, reverse = options.ReversePageOrder;
 			bool rasterize = options.OptimizeCadDrawings;
 			int[] pageIndices = options.PageIndices;
+			int originalPageCount = PageCount;
 			double scalePercent = options.ScalePercent;
 			var annotations = Annotations.ToList();
 			var progressDialog = new PrintProgressDialog { Owner = Window.GetWindow(this) };
@@ -2178,6 +2179,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				await PrintWorker.RunAsync(() =>
 				{
 					cancellation.ThrowIfCancellationRequested();
+					if (engine is "PdfDirect" or "PdfDirect_Optimized")
+					{
+						PdfDirectPrintJob.Print(pdfPath, printerName, pageIndices, originalPageCount, copies, reverse, progress, cancellation);
+						return;
+					}
 					// Create all System.Printing objects on this worker, including the driver queries.
 					using var server = new LocalPrintServer();
 					using var queue = new PrintQueue(server, printerName, Array.Empty<string>());
@@ -2196,12 +2202,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 						NativePdfPrinter.Print(pdfPath, printerName, devMode, startPage, endPage, copies, fit, center,
 							driverOffsets, profile.RightSafetyPadding, profile.BottomSafetyPadding, separateJobs,
 							reverse, rasterize, progress, cancellation, printDpi, scalePercent, pageIndices);
-					}
-					else if (engine == "PdfDirect" || engine == "PdfDirect_Optimized")
-					{
-						string name = "PDF Pro - " + System.IO.Path.GetFileName(pdfPath);
-						if (engine == "PdfDirect_Optimized") NativePdfPrinter.PrintPdfDirectOptimized(pdfPath, printerName, name, cancellation);
-						else NativePdfPrinter.PrintPdfDirect(pdfPath, printerName, name, cancellation);
 					}
 					else
 					{

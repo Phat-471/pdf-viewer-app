@@ -625,143 +625,59 @@ internal static class NativePdfPrinter
 	[DllImport("winspool.drv", SetLastError = true)]
 	private static extern bool WritePrinter(nint hPrinter, nint pBytes, int dwCount, out int dwWritten);
 
-	public static void PrintPdfDirect(string pdfPath, string printQueueName, string docName, CancellationToken cancellationToken)
-	{
-		cancellationToken.ThrowIfCancellationRequested();
-		byte[] pdfBytes = File.ReadAllBytes(pdfPath);
-		
-		nint hPrinter = IntPtr.Zero;
-		var di = new DOC_INFO_1
-		{
-			pDocName = docName,
-			pDataType = "RAW",
-			pOutputFile = null
-		};
+    public static void PrintPdfDirect(string pdfPath, string printQueueName, string docName, CancellationToken cancellationToken)
+    {
+        PrintPdfDirectOptimized(pdfPath, printQueueName, docName, cancellationToken);
+    }
 
-		if (!OpenPrinter(printQueueName, out hPrinter, IntPtr.Zero))
-		{
-			throw new InvalidOperationException($"Cannot open printer {printQueueName}. Win32 Error: {Marshal.GetLastWin32Error()}");
-		}
+    public static void PrintPdfDirectOptimized(string pdfPath, string printQueueName, string docName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var source = new FileStream(pdfPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (source.Length == 0) throw new InvalidOperationException("PDF không có dữ liệu để in.");
+        var info = new DOC_INFO_1 { pDocName = docName, pDataType = "RAW", pOutputFile = null };
+        if (!OpenPrinter(printQueueName, out nint printer, IntPtr.Zero))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        bool jobStarted = false;
+        nint nativeBuffer = IntPtr.Zero;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!StartDocPrinter(printer, 1, info)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            jobStarted = true;
+            if (!StartPagePrinter(printer)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            byte[] buffer = new byte[65536];
+            nativeBuffer = Marshal.AllocCoTaskMem(buffer.Length);
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Marshal.Copy(buffer, 0, nativeBuffer, read);
+                int sent = 0;
+                while (sent < read)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!WritePrinter(printer, IntPtr.Add(nativeBuffer, sent), read - sent, out int written))
+                        throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+                    if (written <= 0 || written > read - sent)
+                        throw new InvalidOperationException("Máy in không nhận đủ dữ liệu PDF. Kiểm tra kết nối rồi thử lại.");
+                    sent += written;
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!EndPagePrinter(printer)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            if (!EndDocPrinter(printer)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            jobStarted = false;
+        }
+        finally
+        {
+            // Never finalize a truncated PDF after cancellation or a failed write.
+            if (jobStarted) AbortPrinter(printer);
+            if (nativeBuffer != IntPtr.Zero) Marshal.FreeCoTaskMem(nativeBuffer);
+            ClosePrinter(printer);
+        }
+    }
 
-		try
-		{
-			if (!StartDocPrinter(hPrinter, 1, di))
-			{
-				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-			}
-
-			try
-			{
-				if (!StartPagePrinter(hPrinter))
-				{
-					throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-				}
-
-				try
-				{
-					nint pBytes = Marshal.AllocCoTaskMem(pdfBytes.Length);
-					Marshal.Copy(pdfBytes, 0, pBytes, pdfBytes.Length);
-					try
-					{
-						int bytesWritten = 0;
-						if (!WritePrinter(hPrinter, pBytes, pdfBytes.Length, out bytesWritten))
-						{
-							throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-						}
-					}
-					finally
-					{
-						Marshal.FreeCoTaskMem(pBytes);
-					}
-				}
-				finally
-				{
-					EndPagePrinter(hPrinter);
-				}
-			}
-			finally
-			{
-				EndDocPrinter(hPrinter);
-			}
-		}
-		finally
-		{
-			ClosePrinter(hPrinter);
-		}
-	}
-
-	public static void PrintPdfDirectOptimized(string pdfPath, string printQueueName, string docName, CancellationToken cancellationToken)
-	{
-		cancellationToken.ThrowIfCancellationRequested();
-		
-		nint hPrinter = IntPtr.Zero;
-		var di = new DOC_INFO_1
-		{
-			pDocName = docName,
-			pDataType = "RAW",
-			pOutputFile = null
-		};
-
-		if (!OpenPrinter(printQueueName, out hPrinter, IntPtr.Zero))
-		{
-			throw new InvalidOperationException($"Cannot open printer {printQueueName}. Win32 Error: {Marshal.GetLastWin32Error()}");
-		}
-
-		try
-		{
-			if (!StartDocPrinter(hPrinter, 1, di))
-			{
-				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-			}
-
-			try
-			{
-				if (!StartPagePrinter(hPrinter))
-				{
-					throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-				}
-
-				try
-				{
-					using (var fs = new FileStream(pdfPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-					{
-						byte[] buffer = new byte[65536]; // 64KB buffer
-						int bytesRead;
-						nint pBytes = Marshal.AllocCoTaskMem(buffer.Length);
-						
-						try
-						{
-							while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
-							{
-								cancellationToken.ThrowIfCancellationRequested();
-								
-								Marshal.Copy(buffer, 0, pBytes, bytesRead);
-								int bytesWritten = 0;
-								if (!WritePrinter(hPrinter, pBytes, bytesRead, out bytesWritten))
-								{
-									throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-								}
-							}
-						}
-						finally
-						{
-							Marshal.FreeCoTaskMem(pBytes);
-						}
-					}
-				}
-				finally
-				{
-					EndPagePrinter(hPrinter);
-				}
-			}
-			finally
-			{
-				EndDocPrinter(hPrinter);
-			}
-		}
-		finally
-		{
-			ClosePrinter(hPrinter);
-		}
-	}
+    [DllImport("winspool.drv", SetLastError = true)]
+    private static extern bool AbortPrinter(nint hPrinter);
 }
