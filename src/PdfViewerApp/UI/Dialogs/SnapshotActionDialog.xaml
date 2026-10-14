@@ -133,6 +133,18 @@
       </Border>
       <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Name="SettingsPanel">
+          <TextBlock Text="VÙNG CHỌN · mm" Foreground="#94A3B8" FontWeight="SemiBold" Margin="0,0,0,8" />
+          <TextBlock Text="X / Y tính từ góc trên trái của trang." Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,8" />
+          <UniformGrid Columns="2" Margin="0,0,0,8">
+            <StackPanel Margin="0,0,4,0"><TextBlock Text="X" /><TextBox Name="RegionXBox" Padding="6" /></StackPanel>
+            <StackPanel Margin="4,0,0,0"><TextBlock Text="Y" /><TextBox Name="RegionYBox" Padding="6" /></StackPanel>
+            <StackPanel Margin="0,6,4,0"><TextBlock Text="Rộng" /><TextBox Name="RegionWidthBox" Padding="6" /></StackPanel>
+            <StackPanel Margin="4,6,0,0"><TextBlock Text="Cao" /><TextBox Name="RegionHeightBox" Padding="6" /></StackPanel>
+          </UniformGrid>
+          <WrapPanel Margin="0,0,0,18">
+            <Button Content="Áp dụng vùng" Style="{StaticResource SecondaryButton}" Click="ApplyRegion_Click" Margin="0,0,4,4" />
+            <Button Content="Kéo chỉnh…" Style="{StaticResource SecondaryButton}" Click="EditRegion_Click" Margin="0,0,0,4" />
+          </WrapPanel>
           <TextBlock Text="BỐ CỤC GIẤY" Foreground="#94A3B8" FontWeight="SemiBold" Margin="0,0,0,12" />
           <TextBlock Text="Khổ giấy" Margin="0,0,0,6" />
           <ComboBox Name="PaperCombo" SelectedIndex="3" SelectionChanged="Layout_Changed" Margin="0,0,0,12" MinHeight="32">
@@ -176,6 +188,7 @@
       <Button Name="PrintButton" Content="In…" Style="{StaticResource PremiumButton}" MinWidth="88" Height="36" Margin="0,0,8,0" IsDefault="True" Click="Print_Click" />
       <Button Name="CopyButton" Content="Copy ảnh" Style="{StaticResource SecondaryButton}" MinWidth="92" Height="36" Margin="0,0,8,0" Click="Copy_Click" ToolTip="Copy ảnh vào Clipboard (Ctrl+C)" />
       <Button Name="SaveButton" Content="Lưu PNG" Style="{StaticResource SecondaryButton}" MinWidth="92" Height="36" Margin="0,0,8,0" Click="Save_Click" />
+      <Button Name="OcrButton" Content="Đọc chữ OCR…" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,8,0" Click="Ocr_Click" />
       <Button Content="Đóng" Style="{StaticResource SecondaryButton}" MinWidth="80" Height="36" IsCancel="True" Click="Cancel_Click" />
     </WrapPanel>
   </Grid>

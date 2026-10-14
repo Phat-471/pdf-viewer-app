@@ -124,6 +124,22 @@ try {
             throw "Invalid update ZIP entry: $name"
         }
     }
+    if ([Version]$manifest.version -ge [Version]'1.11.0') {
+        foreach ($required in @('tessdata/eng.traineddata','tessdata/vie.traineddata','tessdata/LICENSE','tessdata/NOTICE.txt','x64/leptonica-1.82.0.dll','x64/tesseract50.dll')) {
+            if ($required -notin $names) { throw "Update ZIP is missing OCR dependency: $required" }
+        }
+        $modelHashes = @{
+            'tessdata/eng.traineddata' = '7D4322BD2A7749724879683FC3912CB542F19906C83BCC1A52132556427170B2'
+            'tessdata/vie.traineddata' = '79DF64CAF7BCFB2A27DF5042ECB6121E196EADA34DA774956995747636D5BFA1'
+        }
+        foreach ($name in $modelHashes.Keys) {
+            $entry = $archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq $name }
+            $stream = $entry.Open(); $sha = [Security.Cryptography.SHA256]::Create()
+            try { $actual = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') }
+            finally { $stream.Dispose(); $sha.Dispose() }
+            if ($actual -ne $modelHashes[$name]) { throw "OCR model differs from the pinned official release: $name" }
+        }
+    }
 } finally { $archive.Dispose() }
 
 $checksumPath = Join-Path $ReleaseDir 'SHA256SUMS.txt'

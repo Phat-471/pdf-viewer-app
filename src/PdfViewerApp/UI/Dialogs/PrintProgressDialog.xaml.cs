@@ -11,12 +11,15 @@ public partial class PrintProgressDialog : Window, IComponentConnector
 	private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
 	private bool _allowClose;
+	private readonly string _taskName;
 
 	public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
-	public PrintProgressDialog()
+	public PrintProgressDialog(string taskName = "In")
 	{
 		InitializeComponent();
+		_taskName = taskName;
+		if (taskName == "OCR") { Title = "Tiến trình OCR"; TaskHeading.Text = "Đang nhận diện chữ"; CancelButton.Content = "Huỷ OCR"; }
 	}
 
 	public void UpdateProgress(PrintProgressInfo info)
@@ -108,8 +111,8 @@ public partial class PrintProgressDialog : Window, IComponentConnector
 		{
 			_cancellationTokenSource.Cancel();
 			CancelButton.IsEnabled = false;
-			StatusText.Text = "Đang huỷ lệnh in…";
-			DetailText.Text = "Đang chờ driver kết thúc bước hiện tại. Trang đã gửi có thể vẫn được in.";
+			StatusText.Text = _taskName == "OCR" ? "Đang huỷ OCR…" : "Đang huỷ lệnh in…";
+			DetailText.Text = _taskName == "OCR" ? "Đang chờ ô ảnh hiện tại xử lý xong. Kết quả chưa hoàn tất sẽ không được lưu." : "Đang chờ driver kết thúc bước hiện tại. Trang đã gửi có thể vẫn được in.";
 		}
 	}
 

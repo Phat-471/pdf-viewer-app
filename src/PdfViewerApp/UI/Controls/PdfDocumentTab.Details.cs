@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,7 +18,21 @@ public partial class PdfDocumentTab
 	private bool _detailWorkerRunning;
 	private bool _detailAgainRequested;
 	private string _detailViewportKey = string.Empty;
+	private CancellationTokenSource _detailCancellation = new();
+	private void CancelDetailRendering()
+	{
+		_detailCancellation.Cancel();
+		_detailCancellation.Dispose();
+		_detailCancellation = new CancellationTokenSource();
+	}
 	private sealed record DetailTilePlacement(string Key, Rect Bounds);
+	private double GetDetailDensity()
+	{
+		DpiScale dpi = VisualTreeHelper.GetDpi(this);
+		// Reuse tiles for nearby zoom values; always round resolution upward.
+		double zoomBucket = Math.Ceiling(CurrentZoom * 8) / 8;
+		return Math.Max(dpi.DpiScaleX, dpi.DpiScaleY) * zoomBucket / Math.Max(0.01, CurrentZoom) * (PdfiumEngine.EnhanceThinLines ? 1.25 : 1.0);
+	}
 
 	private static Canvas GetDetailCanvas(Grid page)
 	{
@@ -68,8 +83,7 @@ public partial class PdfDocumentTab
 		catch (InvalidOperationException) { return; }
 		if (visible.IsEmpty || visible.Width < 1 || visible.Height < 1) return;
 
-		DpiScale dpi = VisualTreeHelper.GetDpi(this);
-		double density = Math.Max(dpi.DpiScaleX, dpi.DpiScaleY) * (PdfiumEngine.EnhanceThinLines ? 1.25 : 1.0);
+		double density = GetDetailDensity();
 		int fullWidth = Math.Max(1, (int)Math.Ceiling(image.Width * density));
 		int fullHeight = Math.Max(1, (int)Math.Ceiling(image.Height * density));
 		PdfiumEngine.ClampRenderDimensions(ref fullWidth, ref fullHeight, long.MaxValue);
@@ -87,6 +101,7 @@ public partial class PdfDocumentTab
 		string viewportKey = $"{_renderGeneration}:{SelectedPageNumber}:{fullWidth}x{fullHeight}:{left},{top},{right / DetailTileSize},{bottom / DetailTileSize}:{_isReverseView}";
 		if (_detailViewportKey == viewportKey) return;
 		_detailViewportKey = viewportKey;
+		CancelDetailRendering();
 		_detailGeneration++;
 		_detailAgainRequested = true;
 		if (!_detailWorkerRunning) _ = RefreshDetailLoopAsync();
@@ -103,12 +118,14 @@ public partial class PdfDocumentTab
 				await RenderVisibleDetailsAsync(_detailGeneration);
 			} while (_detailAgainRequested && !_zoomPreviewActive);
 		}
+		catch (OperationCanceledException) { }
 		catch (Exception ex) { PdfPerfLogger.Log("Detail render failed: " + ex.Message); }
 		finally { _detailWorkerRunning = false; }
 	}
 
 	private async Task RenderVisibleDetailsAsync(int generation)
 	{
+		var token = _detailCancellation.Token;
 		PdfRenderSession? session = _renderSession;
 		int pageNumber = SelectedPageNumber;
 		bool inverted = _isReverseView;
@@ -120,8 +137,7 @@ public partial class PdfDocumentTab
 		Rect visible = inverse.TransformBounds(new Rect(0, 0, DocumentScrollViewer.ViewportWidth, DocumentScrollViewer.ViewportHeight));
 		visible.Intersect(new Rect(0, 0, image.Width, image.Height));
 		if (visible.IsEmpty) return;
-		DpiScale dpi = VisualTreeHelper.GetDpi(this);
-		double density = Math.Max(dpi.DpiScaleX, dpi.DpiScaleY) * (PdfiumEngine.EnhanceThinLines ? 1.25 : 1.0);
+		double density = GetDetailDensity();
 		int fullWidth = Math.Max(1, (int)Math.Ceiling(image.Width * density));
 		int fullHeight = Math.Max(1, (int)Math.Ceiling(image.Height * density));
 		PdfiumEngine.ClampRenderDimensions(ref fullWidth, ref fullHeight, long.MaxValue);
@@ -152,7 +168,8 @@ public partial class PdfDocumentTab
 			if (!TryGetCachedBitmap(tile.Key, out BitmapSource? source))
 			{
 				Stopwatch sw = Stopwatch.StartNew();
-				source = await Task.Run(() => session.Render(pageNumber - 1, fullWidth, fullHeight, tile.X, tile.Y, tile.Width, tile.Height, inverted));
+				try { source = await Task.Run(() => session.Render(pageNumber - 1, fullWidth, fullHeight, tile.X, tile.Y, tile.Width, tile.Height, inverted, token), token); }
+				catch (OperationCanceledException) { return; }
 				PdfPerfLogger.Log($"Detail tile page={pageNumber} {tile.X},{tile.Y}: {sw.ElapsedMilliseconds} ms");
 				if (source != null && session == _renderSession) StoreBitmap(tile.Key, source);
 			}

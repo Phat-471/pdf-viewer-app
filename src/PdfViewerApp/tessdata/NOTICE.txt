@@ -1,0 +1,5 @@
+PDF Pro includes unmodified eng.traineddata and vie.traineddata from
+Tesseract tessdata_fast, release 4.1.0:
+https://github.com/tesseract-ocr/tessdata_fast/tree/4.1.0
+Copyright Tesseract contributors. Distributed under Apache License 2.0.
+See LICENSE in this directory.

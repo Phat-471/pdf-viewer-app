@@ -36,6 +36,15 @@ internal sealed class AppPreferences
 	public bool AllowMultipleInstances { get; set; } = false;
 
 	public string OcrLanguage { get; set; } = "";
+	public int OcrDpi { get; set; } = 300;
+	public bool OcrPreferNative { get; set; } = true;
+	public bool OcrSparse { get; set; } = true;
+	public string SnapshotPaperKey { get; set; } = "A3";
+	public bool SnapshotLandscape { get; set; } = true;
+	public bool SnapshotFit { get; set; } = true;
+	public double SnapshotScale { get; set; } = 100;
+	public int SnapshotQuality { get; set; } = 2400;
+	public bool SnapshotExportPaper { get; set; } = true;
 
 	public bool EnhanceThinLines { get; set; } = true;
 

@@ -1,6 +1,22 @@
 # 🗺️ DỰ ÁN PDF VIEWER PRO - ROADMAP & SƠ ĐỒ MÃ NGUỒN
 
-Tài liệu này giúp tra cứu nhanh cấu trúc dự án, vị trí các tệp nguồn, các mô-đun cốt lõi và lộ trình phát triển. Khi cần sửa lỗi hoặc phát triển tính năng mới, **chỉ cần xem tệp này** mà không cần phải đọc lại toàn bộ codebase.
+Tài liệu này giúp tra cứu cấu trúc và kế hoạch dự án. Cần đối chiếu mã nguồn và tài liệu
+theo từng tính năng; các mục hoàn tất trong phần lịch sử không thay cho kết quả kiểm chứng thực tế.
+
+## Đợt 1.11.0 — mở file, Snapshot và OCR
+
+- Đã bổ sung cache ảnh trên ổ đĩa theo SHA-256 nội dung, có giới hạn 256 MB;
+  giữ cache RAM và ảnh nền, bỏ tác vụ render cũ trước/sau lời gọi native.
+- Đã gom mức zoom chi tiết theo bước 1/8 để dùng lại các ô ở mức zoom gần nhau;
+  ảnh chi tiết dùng chế độ nội suy nhanh trong lúc zoom, rồi trở lại chất lượng cao.
+- Đã thêm kéo di chuyển/đổi kích thước vùng Snapshot, nhập mm và nhớ thiết lập.
+- Đã thêm OCR vùng, lựa chọn ngôn ngữ/DPI, ưu tiên chữ gốc, nhận diện theo ô,
+  tiến độ/huỷ và cache kết quả. Gói cập nhật kèm dữ liệu tiếng Việt và tiếng Anh.
+- Đã sửa lớp chữ ẩn của PDF tìm kiếm để giữ Unicode và tài nguyên của trang gốc.
+- Cần đánh giá tiếp trên file Revit, bản scan và trang xoay thực tế. Chưa đo lại hiệu năng
+  hoặc chạy thử giao diện trong đợt này.
+
+Xem [OCR](docs/OCR.md) và [Snapshot](docs/SNAPSHOT.md) để biết cách dùng và giới hạn.
 
 ---
 

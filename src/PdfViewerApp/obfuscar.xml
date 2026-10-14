@@ -20,6 +20,7 @@
     <SkipType name="PdfViewerApp.ActivationRecord" />
     <SkipType name="PdfViewerApp.ActivationState" />
     <SkipType name="PdfViewerApp.AppPreferences" />
+    <SkipType name="PdfViewerApp.PdfOcrRegion" />
     <SkipType name="PdfViewerApp.Ai.AiSettings" />
     <SkipType name="PdfViewerApp.UpdateRollbackState" />
     <SkipType name="PdfViewerApp.SilentUpdateReadyState" />

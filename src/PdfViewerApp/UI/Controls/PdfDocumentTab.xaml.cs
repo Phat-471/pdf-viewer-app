@@ -163,6 +163,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private nint _documentHandle = IntPtr.Zero;
 	private PdfRenderSession? _renderSession;
+	private System.Threading.CancellationTokenSource _ocrLifetime = new();
+	private System.Threading.CancellationTokenSource _renderCancellation = new();
 
 	private Point? _pendingZoomContentPoint;
 
@@ -218,7 +220,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private readonly Dictionary<int, int> _pageRotations = new Dictionary<int, int>();
 
-	private readonly ConcurrentDictionary<int, Task<List<OcrTextRegion>?>> _ocrLoadingTasks = new();
+	private readonly ConcurrentDictionary<string, Task<List<OcrTextRegion>?>> _ocrLoadingTasks = new();
 
 	private readonly List<PendingTextEdit> _pendingTextEdits = new List<PendingTextEdit>();
 
@@ -271,7 +273,20 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public List<PdfAnnotation> Annotations { get; } = new List<PdfAnnotation>();
 
-	public string ActiveTool { get; set; } = "Select";
+	private string _currentActiveTool = "Select";
+	public string ActiveTool
+	{
+		get => _currentActiveTool;
+		set
+		{
+			_currentActiveTool = value;
+			if (_editingSnapshot && value != "Select")
+			{
+				_editingSnapshot = false;
+				if (_lastSnapshotCanvas != null) DrawSnapshotOverlay(_lastSnapshotCanvas, _snapshotPageNumber);
+			}
+		}
+	}
 
 	public bool KeepToolsActive { get; set; }
 
@@ -1371,7 +1386,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		if (tempRect != null) canvas.Children.Remove(tempRect);
 		if (string.IsNullOrEmpty(CurrentPdfPath)) return;
-		if (w < 10 || h < 10)
+		if (w <= 0 || h <= 0 || ((w < 10 || h < 10) && _snapshotBounds == null))
 		{
 			LogStatus("Vùng chọn Snapshot quá nhỏ. Hãy kéo chọn vùng lớn hơn.");
 			return;
@@ -1387,7 +1402,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Owner = Window.GetWindow(this)
 		};
-		dialog.ShowDialog();
+		if (_lastSnapshotPaperLayout != null) dialog.RestoreLayout(_lastSnapshotPaperLayout);
+        dialog.SelectionChanged += changed =>
+        {
+            _snapshotBounds = new Rect(changed.X, changed.Y, changed.Width, changed.Height);
+            _snapshotPageNumber = changed.PageIndex + 1; DrawSnapshotOverlay(canvas, _snapshotPageNumber);
+        };
+        dialog.ShowDialog();
+        _lastSnapshotPaperLayout = dialog.Layout;
+        if (dialog.EditRegionRequested)
+        {
+            _editingSnapshot = true; ActiveTool = "Select";
+            if (Window.GetWindow(this) is MainWindow main) main.ActiveTool = "Select";
+            DrawSnapshotOverlay(canvas, pageNumber);
+            LogStatus("Kéo vùng chọn để di chuyển, kéo góc để đổi kích thước. Chọn Xem trước để tiếp tục.");
+        }
 		if (dialog.ReselectRequested)
 		{
 			ClearLastSnapshotOverlay();
@@ -3778,6 +3807,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void CloseActiveDocument()
 	{
+		_ocrLifetime.Cancel();
+		_ocrLifetime.Dispose();
+		_ocrLifetime = new System.Threading.CancellationTokenSource();
+		_ocrLoadingTasks.Clear();
+		CancelDetailRendering();
+		_renderCancellation.Cancel();
+		_renderCancellation.Dispose();
+		_renderCancellation = new System.Threading.CancellationTokenSource();
 		_renderSession?.Dispose();
 		_renderSession = null;
 		_detailGeneration++;

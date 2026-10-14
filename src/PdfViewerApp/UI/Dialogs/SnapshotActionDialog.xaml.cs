@@ -15,10 +15,13 @@ namespace PdfViewerApp;
 
 public partial class SnapshotActionDialog : Window
 {
-    private readonly PdfSnapshotSelection _snapshot;
+    private PdfSnapshotSelection _snapshot;
     private readonly PdfRenderSession _session;
     private readonly bool _ownsSession;
-    private readonly Size _cropPoints;
+    private Size _cropPoints;
+    private readonly Size _pageSizePoints;
+    internal event Action<PdfSnapshotSelection>? SelectionChanged;
+    internal bool EditRegionRequested { get; private set; }
     private readonly CancellationTokenSource _lifetime = new();
     private BitmapSource? _previewCrop;
     private BitmapSource? _exportCrop;
@@ -37,16 +40,37 @@ public partial class SnapshotActionDialog : Window
     {
         InitializeComponent();
         _snapshot = snapshot;
+        _pageSizePoints = pageSizePoints;
         _cropPoints = new Size(pageSizePoints.Width * snapshot.Width, pageSizePoints.Height * snapshot.Height);
         _session = session ?? new PdfRenderSession(snapshot.PdfPath);
         _ownsSession = session == null;
         SnapshotInfoText.Text = $"Trang {pageNumber} · Vùng chọn {_cropPoints.Width * 25.4 / 72:N1} × {_cropPoints.Height * 25.4 / 72:N1} mm";
+        var preferences = AppPreferences.Load();
+        foreach (ComboBoxItem item in PaperCombo.Items) if (Equals(item.Tag, preferences.SnapshotPaperKey)) PaperCombo.SelectedItem = item;
+        OrientationCombo.SelectedIndex = preferences.SnapshotLandscape ? 0 : 1;
+        ScaleModeCombo.SelectedIndex = preferences.SnapshotFit ? 0 : 1;
+        ScaleTextBox.Text = Math.Clamp(preferences.SnapshotScale, 10, 400).ToString("0.##", CultureInfo.InvariantCulture);
+        foreach (ComboBoxItem item in QualityCombo.Items) if (item.Tag?.ToString() == preferences.SnapshotQuality.ToString()) QualityCombo.SelectedItem = item;
+        ExportModeCombo.SelectedIndex = preferences.SnapshotExportPaper ? 0 : 1;
+        FillRegionFields();
         _ready = true;
         ContentRendered += LoadPreview;
         Closed += (_, _) =>
         {
             _closed = true;
             _lifetime.Cancel();
+            if (_validLayout)
+            {
+                try
+                {
+                    var saved = AppPreferences.Load();
+                    saved.SnapshotPaperKey = Layout.PaperKey; saved.SnapshotLandscape = Layout.Landscape;
+                    saved.SnapshotFit = Layout.FitToPage; saved.SnapshotScale = Layout.ScalePercent;
+                    saved.SnapshotQuality = int.Parse((QualityCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "2400");
+                    saved.SnapshotExportPaper = ExportModeCombo.SelectedIndex == 0; saved.Save();
+                }
+                catch (Exception ex) { PdfPerfLogger.Log("Snapshot preferences: " + ex.Message); }
+            }
             if (_ownsSession) _session.Dispose();
         };
     }
@@ -117,7 +141,64 @@ public partial class SnapshotActionDialog : Window
 
     private void UpdateButtons()
     {
-        PrintButton.IsEnabled = CopyButton.IsEnabled = SaveButton.IsEnabled = !_busy && _validLayout;
+        PrintButton.IsEnabled = CopyButton.IsEnabled = SaveButton.IsEnabled = OcrButton.IsEnabled = !_busy && _validLayout;
+    }
+
+    internal void RestoreLayout(SnapshotPaperLayout layout)
+    {
+        _ready = false;
+        foreach (ComboBoxItem item in PaperCombo.Items) if (Equals(item.Tag, layout.PaperKey)) PaperCombo.SelectedItem = item;
+        OrientationCombo.SelectedIndex = layout.Landscape ? 0 : 1; ScaleModeCombo.SelectedIndex = layout.FitToPage ? 0 : 1;
+        ScaleTextBox.Text = layout.ScalePercent.ToString("0.##", CultureInfo.InvariantCulture);
+        Layout = layout; _ready = true; UpdateLayoutPreview();
+    }
+
+    private void FillRegionFields()
+    {
+        RegionXBox.Text = (_snapshot.X * _pageSizePoints.Width * 25.4 / 72).ToString("0.###", CultureInfo.InvariantCulture);
+        RegionYBox.Text = (_snapshot.Y * _pageSizePoints.Height * 25.4 / 72).ToString("0.###", CultureInfo.InvariantCulture);
+        RegionWidthBox.Text = (_cropPoints.Width * 25.4 / 72).ToString("0.###", CultureInfo.InvariantCulture);
+        RegionHeightBox.Text = (_cropPoints.Height * 25.4 / 72).ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private void ApplyRegion_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        double[] values = new double[4]; var boxes = new[] { RegionXBox, RegionYBox, RegionWidthBox, RegionHeightBox };
+        for (int i = 0; i < 4; i++)
+            if (!double.TryParse(boxes[i].Text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]) || !double.IsFinite(values[i]))
+            { StatusText.Text = "Nhập vị trí và kích thước hợp lệ bằng mm."; return; }
+        double pw = _pageSizePoints.Width * 25.4 / 72, ph = _pageSizePoints.Height * 25.4 / 72;
+        if (values[0] < 0 || values[1] < 0 || values[2] < 0.5 || values[3] < 0.5 || values[0] + values[2] > pw + 0.001 || values[1] + values[3] > ph + 0.001)
+        { StatusText.Text = $"Vùng phải nằm trong trang {pw:0.###} × {ph:0.###} mm và rộng/cao ít nhất 0,5 mm."; return; }
+        _snapshot = _snapshot with { X = values[0] / pw, Y = values[1] / ph, Width = Math.Min(values[2] / pw, 1 - values[0] / pw), Height = Math.Min(values[3] / ph, 1 - values[1] / ph) };
+        _cropPoints = new Size(_snapshot.Width * _pageSizePoints.Width, _snapshot.Height * _pageSizePoints.Height);
+        _previewCrop = _exportCrop = null; _exportLongEdge = 0;
+        SnapshotInfoText.Text = $"Trang {_snapshot.PageIndex + 1} · Vùng chọn {_cropPoints.Width * 25.4 / 72:N1} × {_cropPoints.Height * 25.4 / 72:N1} mm";
+        SelectionChanged?.Invoke(_snapshot); FillRegionFields(); LoadPreview(this, EventArgs.Empty);
+    }
+
+    private void EditRegion_Click(object sender, RoutedEventArgs e) { EditRegionRequested = true; DialogResult = false; }
+
+    private async void Ocr_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        var options = new OcrOptionsDialog(hasRegion: true, regionOnly: true) { Owner = this };
+        if (options.ShowDialog() != true) return;
+        SetBusy(true, "Đang đọc chữ trong vùng chọn…");
+        var progress = new PrintProgressDialog("OCR") { Owner = this }; progress.Show();
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, progress.CancellationToken);
+        try
+        {
+            var selection = _snapshot;
+            var output = await Task.Run(() => PdfOcrService.RecognizeAsync(_session, selection.PageIndex, options.Options,
+                new Rect(selection.X, selection.Y, selection.Width, selection.Height), cancel.Token, new Progress<PrintProgressInfo>(info => progress.Dispatcher.BeginInvoke(new Action(() => progress.UpdateProgress(info))))));
+            cancel.Token.ThrowIfCancellationRequested(); progress.CloseAfterSuccess();
+            if (!_closed) new OcrResultDialog(PdfOcrService.ToText(output)) { Owner = this }.ShowDialog();
+        }
+        catch (OperationCanceledException) { progress.CloseAfterSuccess(); }
+        catch (Exception ex) { progress.MarkFailed("Không đọc được chữ: " + ex.Message); }
+        finally { if (!_closed) SetBusy(false); }
     }
 
     private async Task<BitmapSource> RenderExportAsync()

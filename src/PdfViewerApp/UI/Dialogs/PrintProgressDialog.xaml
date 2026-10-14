@@ -42,7 +42,7 @@
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <TextBlock Text="Đang gửi lệnh in" FontSize="18" FontWeight="SemiBold" Foreground="#38BDF8" />
+    <TextBlock Name="TaskHeading" Text="Đang gửi lệnh in" FontSize="18" FontWeight="SemiBold" Foreground="#38BDF8" />
     <ProgressBar Name="PrintProgressBar" Grid.Row="1" Style="{StaticResource ModernProgressBar}" Margin="0,16,0,8" Minimum="0" Maximum="1" Value="0" IsIndeterminate="True" />
     <StackPanel Grid.Row="2">
       <TextBlock Name="StatusText" Text="Đang chuẩn bị..." TextWrapping="Wrap" Foreground="#CBD5E1" FontWeight="SemiBold" />

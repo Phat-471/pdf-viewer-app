@@ -43,6 +43,12 @@ public partial class SettingsWindow : Window, IComponentConnector
 		ComboBoxItem defaultItem = new ComboBoxItem { Content = "Mặc định hệ thống", Tag = "" };
 		OcrLanguageComboBox.Items.Add(defaultItem);
 		OcrLanguageComboBox.SelectedItem = defaultItem;
+		foreach (var option in new[] { (Name: "Tiếng Anh · Tesseract", Tag: "eng"), (Name: "Tiếng Việt · Tesseract", Tag: "vie"), (Name: "Việt + Anh · Tesseract", Tag: "vie+eng") })
+		{
+			var item = new ComboBoxItem { Content = option.Name, Tag = option.Tag };
+			OcrLanguageComboBox.Items.Add(item);
+			if (_preferences.OcrLanguage == option.Tag) OcrLanguageComboBox.SelectedItem = item;
+		}
 
 		if (OperatingSystem.IsWindows() && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
 		{

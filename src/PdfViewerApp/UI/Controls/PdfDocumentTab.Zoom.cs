@@ -40,6 +40,7 @@ namespace PdfViewerApp
 			_pendingZoomContentPoint = null;
 			_resetScrollAfterRender = false;
 			ClearRenderQueue();
+			CancelDetailRendering();
 			_renderGeneration++;
 			_detailGeneration++;
 			_detailViewportKey = string.Empty;
@@ -208,6 +209,10 @@ namespace PdfViewerApp
 								RenderOptions.SetBitmapScalingMode(image, scalingMode);
 							}
 						}
+						foreach (Grid detailLayer in grid.Children.OfType<Grid>().Where(g => Equals(g.Tag, "page-detail")))
+							foreach (Canvas detailCanvas in detailLayer.Children.OfType<Canvas>())
+								foreach (Image tile in detailCanvas.Children.OfType<Image>())
+									if (RenderOptions.GetBitmapScalingMode(tile) != scalingMode) RenderOptions.SetBitmapScalingMode(tile, scalingMode);
 					}
 				}
 			}

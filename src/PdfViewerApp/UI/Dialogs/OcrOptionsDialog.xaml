@@ -1,0 +1,140 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="PdfViewerApp.OcrOptionsDialog" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Đọc chữ / OCR" Width="480" Height="610" MinWidth="440" MinHeight="480" WindowStartupLocation="CenterOwner" Background="#0F172A" Foreground="#F8FAFC" FontFamily="Segoe UI, Tahoma">
+<Window.Resources>
+    <ResourceDictionary>
+      <Style TargetType="ComboBoxItem">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ComboBoxItem">
+              <Border Name="ItemBorder" Background="#1E293B" Padding="{TemplateBinding Padding}">
+                <ContentPresenter />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#0F766E" /></Trigger>
+                <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemBorder" Property="Background" Value="#334155" /></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style TargetType="ComboBox">
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ComboBox">
+              <Grid>
+                <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                  <ToggleButton.Template>
+                    <ControlTemplate TargetType="ToggleButton">
+                      <Border CornerRadius="4" BorderBrush="#475569" BorderThickness="1" Background="#1E293B">
+                        <Path Data="M 0 0 L 4 4 L 8 0" Stroke="#CBD5E1" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+                      </Border>
+                    </ControlTemplate>
+                  </ToggleButton.Template>
+                </ToggleButton>
+                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="8,4,28,4" IsHitTestVisible="False" VerticalAlignment="Center" />
+                <Popup Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
+                  <Border Background="#1E293B" BorderBrush="#475569" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                    <ScrollViewer MaxHeight="260" CanContentScroll="True"><ItemsPresenter /></ScrollViewer>
+                  </Border>
+                </Popup>
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style TargetType="TextBox">
+        <Setter Property="Background" Value="#1E293B" />
+        <Setter Property="Foreground" Value="#F8FAFC" />
+        <Setter Property="BorderBrush" Value="#475569" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+      </Style>
+      <Style x:Key="PremiumButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#FFFFFFFF" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="6" Padding="12,8">
+                <Border.Background>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0F766E" Offset="0.0" />
+                    <GradientStop Color="#14B8A6" Offset="1.0" />
+                  </LinearGradientBrush>
+                </Border.Background>
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Border" Property="Opacity" Value="0.4" /></Trigger>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.9" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="UIElement.Opacity" Value="0.8" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style x:Key="SecondaryButton" TargetType="{x:Type Button}">
+        <Setter Property="Foreground" Value="#94A3B8" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FrameworkElement.Cursor" Value="Hand" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="{x:Type Button}">
+              <Border Name="Border" CornerRadius="6" BorderThickness="1.5" BorderBrush="#334155" Background="#1E293B" Padding="10,6">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Border" Property="Opacity" Value="0.4" /></Trigger>
+                <Trigger Property="UIElement.IsMouseOver" Value="True">
+                  <Setter TargetName="Border" Property="Border.BorderBrush" Value="#475569" />
+                  <Setter Property="Foreground" Value="#F8FAFC" />
+                  <Setter TargetName="Border" Property="Border.Background" Value="#334155" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                  <Setter TargetName="Border" Property="Border.Background" Value="#0F172A" />
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+    </ResourceDictionary>
+  </Window.Resources>
+<DockPanel Margin="24">
+  <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+    <Button Content="Huỷ" IsCancel="True" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0" />
+    <Button Content="Bắt đầu" IsDefault="True" Style="{StaticResource PremiumButton}" Click="Start_Click" />
+  </StackPanel>
+  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+    <TextBlock Text="Đọc chữ trong PDF" FontSize="21" Foreground="#38BDF8" FontWeight="SemiBold" Margin="0,0,0,18" />
+    <TextBlock Text="Phạm vi" Margin="0,0,0,6" />
+    <ComboBox Name="ScopeCombo" SelectedIndex="0" MinHeight="34" Margin="0,0,0,14">
+      <ComboBoxItem Content="Trang hiện tại" Tag="Current" />
+      <ComboBoxItem Content="Toàn bộ tài liệu" Tag="All" />
+      <ComboBoxItem Name="RegionItem" Content="Vùng Snapshot đã chọn" Tag="Region" />
+    </ComboBox>
+    <TextBlock Text="Ngôn ngữ" Margin="0,0,0,6" />
+    <ComboBox Name="LanguageCombo" SelectedIndex="2" MinHeight="34" Margin="0,0,0,14">
+      <ComboBoxItem Content="Tiếng Anh" Tag="eng" /><ComboBoxItem Content="Tiếng Việt" Tag="vie" /><ComboBoxItem Content="Việt + Anh" Tag="vie+eng" />
+    </ComboBox>
+    <TextBlock Text="Độ phân giải ảnh OCR" Margin="0,0,0,6" />
+    <ComboBox Name="DpiCombo" SelectedIndex="1" MinHeight="34" Margin="0,0,0,14">
+      <ComboBoxItem Content="150 DPI · Nhanh" Tag="150" /><ComboBoxItem Content="300 DPI · Khuyên dùng" Tag="300" /><ComboBoxItem Content="400 DPI · Chữ nhỏ" Tag="400" />
+    </ComboBox>
+    <CheckBox Name="NativeCheck" Content="Ưu tiên lớp chữ gốc" IsChecked="True" Foreground="#F8FAFC" Margin="0,0,0,6" />
+    <TextBlock Text="Khi có chữ gốc dùng được, lấy chữ trực tiếp. Bỏ chọn để OCR vùng scan hoặc PDF có lớp chữ sai." Foreground="#94A3B8" TextWrapping="Wrap" Margin="0,0,0,14" />
+    <CheckBox Name="SparseCheck" Content="Chữ rời trên bản vẽ CAD/Revit" IsChecked="True" Foreground="#F8FAFC" Margin="0,0,0,14" />
+    <TextBlock Text="Nhận diện từng ô ảnh để giữ chữ nhỏ và giới hạn RAM. Cần dữ liệu OCR cho ngôn ngữ đã chọn. Kết quả được lưu trong cache trên máy." Foreground="#94A3B8" TextWrapping="Wrap" />
+  </StackPanel></ScrollViewer>
+</DockPanel></Window>

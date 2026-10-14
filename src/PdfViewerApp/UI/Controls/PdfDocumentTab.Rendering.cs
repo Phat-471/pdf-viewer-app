@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -811,10 +811,11 @@ public partial class PdfDocumentTab
 				return;
 			}
 			Stopwatch renderSw = Stopwatch.StartNew();
+			var renderToken = _renderCancellation.Token;
 			BitmapSource? bitmapSource = await Task.Run(() => session.Render(pageNumber - 1,
-				renderWidth, renderHeight, 0, 0, renderWidth, renderHeight, inverted));
+				renderWidth, renderHeight, 0, 0, renderWidth, renderHeight, inverted, renderToken), renderToken);
 			renderSw.Stop();
-			if (session == _renderSession && bitmapSource != null)
+			if (session == _renderSession && renderGeneration == _renderGeneration && bitmapSource != null)
 			{
 				StoreBitmap(cacheKey, bitmapSource);
 				if (GetPageBorder(pageNumber) != pageBorder || inverted != _isReverseView) return;
@@ -836,7 +837,7 @@ public partial class PdfDocumentTab
 		}
 		catch (Exception ex)
 		{
-			LogStatus("Page load failed: " + ex.Message);
+			if (ex is not OperationCanceledException) LogStatus("Page load failed: " + ex.Message);
 		}
 		finally
 		{
@@ -882,8 +883,9 @@ public partial class PdfDocumentTab
 			if (session == null) return;
 			bool inverted = _isReverseView;
 			Stopwatch renderSw = Stopwatch.StartNew();
+			var renderToken = _renderCancellation.Token;
 			BitmapSource? bitmapSource = await Task.Run(() => session.Render(pageNumber - 1,
-				thumbWidth, thumbHeight, 0, 0, thumbWidth, thumbHeight, inverted));
+				thumbWidth, thumbHeight, 0, 0, thumbWidth, thumbHeight, inverted, renderToken), renderToken);
 			renderSw.Stop();
 			if (renderGeneration == _renderGeneration && bitmapSource != null)
 			{
@@ -894,7 +896,7 @@ public partial class PdfDocumentTab
 		}
 		catch (Exception ex)
 		{
-			LogStatus("Thumbnail load failed: " + ex.Message);
+			if (ex is not OperationCanceledException) LogStatus("Thumbnail load failed: " + ex.Message);
 		}
 		finally
 		{
@@ -991,6 +993,9 @@ public partial class PdfDocumentTab
 
 	private void ClearRenderQueue()
 	{
+		_renderCancellation.Cancel();
+		_renderCancellation.Dispose();
+		_renderCancellation = new System.Threading.CancellationTokenSource();
 		lock (_renderQueue)
 		{
 			_renderQueue.Clear();

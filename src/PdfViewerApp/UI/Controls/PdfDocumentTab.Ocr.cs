@@ -1,164 +1,130 @@
-using System;
-#pragma warning disable CA1416
-using System.IO;
-using System.Text;
+﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using Windows.Globalization;
-using Windows.Media.Ocr;
-using Windows.Storage.Streams;
-using Windows.Graphics.Imaging;
 
-namespace PdfViewerApp
+namespace PdfViewerApp;
+public partial class PdfDocumentTab
 {
-	public partial class PdfDocumentTab
-	{
-		private static Windows.Foundation.Rect UnionRect(Windows.Foundation.Rect a, Windows.Foundation.Rect b)
-		{
-			double left = Math.Min(a.X, b.X);
-			double top = Math.Min(a.Y, b.Y);
-			double right = Math.Max(a.X + a.Width, b.X + b.Width);
-			double bottom = Math.Max(a.Y + a.Height, b.Y + b.Height);
-			return new Windows.Foundation.Rect(left, top, right - left, bottom - top);
-		}
+    private PdfOcrOptions CurrentOcrOptions()
+    {
+        var p = AppPreferences.Load();
+        string language = p.OcrLanguage == "vie+eng" ? "vie+eng" : p.OcrLanguage.StartsWith("vi", StringComparison.OrdinalIgnoreCase) ? "vie" : p.OcrLanguage.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "eng" : "vie+eng";
+        return new PdfOcrOptions(language, p.OcrDpi, p.OcrPreferNative, p.OcrSparse);
+    }
 
-		public async Task PreloadOcrForSelectedPageAsync()
-		{
-			if (!OperatingSystem.IsWindows() || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
-			{
-				return;
-			}
+    public async Task PreloadOcrForSelectedPageAsync()
+    {
+        if (PageCount <= 0) return;
+        try { var result = await EnsureOcrRegionsAsync(Math.Clamp(SelectedPageNumber, 1, PageCount)); LogStatus($"Đã đọc {result?.Count ?? 0} vùng chữ."); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { LogStatus("Không đọc được chữ: " + ex.Message); }
+    }
 
-			if (PageCount <= 0)
-			{
-				return;
-			}
-			int pageNumber = Math.Clamp(SelectedPageNumber, 1, PageCount);
-			List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNumber);
-			if (regions != null && regions.Count > 0)
-			{
-				LogStatus($"OCR ready for page {pageNumber} ({regions.Count} regions).");
-			}
-			else
-			{
-				LogStatus($"OCR found no text on page {pageNumber}.");
-			}
-		}
+    private Task<List<OcrTextRegion>?> EnsureOcrRegionsAsync(int pageNumber)
+    {
+        string path = CurrentPdfPath; var token = _ocrLifetime.Token; var options = CurrentOcrOptions();
+        string key = $"{_loadGeneration}:{pageNumber}:{options}";
+        if (_ocrLoadingTasks.Count > 64) _ocrLoadingTasks.Clear();
+        var task = _ocrLoadingTasks.GetOrAdd(key, _ => Task.Run(async () =>
+        {
+            try
+            {
+                using var session = new PdfRenderSession(path);
+                var result = await PdfOcrService.RecognizeAsync(session, pageNumber - 1, options, null, token);
+                return result.Select(r => session.MapOcrToPdf(pageNumber - 1, r)).Select(r => new OcrTextRegion(r.Text, r.Left, r.Bottom, r.Width, r.Height)).ToList();
+            }
+            catch { _ocrLoadingTasks.TryRemove(key, out var ignored); throw; }
+        }, token));
+        _ = task.ContinueWith(completed => { if (completed.IsFaulted || completed.IsCanceled || completed.Result?.Count == 0) _ocrLoadingTasks.TryRemove(key, out var ignored); }, TaskScheduler.Default);
+        return task;
+    }
 
-		public async Task ExportOcrTextAsync()
-		{
-			if (!OperatingSystem.IsWindows() || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
-			{
-				MessageBox.Show("Tính năng OCR chỉ hỗ trợ từ Windows 10 trở lên.", "Không hỗ trợ", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
+    public Task ExportOcrTextAsync() => ExportOcrAsync(searchable: false);
+    public Task ExportSearchablePdfAsync() => ExportOcrAsync(searchable: true);
 
-			if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
-			{
-				MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-				return;
-			}
+    private async Task ExportOcrAsync(bool searchable)
+    {
+        if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0) { MessageBox.Show("Mở PDF trước khi đọc chữ."); return; }
+        string source = CurrentPdfPath; int generation = _loadGeneration;
+        var settings = new OcrOptionsDialog(_snapshotBounds.HasValue && _snapshotPageNumber > 0) { Owner = Window.GetWindow(this) };
+        if (settings.ShowDialog() != true) return;
+        if (searchable && settings.Scope == "Region")
+        { MessageBox.Show("PDF tìm kiếm áp dụng cho cả trang hoặc tài liệu. Dùng xuất văn bản để đọc riêng vùng Snapshot."); return; }
+        var save = new SaveFileDialog
+        {
+            Filter = searchable ? "PDF (*.pdf)|*.pdf" : "Văn bản (*.txt)|*.txt|Word (*.docx)|*.docx",
+            FileName = Path.GetFileNameWithoutExtension(source) + (searchable ? "_Searchable.pdf" : "_OCR.txt"),
+            Title = searchable ? "Lưu PDF có thể tìm kiếm" : "Lưu kết quả đọc chữ"
+        };
+        if (save.ShowDialog(Window.GetWindow(this)) != true) return;
+        if (IsSamePath(source, save.FileName)) { MessageBox.Show("Chọn tên file khác với PDF nguồn."); return; }
+        var pages = settings.Scope == "All" ? Enumerable.Range(1, PageCount).ToArray() : new[] { settings.Scope == "Region" ? _snapshotPageNumber : SelectedPageNumber };
+        Rect? region = settings.Scope == "Region" ? _snapshotBounds : null;
+        var progress = new PrintProgressDialog("OCR") { Owner = Window.GetWindow(this) };
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_ocrLifetime.Token, progress.CancellationToken);
+        var token = cancellation.Token;
+        IProgress<PrintProgressInfo> report = new Progress<PrintProgressInfo>(progress.UpdateProgress);
+        progress.Show();
+        try
+        {
+            var text = new StringBuilder(); var data = new StringBuilder();
+            await Task.Run(async () =>
+            {
+                using var session = new PdfRenderSession(source);
+                foreach (int number in pages)
+                {
+                    token.ThrowIfCancellationRequested();
+                    report.Report(new PrintProgressInfo($"Đang đọc trang {number}…", Array.IndexOf(pages, number), pages.Length));
+                    var result = await PdfOcrService.RecognizeAsync(session, number - 1, settings.Options, region, token, report);
+                    if (pages.Length > 1) text.AppendLine($"--- Trang {number} ---");
+                    text.AppendLine(PdfOcrService.ToText(result)); text.AppendLine();
+                    if (searchable)
+                    {
+                        // Original usable text is already searchable; never duplicate its text layer.
+                        bool hasNative = settings.Options.PreferNative && session.ReadNativeText(number - 1, new Rect(0, 0, 1, 1), token).Sum(r => r.Text.Count(char.IsLetterOrDigit)) >= 3;
+                        if (!hasNative)
+                            foreach (var recognized in result) { token.ThrowIfCancellationRequested(); var word = session.MapOcrToPdf(number - 1, recognized); data.AppendLine(FormattableString.Invariant($"{number}|{word.Left:F2}|{word.Bottom:F2}|{word.Width:F2}|{word.Height:F2}|{word.Text.Replace("|", " ").Replace("\n", " ").Replace("\r", " ")}")); }
+                    }
+                }
+            }, token);
+            token.ThrowIfCancellationRequested();
+            if (generation != _loadGeneration) throw new OperationCanceledException();
+            if (!searchable && string.IsNullOrWhiteSpace(text.ToString())) { progress.CloseAfterSuccess(); MessageBox.Show("Không tìm thấy chữ trong phạm vi đã chọn."); return; }
+            string output = save.FileName;
+            await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                string temp = Path.Combine(Path.GetDirectoryName(output)!, ".PDFPro-OCR-" + Guid.NewGuid().ToString("N") + Path.GetExtension(output));
+                try
+                {
+                    if (searchable)
+                    {
+                        if (data.Length == 0) File.Copy(source, temp);
+                        else if (!PdfInterop.PdfCore.make_pdf_searchable(source, data.ToString(), temp)) throw new InvalidOperationException("Không ghép được lớp chữ vào PDF.");
+                    }
+                    else if (Path.GetExtension(output).Equals(".docx", StringComparison.OrdinalIgnoreCase)) SaveAsDocx(temp, text.ToString());
+                    else File.WriteAllText(temp, text.ToString(), Encoding.UTF8);
+                    token.ThrowIfCancellationRequested(); File.Move(temp, output, overwrite: true);
+                }
+                finally { if (File.Exists(temp)) File.Delete(temp); }
+            }, token);
+            progress.CloseAfterSuccess(); LogStatus("Đã lưu: " + Path.GetFileName(output));
+            if (searchable) DocumentOpenRequested?.Invoke(this, output);
+            else new OcrResultDialog(text.ToString()) { Owner = Window.GetWindow(this) }.ShowDialog();
+        }
+        catch (OperationCanceledException) { progress.CloseAfterSuccess(); LogStatus("Đã huỷ OCR."); }
+        catch (Exception ex) { progress.MarkFailed("Không đọc được chữ: " + ex.Message); }
+    }
 
-			MessageBoxResult scopeChoice = MessageBox.Show(
-				"Bạn có muốn chạy OCR và xuất toàn bộ tài liệu không?\n\n- Click YES để xuất TOÀN BỘ tài liệu.\n- Click NO để chỉ xuất TRANG HIỆN TẠI.\n- Click CANCEL để hủy.",
-				"Phạm vi xuất OCR",
-				MessageBoxButton.YesNoCancel,
-				MessageBoxImage.Question
-			);
-
-			if (scopeChoice == MessageBoxResult.Cancel)
-			{
-				return;
-			}
-
-			SaveFileDialog saveFileDialog = new SaveFileDialog
-			{
-				Filter = "Text Files (*.txt)|*.txt|Word Documents (*.docx)|*.docx",
-				Title = "Lưu kết quả OCR",
-				FileName = System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath) + "_OCR"
-			};
-
-			if (saveFileDialog.ShowDialog() != true)
-			{
-				return;
-			}
-
-			string outputPath = saveFileDialog.FileName;
-			bool isDocx = System.IO.Path.GetExtension(outputPath).Equals(".docx", StringComparison.OrdinalIgnoreCase);
-
-			LogStatus("Đang chạy nhận diện OCR...");
-
-			try
-			{
-				StringBuilder fullTextBuilder = new StringBuilder();
-				List<int> pagesToProcess = new List<int>();
-
-				if (scopeChoice == MessageBoxResult.Yes)
-				{
-					for (int i = 1; i <= PageCount; i++) pagesToProcess.Add(i);
-				}
-				else
-				{
-					pagesToProcess.Add(Math.Clamp(SelectedPageNumber, 1, PageCount));
-				}
-
-				await Task.Run(async () =>
-				{
-					for (int idx = 0; idx < pagesToProcess.Count; idx++)
-					{
-						int pageNum = pagesToProcess[idx];
-						base.Dispatcher.Invoke(() => LogStatus($"Đang chạy OCR trang {pageNum}/{PageCount}..."));
-
-						List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNum);
-						if (regions != null && regions.Count > 0)
-						{
-							string pageText = string.Join(" ", regions.Select(r => r.Text));
-							
-							lock (fullTextBuilder)
-							{
-								if (scopeChoice == MessageBoxResult.Yes)
-								{
-									fullTextBuilder.AppendLine($"--- Trang {pageNum} ---");
-								}
-								fullTextBuilder.AppendLine(pageText);
-								fullTextBuilder.AppendLine();
-							}
-						}
-					}
-				});
-
-				string resultText = fullTextBuilder.ToString();
-				if (string.IsNullOrWhiteSpace(resultText))
-				{
-					MessageBox.Show("Không nhận diện được văn bản nào trong phạm vi đã chọn.", "Không có kết quả", MessageBoxButton.OK, MessageBoxImage.Warning);
-					LogStatus("Nhận diện OCR không có kết quả");
-					return;
-				}
-
-				if (isDocx)
-				{
-					SaveAsDocx(outputPath, resultText);
-				}
-				else
-				{
-					File.WriteAllText(outputPath, resultText, Encoding.UTF8);
-				}
-
-				MessageBox.Show("Xuất kết quả OCR thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
-				LogStatus("Đã lưu kết quả OCR tại: " + System.IO.Path.GetFileName(outputPath));
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show("Có lỗi xảy ra khi xuất kết quả OCR: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-				LogStatus("Lỗi xuất OCR: " + ex.Message);
-			}
-		}
-
+    private void TryShowOcrTextEditOverlayAsync(Canvas canvas, Point clickPoint, int pageNumber) { }
 		private static void SaveAsDocx(string filePath, string text)
 		{
 			using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -207,294 +173,5 @@ namespace PdfViewerApp
 			}
 		}
 
-		public async Task ExportSearchablePdfAsync()
-		{
-			if (!OperatingSystem.IsWindows() || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 10240))
-			{
-				MessageBox.Show("Tính năng OCR chỉ hỗ trợ từ Windows 10 trở lên.", "Không hỗ trợ", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
 
-			if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
-			{
-				MessageBox.Show("Vui lòng mở một file PDF trước.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-				return;
-			}
-
-			SaveFileDialog saveFileDialog = new SaveFileDialog
-			{
-				Filter = "PDF Documents (*.pdf)|*.pdf",
-				Title = "Lưu Searchable PDF",
-				FileName = System.IO.Path.GetFileNameWithoutExtension(CurrentPdfPath) + "_Searchable"
-			};
-
-			if (saveFileDialog.ShowDialog() != true)
-			{
-				return;
-			}
-
-			string outputPath = saveFileDialog.FileName;
-			if (IsSamePath(CurrentPdfPath, outputPath))
-			{
-				MessageBox.Show("Tên file đích phải khác với file nguồn.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Warning);
-				return;
-			}
-
-			LogStatus("Đang chuyển đổi thành Searchable PDF...");
-
-			try
-			{
-				StringBuilder ocrDataBuilder = new StringBuilder();
-
-				await Task.Run(async () =>
-				{
-					for (int pageNum = 1; pageNum <= PageCount; pageNum++)
-					{
-						base.Dispatcher.Invoke(() => LogStatus($"Đang nhận diện văn bản trang {pageNum}/{PageCount}..."));
-
-						List<OcrTextRegion>? regions = await EnsureOcrRegionsAsync(pageNum);
-						if (regions != null && regions.Count > 0)
-						{
-							foreach (var region in regions)
-							{
-								string line = $"{pageNum}|{region.Left:F2}|{region.Bottom:F2}|{region.Width:F2}|{region.Height:F2}|{region.Text}";
-								lock (ocrDataBuilder)
-								{
-									ocrDataBuilder.AppendLine(line);
-								}
-							}
-						}
-					}
-				});
-
-				string ocrRawData = ocrDataBuilder.ToString();
-				if (string.IsNullOrWhiteSpace(ocrRawData))
-				{
-					MessageBox.Show("Không tìm thấy văn bản nào để tạo lớp tìm kiếm. PDF sẽ chỉ lưu lại như cũ.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-				}
-
-				LogStatus("Đang ghép lớp văn bản vào file PDF...");
-				bool success = await Task.Run(() => PdfInterop.PdfCore.make_pdf_searchable(CurrentPdfPath, ocrRawData, outputPath));
-
-				if (success)
-				{
-					MessageBox.Show("Tạo Searchable PDF thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
-					LogStatus("Đã lưu Searchable PDF tại: " + System.IO.Path.GetFileName(outputPath));
-					this.DocumentOpenRequested?.Invoke(this, outputPath);
-				}
-				else
-				{
-					MessageBox.Show("Không thể tạo Searchable PDF. Kiểm tra lại tệp PDF nguồn.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-					LogStatus("Lỗi tạo Searchable PDF");
-				}
-			}
-			catch (Exception ex)
-			{
-				MessageBox.Show("Có lỗi xảy ra: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-				LogStatus("Lỗi tạo Searchable PDF: " + ex.Message);
-			}
-		}
-
-		private void TryShowOcrTextEditOverlayAsync(Canvas canvas, Point clickPoint, int pageNumber)
-		{
-			// Đã gỡ bỏ overlay cũ
-		}
-
-		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
-		private Task<List<OcrTextRegion>?> EnsureOcrRegionsAsync(int pageNumber)
-		{
-			return _ocrLoadingTasks.GetOrAdd(pageNumber, page => RecognizeOcrRegionsAsync(page));
-		}
-
-		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
-		private async Task<List<OcrTextRegion>?> RunTesseractOcrAsync(string imagePath, Size pageSize, double targetWidth, double targetHeight)
-		{
-			string tessdataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdata");
-			if (!Directory.Exists(tessdataPath))
-			{
-				return null;
-			}
-
-			return await Task.Run(() =>
-			{
-				try
-				{
-					AppPreferences preferences = AppPreferences.Load();
-					string lang = "eng";
-					if (!string.IsNullOrEmpty(preferences.OcrLanguage))
-					{
-						string pref = preferences.OcrLanguage.ToLowerInvariant();
-						if (pref.StartsWith("vi")) lang = "vie";
-						else if (pref.StartsWith("en")) lang = "eng";
-						else lang = "vie+eng";
-					}
-					else
-					{
-						lang = "vie+eng";
-					}
-
-					string[] langs = lang.Split('+');
-					List<string> availableLangs = new List<string>();
-					foreach (var l in langs)
-					{
-						if (File.Exists(Path.Combine(tessdataPath, $"{l}.traineddata")))
-						{
-							availableLangs.Add(l);
-						}
-					}
-
-					if (availableLangs.Count == 0)
-					{
-						var files = Directory.GetFiles(tessdataPath, "*.traineddata");
-						if (files.Length > 0)
-						{
-							availableLangs.Add(Path.GetFileNameWithoutExtension(files[0]));
-						}
-						else
-						{
-							return null;
-						}
-					}
-
-					string finalLang = string.Join("+", availableLangs);
-
-					using (var engine = new Tesseract.TesseractEngine(tessdataPath, finalLang, Tesseract.EngineMode.Default))
-					using (var img = Tesseract.Pix.LoadFromFile(imagePath))
-					using (var page = engine.Process(img))
-					{
-						List<OcrTextRegion> regions = new List<OcrTextRegion>();
-						double scaleX = pageSize.Width / Math.Max(1.0, targetWidth);
-						double scaleY = pageSize.Height / Math.Max(1.0, targetHeight);
-
-						using (var iter = page.GetIterator())
-						{
-							iter.Begin();
-							do
-							{
-								if (iter.TryGetBoundingBox(Tesseract.PageIteratorLevel.TextLine, out Tesseract.Rect rect))
-								{
-									string text = iter.GetText(Tesseract.PageIteratorLevel.TextLine)?.Trim() ?? "";
-									if (string.IsNullOrWhiteSpace(text))
-									{
-										continue;
-									}
-
-									double left = rect.X1 * scaleX;
-									double right = rect.X2 * scaleX;
-									double top = pageSize.Height - rect.Y1 * scaleY;
-									double bottom = pageSize.Height - rect.Y2 * scaleY;
-
-									regions.Add(new OcrTextRegion(text, left, bottom, right - left, top - bottom));
-								}
-							} while (iter.Next(Tesseract.PageIteratorLevel.TextLine));
-						}
-						return regions;
-					}
-				}
-				catch (Exception ex)
-				{
-					PdfPerfLogger.Log("Tesseract OCR failed: " + ex.Message);
-					return null;
-				}
-			});
-		}
-
-		[System.Runtime.Versioning.SupportedOSPlatform("windows10.0.10240.0")]
-		private async Task<List<OcrTextRegion>?> RecognizeOcrRegionsAsync(int pageNumber)
-		{
-			if (_documentHandle == IntPtr.Zero || !TryGetPageSize(pageNumber, out Size pageSize))
-			{
-				return null;
-			}
-			int targetWidth = 1800;
-			int targetHeight = Math.Max(1, (int)Math.Round(targetWidth * pageSize.Height / Math.Max(1.0, pageSize.Width)));
-			BitmapSource? pageBitmap = await Task.Run(() => PdfiumEngine.RenderPageToBitmap(_documentHandle, pageNumber - 1, targetWidth, targetHeight));
-			if (pageBitmap == null)
-			{
-				return null;
-			}
-			string imagePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-			try
-			{
-				PngBitmapEncoder encoder = new PngBitmapEncoder();
-				encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(pageBitmap));
-				using (FileStream fileStream = File.Create(imagePath))
-				{
-					encoder.Save(fileStream);
-				}
-
-				var tesseractRegions = await RunTesseractOcrAsync(imagePath, pageSize, targetWidth, targetHeight);
-				if (tesseractRegions != null && tesseractRegions.Count > 0)
-				{
-					return tesseractRegions;
-				}
-
-				AppPreferences preferences = AppPreferences.Load();
-				OcrEngine? engine = null;
-				if (!string.IsNullOrEmpty(preferences.OcrLanguage))
-				{
-					try
-					{
-						engine = OcrEngine.TryCreateFromLanguage(new Language(preferences.OcrLanguage));
-					}
-					catch
-					{
-					}
-				}
-				if (engine == null)
-				{
-					engine = OcrEngine.TryCreateFromUserProfileLanguages() ?? OcrEngine.TryCreateFromLanguage(new Language("en"));
-				}
-				if (engine == null)
-				{
-					return null;
-				}
-				using (FileStream inputStream = File.OpenRead(imagePath))
-				{
-					IRandomAccessStream randomAccessStream = inputStream.AsRandomAccessStream();
-					Windows.Graphics.Imaging.BitmapDecoder decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(randomAccessStream).AsTask();
-					SoftwareBitmap softwareBitmap = await decoder.GetSoftwareBitmapAsync().AsTask();
-					if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 || softwareBitmap.BitmapAlphaMode != BitmapAlphaMode.Ignore)
-					{
-						softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore);
-					}
-					OcrResult result = await engine.RecognizeAsync(softwareBitmap).AsTask();
-					List<OcrTextRegion> regions = new List<OcrTextRegion>();
-					double scaleX = pageSize.Width / Math.Max(1.0, pageBitmap.PixelWidth);
-					double scaleY = pageSize.Height / Math.Max(1.0, pageBitmap.PixelHeight);
-					foreach (var line in result.Lines)
-					{
-						foreach (var word in line.Words)
-						{
-							string text = word.Text?.Trim() ?? "";
-							if (string.IsNullOrWhiteSpace(text)) continue;
-
-							Windows.Foundation.Rect rect = word.BoundingRect;
-							double left = rect.X * scaleX;
-							double width = rect.Width * scaleX;
-							double height = rect.Height * scaleY;
-							double pdfBottom = pageSize.Height - (rect.Y + rect.Height) * scaleY;
-							regions.Add(new OcrTextRegion(text, left, pdfBottom, width, height));
-						}
-					}
-					return regions;
-				}
-			}
-			catch (Exception ex)
-			{
-				PdfPerfLogger.Log("OCR failed: " + ex.Message);
-				return null;
-			}
-			finally
-			{
-				try
-				{
-					File.Delete(imagePath);
-				}
-				catch
-				{
-				}
-			}
-		}
-	}
 }

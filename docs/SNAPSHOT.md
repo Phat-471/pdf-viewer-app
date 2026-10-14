@@ -14,6 +14,14 @@
 
 ## Hiển thị vùng chọn
 
+- **Kéo chỉnh…** trong xem trước trở về trang và giữ vùng chọn. Kéo trong khung để
+  di chuyển, kéo bốn góc để đổi kích thước. Nhãn mm cập nhật ngay khi kéo.
+- Chọn **Xem trước / OCR…** bên khung để trở lại màn hình xem trước.
+- Có thể nhập X, Y, rộng và cao bằng mm rồi chọn **Áp dụng vùng**. X/Y được tính
+  từ góc trên trái trang; vùng phải nằm trong trang và rộng/cao ít nhất 0,5 mm.
+- Khổ giấy, hướng, tỉ lệ, chất lượng và kiểu ảnh xuất được nhớ cho lần sau.
+- **Đọc chữ OCR…** mở lựa chọn ngôn ngữ và DPI cho riêng vùng Snapshot; kết quả có thể copy hoặc lưu TXT.
+
 - Lúc kéo chuột: vùng chọn có nền xanh trong suốt, viền xanh và kích thước tính bằng mm trên trang PDF.
 - Thả chuột: giữ viền đứt nét đen, bỏ màu phủ để đọc rõ nội dung bên trong. Khung bám theo trang khi cuộn, zoom, xoay hoặc vẽ lại chú thích.
 - Điểm kéo được giới hạn trong trang; vùng quá nhỏ không tự nới rộng mà yêu cầu chọn lại.
