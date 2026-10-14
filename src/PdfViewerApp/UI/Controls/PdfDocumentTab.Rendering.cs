@@ -35,7 +35,7 @@ public partial class PdfDocumentTab
 
 	private string BuildPageCacheKey(int pageNumber, int width, int height, bool isThumbnail)
 	{
-		string suffix = _isReverseView ? ":dark" : "";
+		string suffix = $":text:{_textEditRevision}" + (_isReverseView ? ":dark" : "");
 		if (!isThumbnail)
 		{
 			return $"page:{pageNumber}:{width}x{height}{suffix}";

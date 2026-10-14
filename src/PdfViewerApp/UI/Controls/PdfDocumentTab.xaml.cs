@@ -2009,6 +2009,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				if (child is Border border && border.Child is Grid grid)
 				{
+					ClearDetailImages(grid);
 					Image image = grid.Children.OfType<Image>().FirstOrDefault();
 					if (image != null)
 					{
@@ -3322,13 +3323,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
                     if (handle == 0) throw new InvalidOperationException("Không mở lại được PDF.");
                     try
                     {
-                        var pageEdits = edits.Where(e => e.PageNumber == selectedPage).ToArray();
-                        if (pageEdits.Length > 0)
+                        foreach (var group in edits.GroupBy(e => e.PageNumber))
                         {
-                            page = PdfiumEngine.FPDF_LoadPage(handle, selectedPage - 1);
-                            if (page == 0) throw new InvalidOperationException("Không đọc được trang vừa sửa.");
-                            PdfNativeTextEditor.ApplyPage(handle, page, pageEdits);
-                            text = PdfiumEngine.FPDFText_LoadPage(page);
+                            nint editedPage = PdfiumEngine.FPDF_LoadPage(handle, group.Key - 1);
+                            if (editedPage == 0) throw new InvalidOperationException("Không đọc được trang vừa sửa.");
+                            try
+                            {
+                                PdfNativeTextEditor.ApplyPage(handle, editedPage, group.ToArray());
+                                if (group.Key == selectedPage)
+                                {
+                                    page = editedPage; editedPage = 0;
+                                    text = PdfiumEngine.FPDFText_LoadPage(page);
+                                    if (text == 0) throw new InvalidOperationException("Không đọc lại được chữ vừa áp dụng.");
+                                }
+                            }
+                            finally { if (editedPage != 0) PdfiumEngine.FPDF_ClosePage(editedPage); }
                         }
                         return (Handle: handle, Page: page, Text: text);
                     }
@@ -3362,9 +3371,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		finally { if (generation == _loadGeneration) _documentOpening = false; }
 	}
 
-	private void CloseActiveDocument()
+	private void CloseActiveDocument(bool preserveInlineEditor = false)
 	{
-		CancelInlineTextEditor();
+		if (!preserveInlineEditor) CancelInlineTextEditor();
 		_ocrLifetime.Cancel();
 		_ocrLifetime.Dispose();
 		_ocrLifetime = new System.Threading.CancellationTokenSource();

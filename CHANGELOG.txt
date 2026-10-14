@@ -1,2 +1,2 @@
-- Sửa lỗi mở ứng dụng sau cập nhật.
-- Cải thiện thay tệp và khôi phục khi cập nhật gặp lỗi.
+- Sửa lỗi nhận diện font và hiển thị chữ sau khi chỉnh sửa.
+- Cải thiện ô nhập và xử lý lỗi khi áp dụng thay đổi.

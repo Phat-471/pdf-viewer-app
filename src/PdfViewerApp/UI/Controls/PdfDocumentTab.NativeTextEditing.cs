@@ -26,6 +26,7 @@ public partial class PdfDocumentTab
     internal bool HandleInlineTextKey(KeyEventArgs e)
     {
         if (_inlineTextEditor == null) return false;
+        if (_textEditDialogOpen) { e.Handled = true; return true; }
         if (e.Key == Key.Escape) { CancelInlineTextEditor(); LogStatus("Đã hủy nội dung đang nhập."); e.Handled = true; return true; }
         if (e.Key == Key.Enter && (_inlineTextEditor.IsInputFocused || Keyboard.Modifiers == ModifierKeys.Control))
             { _ = ApplyInlineTextAsync(); e.Handled = true; return true; }
@@ -145,6 +146,7 @@ public partial class PdfDocumentTab
 
     private async Task<bool> ApplyInlineTextAsync()
     {
+        if (_textEditDialogOpen) return false;
         var editor = _inlineTextEditor;
         var region = _inlineTextRegion;
         if (editor == null || region == null) return true;
@@ -153,21 +155,34 @@ public partial class PdfDocumentTab
         var font = editor.ReplacementFont;
         var previous = _nativeTextEdits.FirstOrDefault(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
         bool changed = text != region.Text || !Equals(font, previous?.Font);
-        CancelInlineTextEditor();
-        if (!changed) return true;
+        if (!changed) { CancelInlineTextEditor(); return true; }
+        var originalEdits = _nativeTextEdits.ToArray();
         _textEditDialogOpen = true;
+        editor.SetApplying(true);
         try
         {
-            SaveUndoState();
             _nativeTextEdits.RemoveAll(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
             if (text != region.OriginalText || font != null)
                 _nativeTextEdits.Add(new(region.PageNumber, region.ObjectIndex, region.OriginalText, text, font));
-            await RefreshNativeTextRenderingAsync();
+            await RefreshNativeTextRenderingAsync(preserveInlineEditor: true);
+            var appliedEdits = _nativeTextEdits.ToArray();
+            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(originalEdits);
+            SaveUndoState();
+            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(appliedEdits);
+            CancelInlineTextEditor();
             LogStatus("Đã áp dụng sửa chữ. Nhấn Lưu để ghi vào PDF; Ctrl+Z để hoàn tác.");
             return true;
         }
-        catch (Exception ex) { LogStatus("Không làm mới được chữ: " + ex.Message + ". Có thể hoàn tác bằng Ctrl+Z."); return false; }
-        finally { _textEditDialogOpen = false; }
+        catch (Exception ex)
+        {
+            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(originalEdits);
+            try { await RefreshNativeTextRenderingAsync(preserveInlineEditor: true); }
+            catch (Exception restoreError) { LogStatus("Không mở lại được trang: " + restoreError.Message); }
+            editor.ReportApplyFailure("Chưa áp dụng thay đổi: " + ex.Message + " Nội dung đang nhập được giữ lại.");
+            LogStatus("Chưa áp dụng thay đổi. Nội dung đang nhập được giữ lại; kiểm tra thông báo trong ô sửa.");
+            return false;
+        }
+        finally { _textEditDialogOpen = false; editor.SetApplying(false); }
     }
 
     private void AttachInlineTextEditor(Canvas canvas, int pageNumber, Point? click = null)
@@ -197,11 +212,11 @@ public partial class PdfDocumentTab
         new(region.DisplayBounds.X * canvas.Width, region.DisplayBounds.Y * canvas.Height,
             region.DisplayBounds.Width * canvas.Width, region.DisplayBounds.Height * canvas.Height);
 
-    private async Task RefreshNativeTextRenderingAsync()
+    private async Task RefreshNativeTextRenderingAsync(bool preserveInlineEditor = false)
     {
         _textEditRevision++; _loadGeneration++; _renderGeneration++;
         _pageEditableRegions.Clear(); _textRegionLoads.Clear();
-        ClearBitmapCache(); ClearRenderQueue(); CloseActiveDocument();
+        ClearBitmapCache(); ClearRenderQueue(); CloseActiveDocument(preserveInlineEditor);
         await _documentCloseTask;
         await ResumeDocumentHandlesAsync(throwOnFailure: true);
         ForceRedrawAllPages(); RedrawAllPageAnnotations();

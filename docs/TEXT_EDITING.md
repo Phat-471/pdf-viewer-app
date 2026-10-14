@@ -48,3 +48,13 @@ Tham khảo thao tác **Edit Text/Edit Object** của [Foxit PhantomPDF 10.0](ht
 Các nhãn STAIRCASE 04 và R.01M.221 trong bản vẽ Revit lưu cỡ chữ 1 pt với hệ số phóng đại gần 8, tương ứng khoảng 8 pt khi hiển thị. Mỗi đối tượng có hai thẻ, gồm thẻ vùng nhìn có tham số dạng từ điển. Arial Narrow 2.40 cài trên máy mẫu thiếu ký tự “ạ”; bản đầy đủ cùng tên không thể viết đủ “chào bạn”. Chọn Noto Sans là lựa chọn đổi font rõ ràng, không tự thay font gốc.
 
 Đã biên dịch mã nguồn. Chưa chạy kiểm thử thao tác sửa/lưu hoặc in trên các PDF mẫu; cần kiểm chứng thực tế trước khi kết luận tương thích đầy đủ.
+
+## Sửa lỗi trong 1.13.2
+
+Đọc tên font, quyền nhúng và ký tự hỗ trợ trực tiếp từ các bảng `name`, `OS/2`, `cmap` của đúng file TTF. Trên máy mẫu, `GlyphTypeface` trả tên “Noto Sans Thin Condensed / Regular” cho hai file Noto Sans Regular và Bold, trong khi bảng tên của chúng đúng là Noto Sans Regular và Bold. Dữ liệu Windows này không còn quyết định font được nhúng. Tìm font ưu tiên bộ font đi kèm, thư mục font hệ thống và font của người dùng; so sánh cả tên PostScript, giữ họ và kiểu chữ, chỉ lưu cache kết quả tìm được.
+
+Làm mới trang sau khi áp dụng sẽ xóa cả lớp ảnh nét cao. Khóa của ảnh nét cao, ảnh trang và thumbnail có phiên sửa chữ để không dùng lại chữ cũ. Ô nhập đủ chiều cao cho cả dòng chữ và dấu tiếng Việt; thanh cuộn ngang không che dòng nhập.
+
+Nếu áp dụng lỗi, danh sách sửa trước đó được khôi phục và nội dung đang nhập vẫn được giữ. Chỉ thêm bước hoàn tác và đóng ô sửa sau khi trang đã mở lại với nội dung mới. Nhấn Lưu để ghi thay đổi vào PDF.
+
+Bộ đọc TTF hỗ trợ bảng Unicode cmap 4, 12 và 13 cho ký tự BMP; vẫn chưa hỗ trợ OTF, TTC, font biến thiên hoặc emoji. Đã đối chiếu dữ liệu font và đọc mã; chưa chạy kiểm thử thao tác sửa/lưu trên giao diện.

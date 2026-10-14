@@ -26,16 +26,19 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
     private readonly Task<PdfNativeTextFont?> _matching;
     private PdfNativeTextFont? _requestedFont, _resolvedFont;
     private string? _validatedText;
-    private bool _running, _pending, _closed, _fontLoading;
+    private bool _running, _pending, _closed, _fontLoading, _applying;
+    private readonly Button _choose, _cancel;
     private int _generation, _fontRequest;
     private int _mode;
     private PdfNativeTextFont? _chosenFont;
     private string? _fontError;
+    private Canvas? _page;
+    private Rect _placementBounds;
     internal event Action? ApplyRequested;
     internal event Action? CancelRequested;
     internal string ReplacementText => _input.Text.Normalize(System.Text.NormalizationForm.FormC);
     internal PdfNativeTextFont? ReplacementFont => _resolvedFont;
-    internal bool CanApply => !_closed && !_running && !_fontLoading && _validatedText == ReplacementText && _apply.IsEnabled;
+    internal bool CanApply => !_closed && !_running && !_fontLoading && !_applying && _validatedText == ReplacementText && _apply.IsEnabled;
     internal bool IsFontPopupOpen => _fontChoice.IsDropDownOpen;
     internal bool IsInputFocused => _input.IsKeyboardFocusWithin;
     internal void FocusInput() => _input.Focus();
@@ -58,7 +61,8 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
             Background = Brushes.White, Foreground = new SolidColorBrush(Color.FromArgb((byte)(region.TextColor >> 24),
                 (byte)(region.TextColor >> 16), (byte)(region.TextColor >> 8), (byte)region.TextColor)),
             BorderBrush = Brush("#0284C7"), BorderThickness = new Thickness(1.5), SelectionBrush = Brush("#7DD3FC"),
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalContentAlignment = VerticalAlignment.Center,
             ToolTip = "Sửa trực tiếp · Ctrl+Enter: áp dụng · Esc: hủy · Ctrl+Z: hoàn tác nội dung đang nhập" };
         Children.Add(_input);
         var panel = new StackPanel();
@@ -71,9 +75,9 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
             SelectedIndex = initialFont == null ? 0 : 4 };
         _mode = _fontChoice.SelectedIndex;
         row.Children.Add(_fontChoice);
-        var choose = Button("TTF…", false); row.Children.Add(choose);
+        _choose = Button("TTF…", false); row.Children.Add(_choose);
         _apply = Button("✓ Áp dụng", true); _apply.IsEnabled = false; row.Children.Add(_apply);
-        var cancel = Button("Hủy", false); row.Children.Add(cancel);
+        _cancel = Button("Hủy", false); row.Children.Add(_cancel);
         panel.Children.Add(row);
         panel.Children.Add(new TextBlock { Text = $"{region.SourceFontName} · {region.DisplayFontSize:0.###} pt · Giữ cỡ, màu, vị trí và góc chữ",
             Foreground = Brush("#94A3B8"), Margin = new Thickness(0, 7, 0, 5), TextWrapping = TextWrapping.Wrap });
@@ -88,9 +92,9 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
         _input.TextChanged += (_, _) => Invalidate();
         _timer.Tick += async (_, _) => await ValidateAsync();
         _apply.Click += (_, _) => { if (CanApply) ApplyRequested?.Invoke(); };
-        cancel.Click += (_, _) => CancelRequested?.Invoke();
+        _cancel.Click += (_, _) => { if (!_applying) CancelRequested?.Invoke(); };
         _fontChoice.SelectionChanged += async (_, _) => await ChangeFontAsync();
-        choose.Click += async (_, _) =>
+        _choose.Click += async (_, _) =>
         {
             var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Chọn font TrueType có quyền nhúng", Filter = "Font TrueType (*.ttf)|*.ttf" };
             if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
@@ -109,7 +113,7 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
         PreviewKeyDown += (_, e) =>
         {
             if (_fontChoice.IsDropDownOpen) return;
-            if (e.Key == Key.Escape) { e.Handled = true; CancelRequested?.Invoke(); }
+            if (e.Key == Key.Escape) { e.Handled = true; if (!_applying) CancelRequested?.Invoke(); }
             else if (e.Key == Key.Enter && (_input.IsKeyboardFocusWithin || Keyboard.Modifiers == ModifierKeys.Control))
                 { e.Handled = true; if (CanApply) ApplyRequested?.Invoke(); }
         };
@@ -122,12 +126,16 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
 
     internal void Place(Canvas page, Rect bounds, Point? click = null)
     {
+        _page = page; _placementBounds = bounds;
         _tools.Width = Math.Min(555, Math.Max(280, page.Width));
         Width = Math.Max(bounds.Width, _tools.Width); Height = Math.Max(30, bounds.Height) + 205;
         SetLeft(this, bounds.Left); SetTop(this, bounds.Top); Panel.SetZIndex(this, 10000);
         _input.Width = Math.Max(90, bounds.Width + 16);
-        _input.Height = Math.Max(26, bounds.Height + 6);
         _input.FontSize = Math.Clamp(_region.DisplayFontSize * page.Height * _region.DisplayBounds.Height / Math.Max(.01, _region.Bounds.Height), 12, 200);
+        // Glyph bounds omit ascenders/descenders. Reserve a full line box and
+        // keep the horizontal scrollbar from consuming the editing line.
+        _input.Height = Math.Max(32, _input.FontSize * Math.Max(1.25, _input.FontFamily.LineSpacing) + 10);
+        Height = Math.Max(Height, _input.Height + 205);
         SetTop(_tools, bounds.Top + _input.Height + 205 > page.Height && bounds.Top > 205 ? -205 : _input.Height + 7);
         SetLeft(_tools, Math.Clamp(0, -bounds.Left, Math.Max(-bounds.Left, page.Width - bounds.Left - _tools.Width)));
         if (click != null) Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
@@ -148,7 +156,7 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
         int request = ++_fontRequest; _generation++; _mode = mode; _fontLoading = true; _apply.IsEnabled = false;
         try
         {
-            var font = mode == 2 ? await _matching : mode == 3 ? await Task.Run(() => PdfTextFontSource.ReadVietnameseFont(_region.SourceFontName))
+            var font = mode == 2 ? await Task.Run(() => PdfTextFontSource.FindMatching(_region.SourceFontName)) : mode == 3 ? await Task.Run(() => PdfTextFontSource.ReadVietnameseFont(_region.SourceFontName))
                 : mode == 4 ? _chosenFont : null;
             if (_closed || request != _fontRequest) return;
             if (mode == 2 && font == null) throw new InvalidOperationException("Không tìm được bản đầy đủ cùng họ và kiểu chữ. Hãy chọn file TTF.");
@@ -168,10 +176,21 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
         _timer.Stop(); _timer.Start();
     }
 
+    internal void SetApplying(bool applying)
+    {
+        _applying = applying;
+        if (_closed) return;
+        _input.IsReadOnly = applying;
+        _fontChoice.IsEnabled = _choose.IsEnabled = _cancel.IsEnabled = !applying;
+        _apply.IsEnabled = !applying && !_fontLoading && _validatedText == ReplacementText;
+        if (applying) { _timer.Stop(); _status.Text = "Đang áp dụng chữ và làm mới trang PDF…"; }
+    }
+    internal void ReportApplyFailure(string message) { if (!_closed) ShowError(message); }
+
     private async Task ValidateAsync()
     {
         _timer.Stop();
-        if (_closed || _fontLoading) return;
+        if (_closed || _fontLoading || _applying) return;
         if (_fontError != null) { ShowError(_fontError); return; }
         if (_running) { _pending = true; return; }
         _running = true; _pending = false;
@@ -213,6 +232,7 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
         if (name.Equals("ArialNarrow", StringComparison.OrdinalIgnoreCase)) name = "Arial Narrow";
         if (name.Equals("NotoSans", StringComparison.OrdinalIgnoreCase)) name = "Noto Sans";
         _input.FontFamily = new FontFamily(name);
+        if (_page != null) Place(_page, _placementBounds);
     }
     private static Brush Brush(string hex) => (Brush)new BrushConverter().ConvertFromString(hex)!;
     private static Button Button(string label, bool primary) => new() { Content = label, Height = 30, Padding = new Thickness(10, 3, 10, 3),

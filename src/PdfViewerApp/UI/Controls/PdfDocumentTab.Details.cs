@@ -146,7 +146,7 @@ public partial class PdfDocumentTab
 		int right = Math.Min(fullWidth, (int)Math.Ceiling(visible.Right / image.Width * fullWidth));
 		int bottom = Math.Min(fullHeight, (int)Math.Ceiling(visible.Bottom / image.Height * fullHeight));
 		Canvas canvas = GetDetailCanvas(grid);
-		string sizeKey = $"{fullWidth}x{fullHeight}:{inverted}";
+		string sizeKey = $"{_loadGeneration}:{_textEditRevision}:{fullWidth}x{fullHeight}:{inverted}";
 		if (!Equals(canvas.Tag, sizeKey)) { canvas.Children.Clear(); canvas.Tag = sizeKey; }
 		var tiles = new List<(string Key, int X, int Y, int Width, int Height)>();
 		for (int y = top; y < bottom; y += DetailTileSize)
@@ -154,7 +154,7 @@ public partial class PdfDocumentTab
 			{
 				int width = Math.Min(DetailTileSize + 2, fullWidth - x);
 				int height = Math.Min(DetailTileSize + 2, fullHeight - y);
-				tiles.Add(($"tile:{pageNumber}:{fullWidth}x{fullHeight}:{x},{y}:{width}x{height}:{inverted}", x, y, width, height));
+				tiles.Add(($"tile:{pageNumber}:{fullWidth}x{fullHeight}:{x},{y}:{width}x{height}:{inverted}:text:{_textEditRevision}", x, y, width, height));
 			}
 		var wanted = tiles.Select(t => t.Key).ToHashSet();
 		foreach (Image tile in canvas.Children.OfType<Image>().ToArray())

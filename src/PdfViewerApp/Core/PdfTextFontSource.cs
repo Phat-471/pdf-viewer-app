@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Windows.Media;
@@ -13,11 +14,16 @@ internal sealed record PdfNativeTextFont(string Name, string DataBase64, string 
 
 internal static class PdfTextFontSource
 {
+    private static readonly ConcurrentDictionary<string, PdfNativeTextFont> MatchesCache = new();
     private static string Key(string name)
     {
         if (name.Length > 7 && name[6] == '+' && name.Take(6).All(c => c is >= 'A' and <= 'Z')) name = name[7..];
         string key = new string(name.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-        return key.EndsWith("regular", StringComparison.Ordinal) ? key[..^7] : key;
+        if (key.EndsWith("psmt", StringComparison.Ordinal)) key = key[..^4];
+        else if (key.StartsWith("arial", StringComparison.Ordinal) && key.EndsWith("mt", StringComparison.Ordinal)) key = key[..^2];
+        foreach (string suffix in new[] { "regular", "normal", "roman" })
+            if (key.EndsWith(suffix, StringComparison.Ordinal)) return key[..^suffix.Length];
+        return key.EndsWith("oblique", StringComparison.Ordinal) ? key[..^7] + "italic" : key;
     }
 
     internal static bool Matches(string original, string fullName) => Key(original) == Key(fullName);
@@ -36,54 +42,62 @@ internal static class PdfTextFontSource
         if (!info.Exists || info.Length < 12 || info.Length > 16 * 1024 * 1024)
             throw new InvalidOperationException("Không đọc được font hoặc file font vượt quá 16 MB.");
         byte[] bytes = File.ReadAllBytes(path);
-        if (!(bytes[0] == 0 && bytes[1] == 1 && bytes[2] == 0 && bytes[3] == 0))
-            throw new InvalidOperationException("Cần font TrueType (.ttf) dạng tĩnh. Chưa hỗ trợ OTF, TTC hoặc font biến thiên.");
-        int tableCount = (bytes[4] << 8) | bytes[5];
-        for (int i = 0; i < tableCount; i++)
-        {
-            int offset = 12 + i * 16;
-            if (offset + 16 > bytes.Length) throw new InvalidOperationException("File font bị hỏng.");
-            if (System.Text.Encoding.ASCII.GetString(bytes, offset, 4) == "fvar")
-                throw new InvalidOperationException("Hãy chọn bản TTF dạng tĩnh của font này.");
-        }
-        var glyph = new GlyphTypeface(new Uri(Path.GetFullPath(path)));
-        string rights = glyph.EmbeddingRights.ToString();
-        if (!rights.StartsWith("Installable", StringComparison.Ordinal) && !rights.StartsWith("Editable", StringComparison.Ordinal))
-            throw new InvalidOperationException("Giấy phép font không cho phép nhúng để chỉnh sửa. Hãy chọn font có quyền nhúng phù hợp.");
-        if (rights.Contains("Bitmap", StringComparison.Ordinal))
-            throw new InvalidOperationException("Font chỉ cho phép nhúng ảnh, không dùng được để sửa chữ PDF.");
-        string family = EnglishName(glyph.Win32FamilyNames);
-        string face = EnglishName(glyph.Win32FaceNames);
-        string name = family + (face is "Regular" or "Normal" or "Roman" ? "" : "-" + face);
-        string characters = new(glyph.CharacterToGlyphMap.Where(pair => pair.Key <= char.MaxValue && pair.Value != 0)
-            .Select(pair => (char)pair.Key).OrderBy(c => c).ToArray());
-        return new(name, Convert.ToBase64String(bytes), characters);
+        var parsed = new PdfTrueTypeFont(bytes);
+        parsed.CheckEmbeddingRights();
+        return new(parsed.Name, Convert.ToBase64String(bytes), parsed.ReadCharacters());
     }
-
-    private static string EnglishName(IDictionary<System.Globalization.CultureInfo, string> names) =>
-        names.FirstOrDefault(pair => pair.Key.Name == "en-US").Value ?? names.Values.FirstOrDefault() ?? "Font TTF";
 
     internal static PdfNativeTextFont? FindMatching(string original)
     {
-        string bundled = Path.Combine(AppContext.BaseDirectory, "assets", "fonts");
-        if (Directory.Exists(bundled))
-            foreach (string path in Directory.EnumerateFiles(bundled, "*.ttf"))
+        string key = Key(original);
+        if (MatchesCache.TryGetValue(key, out var cached)) return cached;
+        string? unusable = null;
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        PdfNativeTextFont? TryFile(string path)
+        {
+            if (!visited.Add(path)) return null;
+            try
             {
-                var font = Read(path);
-                if (Matches(original, font.Name)) return font;
+                var info = new FileInfo(path);
+                if (!info.Exists || info.Length < 12 || info.Length > 16 * 1024 * 1024) return null;
+                var parsed = new PdfTrueTypeFont(File.ReadAllBytes(path));
+                if (!Matches(original, parsed.Name) && !Matches(original, parsed.PostScriptName)) return null;
+                try
+                {
+                    var font = Read(path);
+                    MatchesCache[key] = font;
+                    return font;
+                }
+                catch (Exception ex) { unusable ??= ex.Message; }
             }
+            catch { /* An unrelated unsupported font must not abort the search. */ }
+            return null;
+        }
+        string bundled = Path.Combine(AppContext.BaseDirectory, "assets", "fonts");
+        foreach (string folder in new[] { bundled, Environment.GetFolderPath(Environment.SpecialFolder.Fonts),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Windows", "Fonts") })
+        {
+            if (!Directory.Exists(folder)) continue;
+            foreach (string path in Directory.EnumerateFiles(folder, "*.ttf").OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            {
+                var font = TryFile(path);
+                if (font != null) return font;
+            }
+        }
+        // Retain WPF enumeration only to locate fonts registered outside the
+        // normal folders. Identity and coverage still come from the file bytes.
         foreach (var typeface in Fonts.SystemTypefaces)
         {
             try
             {
                 if (!typeface.TryGetGlyphTypeface(out var glyph) || !glyph.FontUri.IsFile ||
                     !Path.GetExtension(glyph.FontUri.LocalPath).Equals(".ttf", StringComparison.OrdinalIgnoreCase)) continue;
-                string family = EnglishName(glyph.Win32FamilyNames), face = EnglishName(glyph.Win32FaceNames);
-                string name = family + (face is "Regular" or "Normal" or "Roman" ? "" : "-" + face);
-                if (Matches(original, name)) return Read(glyph.FontUri.LocalPath);
+                var font = TryFile(glyph.FontUri.LocalPath);
+                if (font != null) return font;
             }
             catch { /* Unsupported system fonts are not offered as a match. */ }
         }
+        if (unusable != null) throw new InvalidOperationException("Đã tìm thấy font cùng tên nhưng chưa dùng được: " + unusable);
         return null;
     }
 
