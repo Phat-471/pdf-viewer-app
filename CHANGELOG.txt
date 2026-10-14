@@ -1,2 +1,2 @@
-- Làm lại tính năng sửa chữ PDF và xem trước.
-- Hoàn thiện lưu, hoàn tác và in nội dung đã sửa.
+- Sửa lỗi chỉnh chữ tiếng Việt trong PDF dùng font nhúng.
+- Bổ sung font đầy đủ và cải thiện xem trước khi sửa chữ.

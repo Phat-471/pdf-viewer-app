@@ -1,8 +1,10 @@
+#nullable enable
 using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace PdfViewerApp;
 
@@ -13,21 +15,28 @@ internal sealed class PdfTextEditDialog : Window
     private readonly TextBlock _status;
     private readonly Button _previewButton;
     private readonly Button _applyButton;
-    private readonly Func<string, Task<PdfTextEditPreview>> _preview;
+    private readonly Func<string, PdfNativeTextFont?, Task<PdfTextEditPreview>> _preview;
+    private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
+    private readonly TextBlock _fontStatus;
+    private readonly Button _fullFontButton;
+    private PdfNativeTextFont? _selectedFont, _matchingFont, _validatedFont;
+    private bool _previewRunning, _refreshPending, _fontLoading;
     private string? _validated;
     private int _generation;
     private bool _closed;
-    internal string ReplacementText => _input.Text;
+    internal string ReplacementText => _input.Text.Normalize(System.Text.NormalizationForm.FormC);
+    internal PdfNativeTextFont? ReplacementFont => _selectedFont;
 
-    internal PdfTextEditDialog(PdfNativeTextRegion region, Func<string, Task<PdfTextEditPreview>> preview)
+    internal PdfTextEditDialog(PdfNativeTextRegion region, PdfNativeTextFont? initialFont,
+        Func<string, PdfNativeTextFont?, Task<PdfTextEditPreview>> preview)
     {
-        _preview = preview;
+        _preview = preview; _selectedFont = initialFont;
         Title = "Sửa chữ gốc trong PDF";
-        Width = 820; Height = 580; MinWidth = 620; MinHeight = 480;
+        Width = 900; Height = 680; MinWidth = 780; MinHeight = 600;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("#0F172A"); Foreground = Brush("#F8FAFC"); FontFamily = new FontFamily("Segoe UI");
         var root = new Grid { Margin = new Thickness(24) };
-        for (int i = 0; i < 5; i++) root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (int i = 0; i < 6; i++) root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Content = root;
@@ -40,10 +49,19 @@ internal sealed class PdfTextEditDialog : Window
             Background = Brush("#1E293B"), Foreground = Foreground, BorderBrush = Brush("#475569"),
             AcceptsReturn = false, MaxLength = 20000, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
         Add(root, _input, 3);
-        Add(root, new TextBlock { Text = "Font, cỡ chữ, màu và vị trí được giữ nguyên. Để trống nội dung nếu muốn xóa đối tượng chữ.",
-            Foreground = Brush("#94A3B8"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 14) }, 4);
+        var fontPanel = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var fontActions = new StackPanel { Orientation = Orientation.Horizontal };
+        var originalFontButton = Button("Font nhúng gốc", false);
+        _fullFontButton = Button("Dùng font đầy đủ", false); _fullFontButton.IsEnabled = false;
+        var chooseFontButton = Button("Chọn font TTF…", false);
+        fontActions.Children.Add(originalFontButton); fontActions.Children.Add(_fullFontButton); fontActions.Children.Add(chooseFontButton);
+        fontPanel.Children.Add(fontActions);
+        _fontStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brush("#38BDF8"), Margin = new Thickness(0, 8, 0, 0) };
+        fontPanel.Children.Add(_fontStatus); Add(root, fontPanel, 4);
+        Add(root, new TextBlock { Text = "Giữ cỡ chữ, màu và vị trí. Font đầy đủ cùng tên có thể khác phiên bản font nhúng; kiểm tra xem trước. Để trống để xóa chữ.",
+            Foreground = Brush("#94A3B8"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 14) }, 5);
         _image = new Image { Stretch = Stretch.Uniform, Margin = new Thickness(10) };
-        Add(root, new Border { Background = Brushes.White, CornerRadius = new CornerRadius(6), Child = _image }, 5);
+        Add(root, new Border { Background = Brushes.White, CornerRadius = new CornerRadius(6), Child = _image }, 6);
         var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         _status = new TextBlock { Text = "Đang tạo bản xem trước…", Foreground = Brush("#94A3B8"), TextWrapping = TextWrapping.Wrap,
             MinHeight = 42, Margin = new Thickness(0, 0, 0, 8) };
@@ -53,35 +71,91 @@ internal sealed class PdfTextEditDialog : Window
         _applyButton = Button("Áp dụng", true); _applyButton.IsEnabled = false;
         var cancel = Button("Hủy", false); cancel.IsCancel = true;
         actions.Children.Add(_previewButton); actions.Children.Add(_applyButton); actions.Children.Add(cancel);
-        footer.Children.Add(actions); Add(root, footer, 6);
-        _input.TextChanged += (_, _) => { _generation++; _validated = null; _applyButton.IsEnabled = false; _image.Source = null;
-            _status.Text = "Nội dung đã đổi. Nhấn Xem trước để kiểm tra bằng font gốc."; };
+        footer.Children.Add(actions); Add(root, footer, 7);
+        _input.TextChanged += (_, _) => InvalidatePreview();
+        _refreshTimer.Tick += async (_, _) => { _refreshTimer.Stop(); await UpdatePreviewAsync(); };
+        originalFontButton.Click += (_, _) => { _selectedFont = null; UpdateFontStatus(); InvalidatePreview(); };
+        _fullFontButton.Click += (_, _) => { _selectedFont = _matchingFont; UpdateFontStatus(); InvalidatePreview(); };
+        chooseFontButton.Click += async (_, _) =>
+        {
+            var picker = new Microsoft.Win32.OpenFileDialog { Title = "Chọn font TrueType có quyền nhúng", Filter = "Font TrueType (*.ttf)|*.ttf" };
+            if (picker.ShowDialog(this) != true) return;
+            chooseFontButton.IsEnabled = false; _fontLoading = true; InvalidatePreview();
+            try
+            {
+                var font = await Task.Run(() => PdfTextFontSource.Read(picker.FileName));
+                if (_closed) return;
+                _selectedFont = font; UpdateFontStatus();
+            }
+            catch (Exception ex) { if (!_closed) MessageBox.Show(this, ex.Message, "Không dùng được font", MessageBoxButton.OK, MessageBoxImage.Information); }
+            finally { _fontLoading = false; if (!_closed) { chooseFontButton.IsEnabled = true; InvalidatePreview(); } }
+        };
         _previewButton.Click += async (_, _) => await UpdatePreviewAsync();
-        _applyButton.Click += (_, _) => { if (_validated == _input.Text) DialogResult = true; };
-        Loaded += async (_, _) => { _input.Focus(); _input.SelectAll(); await UpdatePreviewAsync(); };
-        Closed += (_, _) => { _closed = true; _generation++; };
+        _applyButton.Click += (_, _) => { if (_validated == ReplacementText && Equals(_validatedFont, _selectedFont)) DialogResult = true; };
+        Loaded += async (_, _) =>
+        {
+            _input.Focus(); _input.SelectAll();
+            var previewTask = UpdatePreviewAsync();
+            try
+            {
+                _matchingFont = initialFont ?? await Task.Run(() => PdfTextFontSource.FindMatching(region.FontName));
+                if (!_closed)
+                {
+                    _fullFontButton.IsEnabled = _matchingFont != null;
+                    _fullFontButton.ToolTip = _matchingFont == null ? "Chưa tìm được bản đầy đủ cùng font. Có thể chọn file TTF." : _matchingFont.Name;
+                    UpdateFontStatus();
+                }
+            }
+            catch { if (!_closed) _fullFontButton.ToolTip = "Chưa tìm được font đầy đủ. Có thể chọn file TTF."; }
+            await previewTask;
+        };
+        Closed += (_, _) => { _closed = true; _generation++; _refreshTimer.Stop(); };
+        UpdateFontStatus();
+    }
+
+    private void UpdateFontStatus() => _fontStatus.Text = _selectedFont == null
+        ? "Đang dùng font nhúng. Nếu thiếu ký tự, chọn Dùng font đầy đủ hoặc Chọn font TTF."
+        : $"Đang dùng: {_selectedFont.Name} · nhúng toàn bộ font vào PDF. Nội dung được kiểm tra bằng font này.";
+
+    private void InvalidatePreview()
+    {
+        _generation++; _validated = null; _validatedFont = null; _applyButton.IsEnabled = false;
+        _image.Opacity = 0.35;
+        _status.Foreground = Brush("#94A3B8");
+        _status.Text = "Nội dung hoặc font đã đổi. Đang chờ tạo bản xem trước mới; ảnh mờ là bản trước đó.";
+        _refreshTimer.Stop(); _refreshTimer.Start();
     }
 
     private async Task UpdatePreviewAsync()
     {
+        _refreshTimer.Stop();
+        if (_fontLoading || _closed) return;
+        if (_previewRunning) { _refreshPending = true; return; }
+        _previewRunning = true; _refreshPending = false;
         int generation = ++_generation;
-        string text = _input.Text;
+        string text = ReplacementText;
+        var font = _selectedFont;
         _validated = null; _applyButton.IsEnabled = false; _previewButton.IsEnabled = false;
         _status.Text = "Đang kiểm tra ký tự và tạo bản xem trước…";
         try
         {
-            var result = await _preview(text);
+            var result = await _preview(text, font);
             if (_closed || generation != _generation) return;
-            _image.Source = result.Image;
+            _image.Source = result.Image; _image.Opacity = 1;
             _status.Foreground = Brush("#94A3B8"); _status.Text = result.Message;
-            _validated = text; _applyButton.IsEnabled = true;
+            _validated = text; _validatedFont = font; _applyButton.IsEnabled = true;
         }
         catch (Exception ex)
         {
             if (_closed || generation != _generation) return;
-            _image.Source = null; _status.Foreground = Brush("#FBBF24"); _status.Text = ex.Message;
+            _image.Opacity = 0.35; _status.Foreground = Brush("#FBBF24"); _status.Text = ex.Message +
+                (_image.Source == null ? "" : " Ảnh mờ vẫn là bản trước đó.");
         }
-        finally { if (!_closed) _previewButton.IsEnabled = true; }
+        finally
+        {
+            _previewRunning = false;
+            if (!_closed) { _previewButton.IsEnabled = true; if (_refreshPending) await UpdatePreviewAsync(); }
+        }
     }
 
     private static Brush Brush(string hex) => (Brush)new BrushConverter().ConvertFromString(hex)!;

@@ -115,18 +115,24 @@ public partial class PdfDocumentTab
         string path = CurrentPdfPath;
         int generation = _loadGeneration, revision = _textEditRevision;
         var pending = _nativeTextEdits.ToArray();
-        PdfNativeTextEdit[] Candidate(string text) => pending.Where(e => e.PageNumber != region.PageNumber || e.ObjectIndex != region.ObjectIndex)
-            .Append(new PdfNativeTextEdit(region.PageNumber, region.ObjectIndex, region.OriginalText, text)).ToArray();
+        var previous = pending.FirstOrDefault(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
+        PdfNativeTextEdit[] Candidate(string text, PdfNativeTextFont? font)
+        {
+            var others = pending.Where(e => e.PageNumber != region.PageNumber || e.ObjectIndex != region.ObjectIndex);
+            return text == region.OriginalText && font == null ? others.ToArray()
+                : others.Append(new PdfNativeTextEdit(region.PageNumber, region.ObjectIndex, region.OriginalText, text, font)).ToArray();
+        }
         try
         {
-            var dialog = new PdfTextEditDialog(region, text => Task.Run(() => PdfNativeTextEditor.Preview(path, region, Candidate(text))))
+            var dialog = new PdfTextEditDialog(region, previous?.Font,
+                (text, font) => Task.Run(() => PdfNativeTextEditor.Preview(path, region, Candidate(text, font))))
                 { Owner = Window.GetWindow(this) };
-            if (dialog.ShowDialog() != true || dialog.ReplacementText == region.Text) return;
+            if (dialog.ShowDialog() != true || (dialog.ReplacementText == region.Text && Equals(dialog.ReplacementFont, previous?.Font))) return;
             if (generation != _loadGeneration || revision != _textEditRevision || path != CurrentPdfPath) return;
             SaveUndoState();
             _nativeTextEdits.RemoveAll(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
-            if (dialog.ReplacementText != region.OriginalText)
-                _nativeTextEdits.Add(new(region.PageNumber, region.ObjectIndex, region.OriginalText, dialog.ReplacementText));
+            if (dialog.ReplacementText != region.OriginalText || dialog.ReplacementFont != null)
+                _nativeTextEdits.Add(new(region.PageNumber, region.ObjectIndex, region.OriginalText, dialog.ReplacementText, dialog.ReplacementFont));
             await RefreshNativeTextRenderingAsync();
             LogStatus("Đã áp dụng sửa chữ. Nhấn Lưu hoặc Lưu dưới dạng để ghi vào PDF; Ctrl+Z để hoàn tác.");
         }
