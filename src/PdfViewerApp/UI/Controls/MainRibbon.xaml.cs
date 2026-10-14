@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using Fluent;
 
@@ -212,20 +213,24 @@ public partial class MainRibbon : UserControl
 	internal void ApplyTheme(AppThemeDefinition theme)
 	{
 		_currentTheme = theme;
-		Resources["RibbonIconBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		ApplyRibbonSurfaceTheme(theme);
+        Resources["RibbonIconBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+            theme.IsLight ? theme.AccentDark : theme.AccentColor));
 		var accent = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
 		var foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
-		var hover = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.HoverBackground));
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.Accent", "Fluent.Ribbon.Brushes.AccentBase" })
 			MyRibbon.Resources[key] = accent;
-		var selectedBackground = theme.IsLight ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#CCFBF1")) : accent;
+		var selectedBackground = (Brush)Resources["RibbonSelectedBrush"];
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.ToggleButton.Checked.Background", "Fluent.Ribbon.Brushes.ToggleButton.CheckedMouseOver.Background", "Fluent.Ribbon.Brushes.RibbonTabItem.Active.Background" })
 			MyRibbon.Resources[key] = selectedBackground;
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.RibbonTabItem.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.MouseOver.Foreground", "Fluent.Ribbon.Brushes.RibbonTabControl.Content.Foreground" })
 			MyRibbon.Resources[key] = foreground;
 		MyRibbon.Resources["Fluent.Ribbon.Brushes.RibbonGroupBox.Header.Foreground"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
-		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.MouseOver.Background"] = hover;
-		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.Pressed.Background"] = accent;
+		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.MouseOver.Background"] = Resources["RibbonHoverBrush"];
+        MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.Pressed.Background"] = selectedBackground;
+        foreach (string key in new[] { "Fluent.Ribbon.Brushes.Button.MouseOver.Border", "Fluent.Ribbon.Brushes.Button.Pressed.Border",
+            "Fluent.Ribbon.Brushes.ToggleButton.Checked.Border", "Fluent.Ribbon.Brushes.ToggleButton.CheckedMouseOver.Border" })
+            MyRibbon.Resources[key] = Resources["RibbonAccentBrush"];
 		bool isDark = !theme.IsLight;
 		PdfPerfLogger.Log($"ApplyTheme: Starting theme update to {theme.Name} (isDark={isDark}, AccentColor={theme.AccentColor})");
 
@@ -304,16 +309,80 @@ public partial class MainRibbon : UserControl
 
 			// CRITICAL FIX: Schedule icon color update via Dispatcher to ensure all tabs are rendered first.
 			// Fluent Ribbon uses virtualization - tabs not yet activated may not have visual tree.
-			var accentBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
 			Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
 			{
-				ApplyIconColors(accentBrush);
+				ApplyIconColors();
 			}));
 		}
 	}
 
+    private void ApplyRibbonSurfaceTheme(AppThemeDefinition theme)
+    {
+        Color Parse(string value) => (Color)ColorConverter.ConvertFromString(value);
+        Color Mix(Color background, Color accentColor, double amount) => Color.FromRgb(
+            (byte)Math.Round(background.R + (accentColor.R - background.R) * amount),
+            (byte)Math.Round(background.G + (accentColor.G - background.G) * amount),
+            (byte)Math.Round(background.B + (accentColor.B - background.B) * amount));
+        void Token(string key, Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            Resources[key] = brush;
+        }
+        var panel = Parse(theme.PanelBackground);
+        var accent = Parse(theme.IsLight ? theme.AccentDark : theme.AccentColor);
+        Token("RibbonButtonBackground", panel);
+        Token("RibbonGroupBackground", Parse(theme.SurfaceBackground));
+        Token("RibbonBorderBrush", Mix(Parse(theme.BorderColor), Parse(theme.ForegroundPrimary), theme.IsLight ? 0.12 : 0.16));
+        Token("RibbonTextBrush", Parse(theme.ForegroundPrimary));
+        Token("RibbonAccentBrush", accent);
+        Token("RibbonHoverBrush", Mix(panel, accent, theme.IsLight ? 0.10 : 0.16));
+        Token("RibbonSelectedBrush", Mix(panel, accent, theme.IsLight ? 0.22 : 0.30));
+        var groupColors = new Dictionary<string, string>
+        {
+            ["Document"] = theme.IsLight ? "#0F766E" : "#5EEAD4",
+            ["Navigation"] = theme.IsLight ? "#0369A1" : "#7DD3FC",
+            ["Pages"] = theme.IsLight ? "#1D4ED8" : "#93C5FD",
+            ["Comments"] = theme.IsLight ? "#B45309" : "#FCD34D",
+            ["Measure"] = theme.IsLight ? "#7E22CE" : "#D8B4FE",
+            ["Ocr"] = theme.IsLight ? "#047857" : "#86EFAC",
+            ["Utilities"] = theme.ForegroundSecondary
+        };
+        foreach (var groupColor in groupColors)
+            Token("RibbonGroup" + groupColor.Key + "Brush", Parse(groupColor.Value));
+    }
+
+    // Fluent 10.1 supplies the command and popup templates. Only decorate the
+    // outer surfaces; retain its template parts, commands, sizes and key tips.
+    private void RibbonFrame_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Control control || control.Template == null) return;
+        Border frame = null;
+        if (control is RibbonGroupBox)
+        {
+            // The normal group surface is the first direct Border in rootGrid.
+            // Quick-access groups use the named button border instead.
+            frame = control.Template.FindName("PART_ButtonBorder", control) as Border;
+            if (frame == null && VisualTreeHelper.GetChildrenCount(control) > 0
+                && VisualTreeHelper.GetChild(control, 0) is Grid grid)
+                frame = grid.Children.OfType<Border>().FirstOrDefault();
+        }
+        else if (control is Fluent.SplitButton)
+            frame = control.Template.FindName("PART_ButtonBorder", control) as Border;
+        else
+            frame = control.Template.FindName("border", control) as Border;
+        if (frame == null) return;
+        frame.CornerRadius = new CornerRadius(control is RibbonGroupBox ? 6 : 4);
+        frame.SnapsToDevicePixels = true;
+        // Binding the outer surface also covers the SplitButton's idle state,
+        // which is hard-coded transparent in Fluent's original template.
+        frame.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background)) { Source = control });
+        frame.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush)) { Source = control });
+        frame.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness)) { Source = control });
+    }
+
 	/// <summary>Cập nhật màu foreground cho tất cả icon TextBlock trong Ribbon.</summary>
-	private void ApplyIconColors(SolidColorBrush accentBrush)
+	private void ApplyIconColors()
 	{
 		if (MyRibbon == null) return;
 		try
@@ -332,7 +401,7 @@ public partial class MainRibbon : UserControl
 				if (isMdl2)
 				{
 					// Segoe MDL2 Assets = all icon font, always update foreground
-					tb.Foreground = accentBrush;
+					tb.SetResourceReference(TextBlock.ForegroundProperty, "RibbonIconBrush");
 					updatedIconsCount++;
 				}
 			}
@@ -988,6 +1057,7 @@ public partial class MainRibbon : UserControl
 		RibbonGroupBox group = new RibbonGroupBox
 		{
 			Header = "Edit Text",
+            Tag = "Pages",
 			Visibility = Visibility.Collapsed
 		};
 		group.Items.Add(CreateEditTextButton("Select Text", "T", SelectTextTool_Click, "#106EBE"));

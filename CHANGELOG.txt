@@ -1,3 +1,2 @@
-﻿- Đã cải thiện mở lại PDF và thu phóng.
-- Đã thêm chỉnh vùng Snapshot và nhớ thiết lập.
-- Đã nâng cấp OCR tiếng Việt, tiếng Anh và vùng bản vẽ.
+﻿- Đã thêm khung và màu nhóm cho thanh công cụ.
+- Đã làm rõ trạng thái chọn và rê chuột trên các nút.
