@@ -15,17 +15,23 @@ namespace PdfViewerApp;
 internal sealed class PdfRenderSession : IDisposable
 {
 	private readonly string _path;
+	private readonly PdfNativeTextEdit[] _textEdits;
+	private readonly HashSet<int> _editedPages = new();
 	private readonly Dictionary<int, (nint Handle, long Used)> _pages = new();
 	private readonly ConcurrentDictionary<int, int> _rotations = new();
 	private nint _document;
 	private long _sequence;
 	private int _disposed;
+	internal Task Closed { get; private set; } = Task.CompletedTask;
 	private readonly Lazy<string> _fingerprint;
 
-	public PdfRenderSession(string path)
-	{
-		_path = path;
-		_fingerprint = new Lazy<string>(() => PdfPersistentCache.Fingerprint(path));
+	public PdfRenderSession(string path, PdfNativeTextEdit[]? textEdits = null)
+    {
+        _path = path;
+        _textEdits = textEdits?.ToArray() ?? Array.Empty<PdfNativeTextEdit>();
+        _fingerprint = new Lazy<string>(() => PdfPersistentCache.Fingerprint(path) +
+            (_textEdits.Length == 0 ? "" : ":text:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(_textEdits))))));
 	}
 	internal string Fingerprint => _fingerprint.Value;
 
@@ -118,6 +124,18 @@ internal sealed class PdfRenderSession : IDisposable
             PdfiumEngine.FPDF_ClosePage(oldest.Value.Handle); _pages.Remove(oldest.Key);
         }
         nint page = PdfiumEngine.FPDF_LoadPage(_document, pageIndex);
+        if (page != IntPtr.Zero)
+        {
+            try
+            {
+                if (!_editedPages.Contains(pageIndex))
+                {
+                    PdfNativeTextEditor.ApplyPage(_document, page, _textEdits.Where(e => e.PageNumber == pageIndex + 1).ToArray());
+                    _editedPages.Add(pageIndex);
+                }
+            }
+            catch { PdfiumEngine.FPDF_ClosePage(page); throw; }
+        }
         if (page != IntPtr.Zero) { _pages[pageIndex] = (page, ++_sequence); _rotations[pageIndex] = PdfInterop.Pdfium.FPDFPage_GetRotation(page) * 90; }
         return page;
     }
@@ -202,7 +220,7 @@ internal sealed class PdfRenderSession : IDisposable
 	{
 		if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 		// Closing a tab must not wait on the UI thread for an ongoing native render.
-		_ = Task.Run(() =>
+		Closed = Task.Run(() =>
 		{
 			lock (PdfiumEngine.SyncRoot)
 			{

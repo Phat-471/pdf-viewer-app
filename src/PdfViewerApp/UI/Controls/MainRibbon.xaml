@@ -428,7 +428,7 @@
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Văn bản" Tag="Pages">
         <fluent:ToggleButton Name="SelectTextToolBtn" Header="Chọn chữ" LargeIcon="{StaticResource IconSelect}" Size="Large" Margin="2,0" Click="SelectTextTool_Click" ToolTip="Chọn chữ" />
-        <fluent:ToggleButton Name="EditTextToolBtn" Header="Sửa chữ" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="EditTextTool_Click" ToolTip="Sửa chữ" />
+        <fluent:ToggleButton Name="EditTextToolBtn" Header="Sửa chữ gốc" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="EditTextTool_Click" ToolTip="Chọn chữ PDF, xem trước và sửa nội dung với font, cỡ chữ, màu và vị trí gốc." />
       </fluent:RibbonGroupBox>
 
       <fluent:RibbonGroupBox Header="Xoay trang" Tag="Pages">

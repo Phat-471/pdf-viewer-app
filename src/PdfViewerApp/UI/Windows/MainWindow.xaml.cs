@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -950,10 +950,11 @@ exit 0
 		};
 	}
 
-	private void CloseActiveTabFromCommandPalette()
+	private async void CloseActiveTabFromCommandPalette()
 	{
 		if (PdfTabControl.SelectedItem is TabItem removeItem)
 		{
+            if (removeItem.Content is PdfDocumentTab document && !await ConfirmTextEditSaveAsync(document)) return;
 			PdfTabControl.Items.Remove(removeItem);
 			UpdateTabEmptyState();
 			if (PdfTabControl.Items.Count == 0)
@@ -1111,8 +1112,9 @@ exit 0
 			Header = stackPanel,
 			Content = pdfDocumentTab2
 		};
-		button.Click += delegate
+		button.Click += async (_, _) =>
 		{
+            if (!await ConfirmTextEditSaveAsync(pdfDocumentTab2)) return;
 			PdfTabControl.Items.Remove(tabItem2);
 			UpdateTabEmptyState();
 			if (PdfTabControl.Items.Count == 0)
@@ -2776,22 +2778,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			activeTab.SetHighlightEditableRegions(true);
 		}
 
-		LogStatus("Đã bật công cụ Sửa chữ. Các vùng chữ có thể sửa được khoanh khung viền nổi bật.");
-	}
-
-	private void EditOriginalFont_Click(object sender, RoutedEventArgs e)
-	{
-		PdfDocumentTab activeTab = GetActiveTab();
-		if (activeTab == null)
-		{
-			return;
-		}
-		activeTab.EditOriginalFontMode = !activeTab.EditOriginalFontMode;
-		_mainRibbon?.SetEditOriginalFontState(activeTab.EditOriginalFontMode);
-		activeTab.RedrawAllPageAnnotations();
-		LogStatus(activeTab.EditOriginalFontMode
-			? "Chế độ sửa gốc (giữ font) ĐÃ BẬT: sửa text sẽ giữ nguyên font/kích thước gốc."
-			: "Chế độ sửa gốc (giữ font) ĐÃ TẮT: sửa text sẽ đè lớp mới như trước.");
+		LogStatus("Đã bật Sửa chữ gốc. Chọn khung chữ, nhập nội dung, xem trước rồi áp dụng và lưu PDF.");
 	}
 
 	private void TextBoxTool_Click(object sender, RoutedEventArgs e)
@@ -3283,7 +3270,6 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.FitPageRequested += (_, _) => GetActiveTab()?.FitPage();
 		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
 		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
-		_mainRibbon.EditOriginalFontRequested += EditOriginalFont_Click;
 		_mainRibbon.ExportOcrTextRequested += ExportOcrText_Click;
 		_mainRibbon.ExportSearchablePdfRequested += ExportSearchablePdf_Click;
 		_mainRibbon.ExportDocxRequested += ExportDocx_Click;
@@ -3559,6 +3545,17 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	// Silent Auto-Update khi đóng ứng dụng
 	// ─────────────────────────────────────────────────────────────────
 
+    private bool _textEditCloseApproved;
+    private bool _confirmingTextEditClose;
+
+    private async Task<bool> ConfirmTextEditSaveAsync(PdfDocumentTab document)
+    {
+        if (!document.HasOriginalFontEdits) return true;
+        var answer = MessageBox.Show(this, $"Chữ trong {Path.GetFileName(document.CurrentPdfPath)} chưa được lưu. Lưu trước khi đóng?",
+            "Thay đổi chưa lưu", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        return answer == MessageBoxResult.No || (answer == MessageBoxResult.Yes && await document.SaveDocumentAsync());
+    }
+
 	protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
 	{
 		base.OnClosing(e);
@@ -3566,6 +3563,26 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		// Không can thiệp nếu đã đang apply hoặc bị cancel từ nơi khác
 		if (e.Cancel || _silentUpdateApplying)
 			return;
+
+        var editedDocuments = PdfTabControl.Items.OfType<TabItem>().Select(t => t.Content).OfType<PdfDocumentTab>()
+            .Where(t => t.HasOriginalFontEdits).ToArray();
+        if (!_textEditCloseApproved && editedDocuments.Length > 0)
+        {
+            e.Cancel = true;
+            if (_confirmingTextEditClose) return;
+            _confirmingTextEditClose = true;
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    foreach (var document in editedDocuments) if (!await ConfirmTextEditSaveAsync(document)) return;
+                    _textEditCloseApproved = true;
+                    Close();
+                }
+                finally { _confirmingTextEditClose = false; }
+            });
+            return;
+        }
 
 		var silentState = AppUpdateService.LoadSilentUpdateState();
 		if (silentState == null)

@@ -61,9 +61,7 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? EditTextToolRequested;
 
-	public event RoutedEventHandler? EditOriginalFontRequested;
 
-	private Fluent.ToggleButton? _editOriginalFontButton;
 	public event RoutedEventHandler? OcrTextRequested;
 
 	public event RoutedEventHandler? ExportOcrTextRequested;
@@ -202,7 +200,6 @@ public partial class MainRibbon : UserControl
 	public MainRibbon()
 	{
 		InitializeComponent();
-		InitializeEditTextContextGroup();
 	}
 
 	public void ApplyTheme(bool isDark)
@@ -448,10 +445,6 @@ public partial class MainRibbon : UserControl
 		if (EditTextToolBtn != null)
 		{
 			EditTextToolBtn.IsChecked = activeTool == "EditText";
-		}
-		if (_editTextContextGroup != null)
-		{
-			_editTextContextGroup.Visibility = (activeTool == "EditText" ? Visibility.Visible : Visibility.Collapsed);
 		}
 		if (SelectToolBtn != null)
 		{
@@ -719,16 +712,6 @@ public partial class MainRibbon : UserControl
 	private void SelectTextTool_Click(object sender, RoutedEventArgs e) => SelectTextToolRequested?.Invoke(this, e);
 
 	private void EditTextTool_Click(object sender, RoutedEventArgs e) => EditTextToolRequested?.Invoke(this, e);
-
-	private void EditOriginalFont_Click(object sender, RoutedEventArgs e) => EditOriginalFontRequested?.Invoke(this, e);
-
-	public void SetEditOriginalFontState(bool enabled)
-	{
-		if (_editOriginalFontButton != null)
-		{
-			_editOriginalFontButton.IsChecked = enabled;
-		}
-	}
 
 	private void OcrText_Click(object sender, RoutedEventArgs e) => OcrTextRequested?.Invoke(this, e);
 
@@ -1039,45 +1022,6 @@ public partial class MainRibbon : UserControl
 		customItem.Content = customText;
 		customItem.Tag = customTag;
 		MeasurementScaleCombo.SelectedItem = customItem;
-	}
-
-	private RibbonGroupBox? _editTextContextGroup;
-
-	private void InitializeEditTextContextGroup()
-	{
-		if (_editTextContextGroup != null)
-		{
-			return;
-		}
-		RibbonTabItem? homeTab = FindVisualChildren<RibbonTabItem>(this).FirstOrDefault();
-		if (homeTab == null)
-		{
-			return;
-		}
-		RibbonGroupBox group = new RibbonGroupBox
-		{
-			Header = "Edit Text",
-            Tag = "Pages",
-			Visibility = Visibility.Collapsed
-		};
-		group.Items.Add(CreateEditTextButton("Select Text", "T", SelectTextTool_Click, "#106EBE"));
-		group.Items.Add(CreateEditTextButton("Edit Text", "E", EditTextTool_Click, "#0F766E"));
-		Fluent.ToggleButton keepFontBtn = new Fluent.ToggleButton
-		{
-			Header = "Sửa gốc (giữ font)",
-			Margin = new Thickness(8.0, 0.0, 8.0, 0.0)
-		};
-		keepFontBtn.Click += EditOriginalFont_Click;
-		_editOriginalFontButton = keepFontBtn;
-		group.Items.Add(keepFontBtn);
-		group.Items.Add(CreateEditTextButton("OCR", "OCR", OcrText_Click, "#D13438"));
-		group.Items.Add(CreateEditTextButton("Xuất văn bản OCR", "TXT", ExportOcrText_Click, "#D13438"));
-		group.Items.Add(CreateEditTextButton("Tạo Searchable PDF", "PDF", ExportSearchablePdf_Click, "#38BDF8"));
-		group.Items.Add(CreateEditTextButton("Xuất Word/Excel", "DOCX", ExportDocx_Click, "#2563EB"));
-		group.Items.Add(CreateEditTextButton("Save", "S", SavePdf_Click, "#0F766E"));
-		group.Items.Add(CreateEditTextButton("Exit", "X", SelectTool_Click, "#64748B"));
-		homeTab.Groups.Add(group);
-		_editTextContextGroup = group;
 	}
 
 	public event RoutedEventHandler? ExportDocxRequested;

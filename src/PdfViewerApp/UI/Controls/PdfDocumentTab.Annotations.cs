@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -132,15 +132,9 @@ public partial class PdfDocumentTab
 			if (!string.IsNullOrEmpty(groupId))
 			{
 				Annotations.RemoveAll(annotation => annotation.AnnotationGroupId == groupId);
-				_pendingTextEdits.RemoveAll(edit =>
-					edit.WhiteoutAnnotation.AnnotationGroupId == groupId ||
-					edit.TextAnnotation.AnnotationGroupId == groupId);
 			}
 			else
 			{
-				_pendingTextEdits.RemoveAll(edit =>
-					ReferenceEquals(edit.WhiteoutAnnotation, SelectedAnnotation) ||
-					ReferenceEquals(edit.TextAnnotation, SelectedAnnotation));
 				Annotations.Remove(SelectedAnnotation);
 			}
 			SelectedAnnotation = null;
@@ -162,10 +156,10 @@ public partial class PdfDocumentTab
 				}
 			}
 
-			_undoStack.Push(snapshot);
+			_undoStack.Push(new DocumentEditSnapshot(snapshot, _nativeTextEdits.ToArray()));
 			if (_undoStack.Count > 50)
 			{
-				var tempStack = new Stack<List<PdfAnnotation>>();
+				var tempStack = new Stack<DocumentEditSnapshot>();
 				while (_undoStack.Count > 1)
 				{
 					tempStack.Push(_undoStack.Pop());
@@ -204,11 +198,12 @@ public partial class PdfDocumentTab
 					currentSnapshot.Add(cloned);
 				}
 			}
-			_redoStack.Push(currentSnapshot);
+			_redoStack.Push(new DocumentEditSnapshot(currentSnapshot, _nativeTextEdits.ToArray()));
 
 			var previousState = _undoStack.Pop();
 			Annotations.Clear();
-			Annotations.AddRange(previousState);
+			Annotations.AddRange(previousState.Annotations);
+			RestoreNativeTextEdits(previousState.TextEdits);
 
 			SelectedAnnotation = null;
 			RedrawAllPageAnnotations();
@@ -239,11 +234,12 @@ public partial class PdfDocumentTab
 					currentSnapshot.Add(cloned);
 				}
 			}
-			_undoStack.Push(currentSnapshot);
+			_undoStack.Push(new DocumentEditSnapshot(currentSnapshot, _nativeTextEdits.ToArray()));
 
 			var nextState = _redoStack.Pop();
 			Annotations.Clear();
-			Annotations.AddRange(nextState);
+			Annotations.AddRange(nextState.Annotations);
+			RestoreNativeTextEdits(nextState.TextEdits);
 
 			SelectedAnnotation = null;
 			RedrawAllPageAnnotations();

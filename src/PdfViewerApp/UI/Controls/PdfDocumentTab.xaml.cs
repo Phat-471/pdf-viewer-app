@@ -35,7 +35,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 {
 	private readonly record struct RenderQueueItem(int PageNumber, bool IsThumbnail, int Generation, string Key, int Priority);
 
-	private readonly record struct PendingTextEdit(int PageNumber, string OriginalText, string ReplacementText, double Left, double Bottom, double Width, double Height, PdfTextBoxAnnotation WhiteoutAnnotation, PdfTextBoxAnnotation TextAnnotation);
 
 	private readonly record struct OcrTextRegion(string Text, double Left, double Bottom, double Width, double Height);
 
@@ -43,24 +42,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private Rect? _selectedEditRectPdf = null;
 	private int _selectedEditPageNumber = -1;
 	private int _selectedEditCharIndex = -1;
-	private System.Windows.Controls.TextBox? _activeDirectEditTextBox = null;
-	private Action? _activeDirectEditCommitAction = null;
 	private bool _skipNextEditTextMouseUp;
 
-	// Chế độ "Sửa gốc (giữ font)": sửa text trong content stream, giữ nguyên Tf (font/kích thước).
-	// Khi bật, edit text sẽ ghi vào _pendingOriginalTextEdits thay vì overlay whiteout+image.
-	private bool _editOriginalFontMode;
-	public bool EditOriginalFontMode
-	{
-		get => _editOriginalFontMode;
-		set
-		{
-			_editOriginalFontMode = value;
-			LogStatus(value ? "Đã bật chế độ sửa gốc (giữ nguyên font/kích thước)." : "Đã tắt chế độ sửa gốc.");
-		}
-	}
-	private readonly List<(int PageNumber, string OriginalText, string ReplacementText)> _pendingOriginalTextEdits = new List<(int, string, string)>();
-	public bool HasOriginalFontEdits => _pendingOriginalTextEdits.Count > 0;
+	public bool HasOriginalFontEdits => _nativeTextEdits.Count > 0;
 
 	private Point _drawStartPoint;
 
@@ -163,6 +147,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private nint _documentHandle = IntPtr.Zero;
 	private PdfRenderSession? _renderSession;
+	private Task _documentCloseTask = Task.CompletedTask;
 	private System.Threading.CancellationTokenSource _ocrLifetime = new();
 	private System.Threading.CancellationTokenSource _renderCancellation = new();
 
@@ -199,9 +184,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private Point _smoothZoomHostAnchor;
 
-	private readonly Stack<List<PdfAnnotation>> _undoStack = new();
+	private readonly Stack<DocumentEditSnapshot> _undoStack = new();
 
-	private readonly Stack<List<PdfAnnotation>> _redoStack = new();
+	private readonly Stack<DocumentEditSnapshot> _redoStack = new();
 
 	private DispatcherTimer? _smoothZoomTimer;
 
@@ -222,7 +207,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private readonly ConcurrentDictionary<string, Task<List<OcrTextRegion>?>> _ocrLoadingTasks = new();
 
-	private readonly List<PendingTextEdit> _pendingTextEdits = new List<PendingTextEdit>();
 
 	private const int RecentPagesLimit = 8;
 
@@ -391,18 +375,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
-		if (_activeDirectEditTextBox != null)
-		{
-			DependencyObject clickedObj = e.OriginalSource as DependencyObject;
-			while (clickedObj != null)
-			{
-				if (clickedObj == _activeDirectEditTextBox)
-				{
-					return;
-				}
-				clickedObj = VisualTreeHelper.GetParent(clickedObj);
-			}
-		}
+
 		if (ActiveTool == "EditText")
 		{
 			FrameworkElement clickedElement = e.Source as FrameworkElement;
@@ -424,7 +397,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				return;
 			}
-		}
+		            if (canvas.IsMouseCaptured) canvas.ReleaseMouseCapture();
+            _skipNextEditTextMouseUp = true;
+            e.Handled = true;
+            ShowDirectTextEditOverlay(canvas, -1, num, e.GetPosition(canvas));
+            return;
+        }
 		if (ActiveTool != "EditText" && ActiveTool != "SelectText")
 		{
 			FrameworkElement clickedElement = e.Source as FrameworkElement;
@@ -1055,18 +1033,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
-		if (_activeDirectEditTextBox != null)
-		{
-			DependencyObject clickedObj = e.OriginalSource as DependencyObject;
-			while (clickedObj != null)
-			{
-				if (clickedObj == _activeDirectEditTextBox)
-				{
-					return;
-				}
-				clickedObj = VisualTreeHelper.GetParent(clickedObj);
-			}
-		}
+
 		if (_isSelectingText)
 		{
 			_isSelectingText = false;
@@ -1105,41 +1072,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		else
 		{
-			if (ActiveTool == "EditText")
-			{
-				if (_skipNextEditTextMouseUp)
-				{
-					_skipNextEditTextMouseUp = false;
-					LogToDesktop("[EDIT TEXT] MouseUp skipped because editor was opened from MouseDown.");
-					e.Handled = true;
-					return;
-				}
-				LogToDesktop("[EDIT DEBUG] 1. MouseUp: B蘯ｯt ﾄ黛ｺｧu x盻ｭ lﾃｽ click EditText.");
-
-				// [R蘯､T QUAN TR盻君G] Ph蘯｣i ﾃｩp Canvas nh蘯｣ chu盻冲 ra thﾃｬ TextBox m盻嬖 nh蘯ｭn ﾄ柁ｰ盻｣c tiﾃｪu ﾄ訴盻ノ
-				if (canvas.IsMouseCaptured)
-				{
-					LogToDesktop("[EDIT DEBUG] 1.1 MouseUp: ﾄ紳ng ﾃｩp Canvas ReleaseMouseCapture().");
-					canvas.ReleaseMouseCapture();
-				}
-
-				int charIndexAtMousePos = GetCharIndexAtMousePos(canvas, e.GetPosition(canvas), num);
-				LogToDesktop($"[EDIT DEBUG] 2. MouseUp: charIndexAtMousePos = {charIndexAtMousePos}");
-
-				if (charIndexAtMousePos != -1)
-				{
-					ShowDirectTextEditOverlay(canvas, charIndexAtMousePos, num, e.GetPosition(canvas));
-					e.Handled = true;
-					return;
-				}
-				else
-				{
-					LogToDesktop("[EDIT DEBUG] 2.1 MouseUp: Khﾃｴng tﾃｬm th蘯･y kﾃｽ t盻ｱ, cﾃｳ th盻・lﾃ PDF 蘯｣nh.");
-					LogStatus("Vﾃｹng nﾃy khﾃｴng cﾃｳ ch盻ｯ (PDF d蘯｡ng 蘯｣nh/scan). Hﾃ｣y th盻ｭ cﾃｴng c盻･ OCR ﾄ黛ｻ・nh蘯ｭn di盻㌻ ch盻ｯ trﾆｰ盻嫩.");
-					e.Handled = true;
-					return;
-				}
-			}
+            if (ActiveTool == "EditText")
+            {
+                e.Handled = true;
+                if (_skipNextEditTextMouseUp) { _skipNextEditTextMouseUp = false; return; }
+                if (canvas.IsMouseCaptured) canvas.ReleaseMouseCapture();
+                ShowDirectTextEditOverlay(canvas, -1, num, e.GetPosition(canvas));
+                return;
+            }
 
 			if (!_isDrawing)
 			{
@@ -1382,7 +1322,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	}
 
 
-	private void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
+	private async void PrintSnapshotSelection(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 	{
 		if (tempRect != null) canvas.Children.Remove(tempRect);
 		if (string.IsNullOrEmpty(CurrentPdfPath)) return;
@@ -1397,10 +1337,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		double right = Math.Clamp((x + w) / canvas.Width, left, 1);
 		double bottom = Math.Clamp((y + h) / canvas.Height, top, 1);
 		if (right <= left || bottom <= top) return;
-		var snapshot = new PdfSnapshotSelection(CurrentPdfPath, pageNumber - 1, left, top, right - left, bottom - top);
+        string? printCopy = null;
+        try
+        {
+            printCopy = await CreateNativeTextPrintCopyAsync();
+		var snapshot = new PdfSnapshotSelection(printCopy ?? CurrentPdfPath, pageNumber - 1, left, top, right - left, bottom - top);
 		var dialog = new SnapshotActionDialog(pageNumber, snapshot, pageSize, _renderSession)
 		{
-			Owner = Window.GetWindow(this)
+			Owner = Window.GetWindow(this), SourceDocumentPath = CurrentPdfPath
 		};
 		if (_lastSnapshotPaperLayout != null) dialog.RestoreLayout(_lastSnapshotPaperLayout);
         dialog.SelectionChanged += changed =>
@@ -1424,7 +1368,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			if (Window.GetWindow(this) is MainWindow window) window.ActiveTool = "Snapshot";
 			LogStatus("Kéo chọn vùng Snapshot mới.");
 		}
-	}
+        }
+        catch (Exception ex) { MessageBox.Show("Không chuẩn bị được Snapshot: " + ex.Message, "Snapshot", MessageBoxButton.OK, MessageBoxImage.Error); }
+        finally { if (printCopy != null) { try { File.Delete(printCopy); } catch { } } }
+    }
 
 	private void RequestAiSnapshot(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 	{
@@ -2171,8 +2118,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		if (App.IsPrinting) return;
 		App.IsPrinting = true;
+		string? printCopy = null;
 		try
 		{
+			printCopy = await CreateNativeTextPrintCopyAsync();
+			pdfPath = printCopy ?? pdfPath;
 			var options = new PrintOptionsDialog(PageCount, SelectedPageNumber, pdfPath,
 				_isReverseView ? null : _cacheManager.FindAnyCachedBitmapForPage(SelectedPageNumber, false))
 			{ Owner = Window.GetWindow(this) };
@@ -2281,6 +2231,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		finally
 		{
+			if (printCopy != null) { try { File.Delete(printCopy); } catch { } }
 			App.IsPrinting = false;
 			App.ResetPrintBusyNotification();
 			App.OpenPendingFiles();
@@ -3087,430 +3038,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	private void ShowDirectTextEditOverlay(Canvas canvas, int charIndex, int pageNumber, Point? clickPoint = null)
-	{
-		LogToDesktop($"[EDIT DEBUG] 3. Kh盻殃 ch蘯｡y ShowDirectTextEditOverlay (CharIndex: {charIndex}, Page: {pageNumber})");
-
-		// [QUAN TR盻君G] N蘯ｿu ﾄ疎ng cﾃｳ TextBox biﾃｪn t蘯ｭp khﾃ｡c, commit vﾃ ﾄ妥ｳng nﾃｳ trﾆｰ盻嫩
-		if (_activeDirectEditCommitAction != null)
-		{
-			try
-			{
-				var tempAction = _activeDirectEditCommitAction;
-				_activeDirectEditTextBox = null; // ﾄ静｡nh d蘯･u ﾄ黛ｻ・bypass guard < 500ms
-				_activeDirectEditCommitAction = null;
-				tempAction();
-			}
-			catch (Exception ex)
-			{
-				LogToDesktop($"[DEBUG] Error committing active edit: {ex.Message}");
-			}
-		}
-
-		nint textPage = GetTextPage(pageNumber);
-		if (textPage == IntPtr.Zero)
-		{
-			LogToDesktop("[EDIT TEXT] Open editor aborted: text page is null.");
-			return;
-		}
-
-		int num = 0;
-		lock (PdfiumEngine.SyncRoot) { num = PdfiumEngine.FPDFText_CountChars(textPage); }
-		if (num <= 0)
-		{
-			LogToDesktop("[EDIT TEXT] Open editor aborted: page has no text chars.");
-			return;
-		}
-
-		// 1. Tﾃｭnh toﾃ｡n layout vﾃ l蘯･y font details
-		double estFontSize = 12.0;
-		double initCenterY = 0.0;
-		double initLeft = 0.0;
-		double initRight = 0.0;
-		double initBottom = 0.0;
-		double initTop = 0.0;
-		lock (PdfiumEngine.SyncRoot)
-		{
-			if (PdfiumEngine.FPDFText_GetCharBox(textPage, charIndex, out double cL, out double cR, out double cB, out double cT))
-			{
-				estFontSize = cT - cB;
-				initCenterY = (cB + cT) / 2.0;
-				initLeft = cL;
-				initRight = cR;
-				initBottom = cB;
-				initTop = cT;
-			}
-
-			double fs = PdfiumEngine.FPDFText_GetFontSize(textPage, charIndex);
-			if (fs > 2.0 && fs < estFontSize * 1.8)
-			{
-				estFontSize = fs;
-			}
-		}
-
-		bool isBold = false;
-		bool isItalic = false;
-		string pdfFontName = ActiveFontFamily;
-		int fontFlags = 0;
-		string rawFontName = "";
-
-		lock (PdfiumEngine.SyncRoot)
-		{
-			rawFontName = PdfiumEngine.FPDFText_GetFontName(textPage, charIndex, out fontFlags);
-			int weight = PdfiumEngine.FPDFText_GetFontWeight(textPage, charIndex);
-			if (weight > 550)
-			{
-				isBold = true;
-			}
-		}
-
-		if (!string.IsNullOrEmpty(rawFontName))
-		{
-			pdfFontName = CleanPdfFontName(rawFontName);
-		}
-
-		if ((fontFlags & 64) != 0)
-		{
-			isItalic = true;
-		}
-		LogToDesktop($"[EDIT TEXT] Font probe: raw='{rawFontName}', mapped='{pdfFontName}', flags={fontFlags}, bold={isBold}, italic={isItalic}, fontSizePt={estFontSize:F2}");
-
-		int num2;
-		double lineThreshold = Math.Max(4.0, estFontSize * 0.85);
-		double overlapSlop = Math.Max(1.5, estFontSize * 0.20);
-		for (num2 = charIndex; num2 > 0; num2--)
-		{
-			lock (PdfiumEngine.SyncRoot)
-			{
-				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num2 - 1, out double l, out double r, out double b, out double t))
-				{
-					double centerY = (b + t) / 2.0;
-					bool sameLine = Math.Abs(initCenterY - centerY) <= lineThreshold ||
-						(b <= initTop + overlapSlop && t >= initBottom - overlapSlop);
-					if (!sameLine) break;
-				}
-				else break;
-			}
-		}
-
-		int num3;
-		for (num3 = charIndex; num3 < num - 1; num3++)
-		{
-			lock (PdfiumEngine.SyncRoot)
-			{
-				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num3 + 1, out double l, out double r, out double b, out double t))
-				{
-					double centerY = (b + t) / 2.0;
-					bool sameLine = Math.Abs(initCenterY - centerY) <= lineThreshold ||
-						(b <= initTop + overlapSlop && t >= initBottom - overlapSlop);
-					if (!sameLine) break;
-				}
-				else break;
-			}
-		}
-
-		double minLeft = double.MaxValue, maxRight = double.MinValue, minBottom = double.MaxValue, maxTop = double.MinValue;
-		bool flag = false;
-		lock (PdfiumEngine.SyncRoot)
-		{
-			for (int num4 = num2; num4 <= num3; num4++)
-			{
-				if (PdfiumEngine.FPDFText_GetCharBox(textPage, num4, out var left, out var right, out var bottom, out var top) && right > left && top > bottom)
-				{
-					minLeft = Math.Min(minLeft, left); maxRight = Math.Max(maxRight, right);
-					minBottom = Math.Min(minBottom, bottom); maxTop = Math.Max(maxTop, top);
-					flag = true;
-				}
-			}
-		}
-
-		if (!flag)
-		{
-			LogToDesktop("[EDIT TEXT] Open editor aborted: could not collect char boxes for line.");
-			return;
-		}
-		if (!TryGetPageSize(pageNumber, out Size pageSize))
-		{
-			LogToDesktop("[EDIT TEXT] Open editor aborted: page size unavailable.");
-			return;
-		}
-		if (!TryPdfRectToCanvasRect(canvas, pageNumber, minLeft, maxRight, minBottom, maxTop, out Rect editRect))
-		{
-			LogToDesktop($"[EDIT TEXT] Open editor aborted: PDF rect could not convert. rect=({minLeft:F2},{minBottom:F2},{maxRight:F2},{maxTop:F2})");
-			return;
-		}
-
-		double lineHeightPoints = Math.Max(1.0, maxTop - minBottom);
-		double replacementFontSize = Math.Max(estFontSize, lineHeightPoints * 0.82);
-		replacementFontSize = Math.Min(replacementFontSize, lineHeightPoints * 1.15);
-		Color sampledBackground = SamplePdfPageBackgroundColor(canvas, editRect);
-		LogToDesktop($"[EDIT TEXT] Visual match: lineHeightPt={lineHeightPoints:F2}, originalFontPt={estFontSize:F2}, replacementFontPt={replacementFontSize:F2}, sampledBg=#{sampledBackground.R:X2}{sampledBackground.G:X2}{sampledBackground.B:X2}");
-
-		int num9 = num3 - num2 + 1;
-		string existingText = "";
-		if (num9 > 0)
-		{
-			StringBuilder stringBuilder = new StringBuilder(num9 + 2);
-			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, num9, stringBuilder) > 0) existingText = stringBuilder.ToString(); }
-		}
-		bool extractedTextBroken = LooksLikeBrokenExtractedText(existingText);
-		if (extractedTextBroken)
-		{
-			LogToDesktop($"[EDIT TEXT] Extracted text looks broken, opening empty editor. raw='{existingText}'");
-			existingText = string.Empty;
-		}
-		LogToDesktop($"[EDIT TEXT] Line selected: start={num2}, end={num3}, length={num9}, text='{existingText}', pdfRect=({minLeft:F2},{minBottom:F2},{maxRight:F2},{maxTop:F2}), canvasRect=({editRect.X:F1},{editRect.Y:F1},{editRect.Width:F1},{editRect.Height:F1})");
-
-		// 2. T蘯｡o UI TextBox
-		Popup editPopup = new Popup
-		{
-			PlacementTarget = canvas,
-			Placement = PlacementMode.Relative,
-			HorizontalOffset = editRect.X - 1.0,
-			VerticalOffset = editRect.Y - 2.0,
-			AllowsTransparency = true,
-			StaysOpen = true,
-			Focusable = false
-		};
-		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
-		{
-			Width = Math.Max(50.0, editRect.Width + 8.0),
-			Height = Math.Max(20.0, editRect.Height + 4.0),
-			Text = existingText,
-			FontFamily = new FontFamily(pdfFontName),
-			FontSize = Math.Max(8.0, replacementFontSize * canvas.Height / pageSize.Height),
-			FontWeight = isBold ? FontWeights.Bold : FontWeights.Normal,
-			FontStyle = isItalic ? FontStyles.Italic : FontStyles.Normal,
-			Foreground = Brushes.Black,
-			TextWrapping = TextWrapping.NoWrap,
-			AcceptsReturn = false,
-			BorderBrush = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
-			BorderThickness = new Thickness(2.0),
-			Background = new SolidColorBrush(sampledBackground),
-			Padding = new Thickness(3.0, 1.0, 3.0, 1.0),
-			Focusable = true,
-			IsHitTestVisible = true,
-			Cursor = Cursors.IBeam
-		};
-
-		editPopup.Child = tbInput;
-		editPopup.IsOpen = true;
-		_activeDirectEditTextBox = tbInput;
-
-		// 3. Tﾃｭnh CaretIndex vﾃ x盻ｭ lﾃｽ Focus an toﾃn
-		int countBefore = charIndex - num2;
-		if (clickPoint.HasValue && TryCanvasToPdfPoint(canvas, clickPoint.Value, pageNumber, out Point clickedPdfPoint))
-		{
-			double clickedCharMiddle = (initLeft + initRight) / 2.0;
-			if (clickedPdfPoint.X > clickedCharMiddle)
-			{
-				countBefore++;
-			}
-		}
-		int caretPos = 0;
-		if (countBefore > 0)
-		{
-			StringBuilder sbBefore = new StringBuilder(countBefore + 2);
-			lock (PdfiumEngine.SyncRoot) { if (PdfiumEngine.FPDFText_GetText(textPage, num2, countBefore, sbBefore) > 0) caretPos = sbBefore.ToString().Length; }
-		}
-		LogToDesktop($"[EDIT TEXT] Popup TextBox created: size={tbInput.Width:F1}x{tbInput.Height:F1}, offset=({editPopup.HorizontalOffset:F1},{editPopup.VerticalOffset:F1}), font='{pdfFontName}', fontSizePx={tbInput.FontSize:F1}, caret={caretPos}");
-
-		// Vﾃ・L盻蜂 M蘯､T CON TR盻・ Gﾃ｡n Loaded ﾄ黛ｻ・ch蘯ｯc ch蘯ｯn textbox ﾄ柁ｰ盻｣c focus vﾃ set cursor index ﾄ妥ｺng
-		tbInput.Loaded += (s, ev) =>
-		{
-			tbInput.Focus();
-			Keyboard.Focus(tbInput);
-			if (extractedTextBroken || string.IsNullOrEmpty(tbInput.Text))
-			{
-				tbInput.SelectAll();
-				tbInput.CaretIndex = tbInput.Text.Length;
-			}
-			else if (caretPos >= 0 && caretPos <= tbInput.Text.Length)
-			{
-				tbInput.CaretIndex = caretPos;
-			}
-		};
-
-		// G盻絞 Focus tr盻ｱc ti蘯ｿp thﾃｴng qua Dispatcher thay vﾃｬ ch盻・Loaded (ﾄ黛ｻ・ch蘯｡y song song/s盻嬶)
-		Dispatcher.BeginInvoke(new Action(() => {
-			tbInput.Focus();
-			Keyboard.Focus(tbInput);
-			if (extractedTextBroken || string.IsNullOrEmpty(tbInput.Text))
-			{
-				tbInput.SelectAll();
-				tbInput.CaretIndex = tbInput.Text.Length;
-			}
-			else if (caretPos >= 0 && caretPos <= tbInput.Text.Length) tbInput.CaretIndex = caretPos;
-			LogToDesktop($"[EDIT TEXT] Popup TextBox focused: popupOpen={editPopup.IsOpen}, focused={tbInput.IsFocused}, keyboardWithin={tbInput.IsKeyboardFocusWithin}, children={canvas.Children.Count}");
-		}), System.Windows.Threading.DispatcherPriority.Input);
-
-		long creationTime = Environment.TickCount;
-		bool editCommitted = false;
-		Action commitEdit = delegate
-		{
-			if (editCommitted) return;
-
-			// [QUAN TR盻君G] Ch盻・ch蘯ｷn LostFocus n蘯ｿu lﾃ do s盻ｱ ki盻㌻ trﾃｴi tiﾃｪu ﾄ訴盻ノ t盻ｱ ﾄ黛ｻ冢g c盻ｧa TextBox hi盻㌻ t蘯｡i
-			if (Environment.TickCount - creationTime < 500 && _activeDirectEditTextBox == tbInput)
-			{
-				LogToDesktop("[DEBUG] B盻・qua LostFocus do th盻拱 gian s盻創g quﾃ｡ ng蘯ｯn (trﾃ｡nh trﾃｴi focus sau click). Refocus TextBox.");
-				Dispatcher.BeginInvoke(new Action(() => {
-					if (_activeDirectEditTextBox == tbInput)
-					{
-						tbInput.Focus();
-						Keyboard.Focus(tbInput);
-					}
-				}), System.Windows.Threading.DispatcherPriority.Input);
-				return;
-			}
-
-			editCommitted = true;
-			if (_activeDirectEditTextBox == tbInput)
-			{
-				_activeDirectEditTextBox = null;
-				_activeDirectEditCommitAction = null;
-			}
-
-			string text = tbInput.Text.TrimEnd('\r', '\n');
-			editPopup.IsOpen = false;
-			editPopup.Child = null;
-
-			if (text != existingText)
-			{
-				LogToDesktop($"[EDIT TEXT] Commit changed text: old='{existingText}', new='{text}'");
-				if (_editOriginalFontMode)
-				{
-					// Chế độ sửa gốc: ghi vào danh sách áp dụng qua replace_text_in_page (giữ font/size).
-					try { SaveUndoState(); } catch {}
-					_pendingOriginalTextEdits.Add((pageNumber, existingText, text));
-					RedrawPageAnnotations(canvas, pageNumber);
-				}
-				else
-				{
-					string editGroupId = Guid.NewGuid().ToString("N");
-					PdfTextBoxAnnotation whiteout = new PdfTextBoxAnnotation { PageIndex = pageNumber - 1, AnnotationGroupId = editGroupId, X = minLeft / pageSize.Width, Y = (pageSize.Height - maxTop) / pageSize.Height, Width = (maxRight - minLeft) / pageSize.Width, Height = (maxTop - minBottom) / pageSize.Height, Text = "", BgColor = sampledBackground, StrokeColor = Colors.Transparent, Opacity = 1.0 };
-					PdfTextBoxAnnotation replacement = new PdfTextBoxAnnotation
-					{
-						PageIndex = pageNumber - 1,
-						AnnotationGroupId = editGroupId,
-						X = minLeft / pageSize.Width,
-						Y = (pageSize.Height - maxTop) / pageSize.Height,
-						Width = (maxRight - minLeft) / pageSize.Width,
-						Height = (maxTop - minBottom) / pageSize.Height,
-						Text = text,
-						BgColor = Colors.Transparent,
-						StrokeColor = Colors.Black,
-						FontFamily = pdfFontName,
-						FontSize = replacementFontSize,
-						IsBold = isBold,
-						IsItalic = isItalic,
-						Opacity = 1.0
-					};
-
-					try { SaveUndoState(); } catch {}
-					Annotations.Add(whiteout); Annotations.Add(replacement);
-					_pendingTextEdits.Add(new PendingTextEdit(pageNumber, existingText, text, minLeft, minBottom, maxRight - minLeft, maxTop - minBottom, whiteout, replacement));
-					RedrawPageAnnotations(canvas, pageNumber);
-				}
-			}
-			else
-			{
-				LogToDesktop("[EDIT TEXT] Commit skipped: text unchanged.");
-			}
-		};
-		_activeDirectEditCommitAction = commitEdit;
-
-		tbInput.PreviewMouseDown += (s, ev) =>
-		{
-			if (!tbInput.IsKeyboardFocusWithin)
-			{
-				ev.Handled = true;
-				tbInput.Focus();
-				Keyboard.Focus(tbInput);
-			}
-			LogToDesktop("[EDIT TEXT] TextBox received mouse down.");
-		};
-
-		tbInput.LostFocus += (s, ev) =>
-		{
-			// [QUAN TR盻君G] Trﾃｬ hoﾃ｣n vi盻㌘ ki盻ノ tra Focus b蘯ｱng Dispatcher.
-			// N蘯ｿu TextBox th盻ｱc s盻ｱ m蘯･t focus (click ra ngoﾃi), nﾃｳ m盻嬖 g盻絞 commitEdit().
-			Dispatcher.BeginInvoke(new Action(() =>
-			{
-				if (!tbInput.IsFocused && !tbInput.IsKeyboardFocusWithin)
-				{
-					commitEdit();
-				}
-			}), System.Windows.Threading.DispatcherPriority.Input);
-		};
-
-		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
-		{
-			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
-			{
-				commitEdit();
-				ev.Handled = true;
-			}
-			else if (ev.Key == Key.Escape)
-			{
-				if (_activeDirectEditTextBox == tbInput)
-				{
-					_activeDirectEditTextBox = null;
-					_activeDirectEditCommitAction = null;
-				}
-				editPopup.IsOpen = false;
-				editPopup.Child = null;
-				ev.Handled = true;
-			}
-		};
-	}
-	private void ShowDirectTextEditOverlayFromBounds(Canvas canvas, int pageNumber, double minLeft, double minBottom, double maxRight, double maxTop, string existingText)
-	{
-		// Đã gỡ bỏ overlay cũ
-	}
-	private string RenderReplacementOverlayImage(PendingTextEdit pendingTextEdit)
-	{
-		double dpi = 192.0;
-		int pixelWidth = Math.Max(1, (int)Math.Ceiling(pendingTextEdit.Width * dpi / 72.0));
-		int pixelHeight = Math.Max(1, (int)Math.Ceiling(pendingTextEdit.Height * dpi / 72.0));
-		double padding = string.IsNullOrEmpty(pendingTextEdit.TextAnnotation.AnnotationGroupId) ? Math.Max(2.0, dpi / 36.0) : 0.0;
-		Border border = new Border
-		{
-			Width = pixelWidth,
-			Height = pixelHeight,
-			Background = new SolidColorBrush(pendingTextEdit.WhiteoutAnnotation.BgColor)
-		};
-		TextBlock textBlock = new TextBlock
-		{
-			Text = pendingTextEdit.TextAnnotation.Text,
-			FontFamily = new FontFamily(pendingTextEdit.TextAnnotation.FontFamily),
-			FontSize = Math.Max(8.0, pendingTextEdit.TextAnnotation.FontSize * dpi / 72.0),
-			FontWeight = (pendingTextEdit.TextAnnotation.IsBold ? FontWeights.Bold : FontWeights.Normal),
-			FontStyle = (pendingTextEdit.TextAnnotation.IsItalic ? FontStyles.Italic : FontStyles.Normal),
-			TextDecorations = (pendingTextEdit.TextAnnotation.IsUnderline ? TextDecorations.Underline : null),
-			Foreground = new SolidColorBrush(pendingTextEdit.TextAnnotation.StrokeColor),
-			TextWrapping = string.IsNullOrEmpty(pendingTextEdit.TextAnnotation.AnnotationGroupId) ? TextWrapping.Wrap : TextWrapping.NoWrap,
-			Padding = new Thickness(padding),
-			Background = Brushes.Transparent,
-			VerticalAlignment = VerticalAlignment.Center
-		};
-		border.Child = textBlock;
-		border.Measure(new Size(pixelWidth, pixelHeight));
-		border.Arrange(new Rect(0.0, 0.0, pixelWidth, pixelHeight));
-		border.UpdateLayout();
-		RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap(pixelWidth, pixelHeight, dpi, dpi, PixelFormats.Pbgra32);
-		renderTargetBitmap.Render(border);
-		PngBitmapEncoder pngBitmapEncoder = new PngBitmapEncoder();
-		pngBitmapEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(renderTargetBitmap));
-		string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
-		using FileStream fileStream = File.Create(path);
-		pngBitmapEncoder.Save(fileStream);
-		return path;
-	}
-
-
-
-
 	public PdfDocumentTab(string path)
 	{
 		try
@@ -3638,8 +3165,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_isFirstLoad = true;
 		if (clearPendingTextEdits)
 		{
-			_pendingTextEdits.Clear();
-			_pendingOriginalTextEdits.Clear();
+			ResetNativeTextEditing();
 		}
 		_pendingZoomContentPoint = null;
 		_pendingZoomHostPoint = null;
@@ -3691,7 +3217,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				return;
 			}
 			_documentHandle = tempDoc;
-			_renderSession = new PdfRenderSession(path);
+			_renderSession = new PdfRenderSession(path, _nativeTextEdits.ToArray());
 			Stopwatch stopwatch2 = Stopwatch.StartNew();
 			int pageCount = opened.Pages.Count;
 			stopwatch2.Stop();
@@ -3776,32 +3302,63 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 	}
 
-	private async Task ResumeDocumentHandlesAsync()
+	private async Task ResumeDocumentHandlesAsync(bool throwOnFailure = false)
 	{
 		int generation = _loadGeneration;
 		string path = CurrentPdfPath;
 		_documentOpening = true;
-		_renderSession = new PdfRenderSession(path);
+		var edits = _nativeTextEdits.ToArray();
+		int selectedPage = SelectedPageNumber;
+		_renderSession = new PdfRenderSession(path, edits);
 		_detailViewportKey = string.Empty;
 		try
 		{
-			nint handle = await Task.Run(() =>
+			var opened = await Task.Run(() =>
 			{
 				lock (PdfiumEngine.SyncRoot)
 				{
 					PdfiumEngine.Initialize();
-					return PdfiumEngine.FPDF_LoadDocument(path, null);
+					nint handle = PdfiumEngine.FPDF_LoadDocument(path, null), page = 0, text = 0;
+                    if (handle == 0) throw new InvalidOperationException("Không mở lại được PDF.");
+                    try
+                    {
+                        var pageEdits = edits.Where(e => e.PageNumber == selectedPage).ToArray();
+                        if (pageEdits.Length > 0)
+                        {
+                            page = PdfiumEngine.FPDF_LoadPage(handle, selectedPage - 1);
+                            if (page == 0) throw new InvalidOperationException("Không đọc được trang vừa sửa.");
+                            PdfNativeTextEditor.ApplyPage(handle, page, pageEdits);
+                            text = PdfiumEngine.FPDFText_LoadPage(page);
+                        }
+                        return (Handle: handle, Page: page, Text: text);
+                    }
+                    catch
+                    {
+                        if (text != 0) PdfiumEngine.FPDFText_ClosePage(text);
+                        if (page != 0) PdfiumEngine.FPDF_ClosePage(page);
+                        PdfiumEngine.FPDF_CloseDocument(handle); throw;
+                    }
 				}
 			});
 			if (generation != _loadGeneration)
 			{
-				if (handle != IntPtr.Zero) _ = Task.Run(() => PdfiumEngine.CloseDocument(handle));
+				_ = Task.Run(() =>
+                {
+                    lock (PdfiumEngine.SyncRoot)
+                    {
+                        if (opened.Text != 0) PdfiumEngine.FPDFText_ClosePage(opened.Text);
+                        if (opened.Page != 0) PdfiumEngine.FPDF_ClosePage(opened.Page);
+                        PdfiumEngine.FPDF_CloseDocument(opened.Handle);
+                    }
+                });
 				return;
 			}
-			_documentHandle = handle;
+			_documentHandle = opened.Handle;
+            if (opened.Page != 0) _openedPdfPages[selectedPage] = opened.Page;
+            if (opened.Text != 0) _textPages[selectedPage] = opened.Text;
 			RequestViewportRefresh();
 		}
-		catch (Exception ex) { LogStatus("Resume document failed: " + ex.Message); }
+		catch (Exception ex) { LogStatus("Không mở lại được tài liệu: " + ex.Message); if (throwOnFailure) throw; }
 		finally { if (generation == _loadGeneration) _documentOpening = false; }
 	}
 
@@ -3815,7 +3372,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_renderCancellation.Cancel();
 		_renderCancellation.Dispose();
 		_renderCancellation = new System.Threading.CancellationTokenSource();
-		_renderSession?.Dispose();
+		var closedSession = _renderSession;
+		closedSession?.Dispose();
 		_renderSession = null;
 		_detailGeneration++;
 		_detailViewportKey = string.Empty;
@@ -3828,7 +3386,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		_openedPdfPages.Clear();
 		nint document = _documentHandle;
 		_documentHandle = IntPtr.Zero;
-		_ = Task.Run(() =>
+		var closeDocument = Task.Run(() =>
 		{
 			lock (PdfiumEngine.SyncRoot)
 			{
@@ -3837,6 +3395,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				if (document != IntPtr.Zero) PdfiumEngine.CloseDocument(document);
 			}
 		});
+		_documentCloseTask = Task.WhenAll(closeDocument, closedSession?.Closed ?? Task.CompletedTask);
 	}
 
 	private static List<PageInfo> CollectPageInfo(nint document, int pageCount)
@@ -4008,14 +3567,17 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		LogStatus($"ﾄ静｣ xoay trang {pageNumber} trﾃｪn mﾃn hﾃｬnh ({num}ﾂｰ).");
 	}
 
-	public async Task<bool> SaveDocumentAsync(string? outputPath = null)
+	private async Task<bool> SaveDocumentCoreAsync(string? outputPath = null)
 	{
 		if (string.IsNullOrEmpty(CurrentPdfPath) || PageCount <= 0)
 		{
-			MessageBox.Show("Vui lﾃｲng m盻・m盻冲 file PDF trﾆｰ盻嫩.", "Thﾃｴng bﾃ｡o", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			MessageBox.Show("Vui lòng mở PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return false;
 		}
-		bool isOverwrite = string.IsNullOrEmpty(outputPath);
+		string sourcePath = CurrentPdfPath;
+		int saveGeneration = _loadGeneration, textRevision = _textEditRevision;
+		bool isOverwrite = string.IsNullOrEmpty(outputPath) ||
+            System.IO.Path.GetFullPath(outputPath).Equals(System.IO.Path.GetFullPath(CurrentPdfPath), StringComparison.OrdinalIgnoreCase);
 		string targetPath = outputPath ?? CurrentPdfPath;
 		List<(int PageNumber, string ImagePath, double Left, double Bottom, double Width, double Height)> imageSigsData = new();
 		foreach (var ann in Annotations.OfType<PdfSignatureAnnotation>())
@@ -4042,86 +3604,36 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 		}
 		List<KeyValuePair<int, int>> activeRotations = _pageRotations.Where((KeyValuePair<int, int> r) => r.Value != 0).ToList();
-		bool hasPendingTextEdits = _pendingTextEdits.Count > 0 || _pendingOriginalTextEdits.Count > 0;
+		var nativeTextEdits = _nativeTextEdits.ToArray();
+		bool hasPendingTextEdits = nativeTextEdits.Length > 0;
 		if (activeRotations.Count == 0 && !isOrderChanged && !hasPendingTextEdits && imageSigsData.Count == 0)
 		{
 			if (isOverwrite)
 			{
-				MessageBox.Show("Khﾃｴng cﾃｳ thay ﾄ黛ｻ品 nﾃo ﾄ黛ｻ・lﾆｰu.", "Thﾃｴng bﾃ｡o", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				MessageBox.Show("Không có thay đổi để lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 				return true;
 			}
 			try
 			{
 				File.Copy(CurrentPdfPath, targetPath, overwrite: true);
-				MessageBox.Show("Lﾆｰu file thﾃnh cﾃｴng.", "Thﾃnh cﾃｴng", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+				MessageBox.Show("Đã lưu PDF.", "Đã lưu", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 				return true;
 			}
 			catch (Exception ex)
 			{
-				MessageBox.Show("L盻擁 khi sao chﾃｩp file: " + ex.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
+				MessageBox.Show("Không sao chép được PDF: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
 				return false;
 			}
 		}
-		LogStatus("ﾄ紳ng lﾆｰu cﾃ｡c thay ﾄ黛ｻ品...");
+		LogStatus("Đang lưu thay đổi vào PDF…");
 		string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-		List<(PendingTextEdit Edit, string ImagePath)> pendingTextEditImages = new List<(PendingTextEdit Edit, string ImagePath)>();
 		try
 		{
-			File.Copy(CurrentPdfPath, tempFile, overwrite: true);
-			if (hasPendingTextEdits)
-			{
-				foreach (PendingTextEdit pendingTextEdit in _pendingTextEdits)
-				{
-					pendingTextEditImages.Add((pendingTextEdit, RenderReplacementOverlayImage(pendingTextEdit)));
-				}
-			}
+			if (nativeTextEdits.Length > 0)
+				await Task.Run(() => PdfNativeTextEditor.SaveCopy(sourcePath, tempFile, nativeTextEdits));
+			else File.Copy(sourcePath, tempFile, overwrite: true);
 			if (!(await Task.Run(delegate
 			{
-				if (hasPendingTextEdits)
-				{
-					List<(PendingTextEdit Edit, string ImagePath)> pendingTextEdits = pendingTextEditImages.ToList();
-					string workingFile = tempFile;
-					foreach (var pendingTextEdit in pendingTextEdits)
-					{
-						string text = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-						bool flag = PdfInterop.PdfCore.overlay_pdf_image(workingFile, pendingTextEdit.Edit.PageNumber, pendingTextEdit.ImagePath, pendingTextEdit.Edit.Left, pendingTextEdit.Edit.Bottom, pendingTextEdit.Edit.Width, pendingTextEdit.Edit.Height, text);
-						try
-						{
-							File.Delete(workingFile);
-						}
-						catch
-						{
-						}
-						if (!flag)
-						{
-							try
-							{
-								File.Delete(text);
-							}
-							catch
-							{
-							}
-							try
-							{
-								File.Delete(pendingTextEdit.ImagePath);
-							}
-							catch
-							{
-							}
-							return false;
-						}
-						try
-						{
-							File.Delete(pendingTextEdit.ImagePath);
-						}
-						catch
-						{
-						}
-						workingFile = text;
-					}
-					tempFile = workingFile;
-				}
-
 				if (imageSigsData.Count > 0)
 				{
 					string workingFile = tempFile;
@@ -4170,21 +3682,6 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					}
 					tempFile = text;
 				}
-				if (_pendingOriginalTextEdits.Count > 0)
-				{
-					foreach (var origEdit in _pendingOriginalTextEdits)
-					{
-						string text = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
-						bool flag = PdfInterop.PdfCore.replace_text_in_page(tempFile, origEdit.PageNumber, origEdit.OriginalText, origEdit.ReplacementText, text);
-						try { File.Delete(tempFile); } catch { }
-						if (!flag)
-						{
-							try { File.Delete(text); } catch { }
-							return false;
-						}
-						tempFile = text;
-					}
-				}
 				if (isOrderChanged)
 				{
 					string text2 = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
@@ -4206,22 +3703,27 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				return true;
 			})))
 			{
-				MessageBox.Show("Khﾃｴng th盻・ﾃ｡p d盻･ng cﾃ｡c thay ﾄ黛ｻ品 vﾃo file PDF.", "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
-				LogStatus("Lﾆｰu th蘯･t b蘯｡i");
+				MessageBox.Show("Không áp dụng được thay đổi vào PDF.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				LogStatus("Lưu thất bại");
 				return false;
 			}
+			if (saveGeneration != _loadGeneration || textRevision != _textEditRevision)
+                throw new InvalidOperationException("Tài liệu đã thay đổi trong lúc lưu. Hãy lưu lại nội dung mới nhất.");
 			if (isOverwrite)
 			{
 				CloseActiveDocument();
+				await _documentCloseTask;
 			}
+			if (saveGeneration != _loadGeneration || textRevision != _textEditRevision)
+                throw new InvalidOperationException("Tài liệu đã thay đổi trong lúc lưu. Chưa thay file PDF gốc.");
 			try
 			{
-				File.Copy(tempFile, targetPath, overwrite: true);
+				CommitSavedPdf(tempFile, targetPath);
 			}
 			catch (Exception ex2)
 			{
-				MessageBox.Show("Khﾃｴng th盻・ghi file ﾄ黛ｺｧu ra: " + ex2.Message + ". Cﾃｳ th盻・file ﾄ疎ng m盻・b盻殃 盻ｩng d盻･ng khﾃ｡c.", "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
-				LogStatus("Lﾆｰu th蘯･t b蘯｡i");
+				MessageBox.Show("Không ghi được file PDF: " + ex2.Message + ". File có thể đang được ứng dụng khác sử dụng.", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+				LogStatus("Lưu thất bại");
 				if (isOverwrite)
 				{
 					LoadDocument(CurrentPdfPath, clearPendingTextEdits: false);
@@ -4237,38 +3739,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				catch
 				{
 				}
-				foreach (var pendingTextEdit in pendingTextEditImages)
-				{
-					try
-					{
-						File.Delete(pendingTextEdit.ImagePath);
-					}
-					catch
-					{
-					}
-				}
-			}
-			if (hasPendingTextEdits)
-			{
-				foreach (PendingTextEdit pendingTextEdit in _pendingTextEdits)
-				{
-					Annotations.Remove(pendingTextEdit.WhiteoutAnnotation);
-					Annotations.Remove(pendingTextEdit.TextAnnotation);
-				}
-			_pendingTextEdits.Clear();
-			_pendingOriginalTextEdits.Clear();
 			}
 			LoadDocument(targetPath);
 			_pageRotations.Clear();
 			RenderPdfPages();
-			MessageBox.Show("Lﾆｰu file thﾃnh cﾃｴng.", "Thﾃnh cﾃｴng", MessageBoxButton.OK, MessageBoxImage.Asterisk);
-			LogStatus("ﾄ静｣ lﾆｰu: " + System.IO.Path.GetFileName(targetPath));
+			MessageBox.Show("Đã lưu PDF.", "Đã lưu", MessageBoxButton.OK, MessageBoxImage.Asterisk);
+			LogStatus("Đã lưu: " + System.IO.Path.GetFileName(targetPath));
 			return true;
 		}
 		catch (Exception ex3)
 		{
-			MessageBox.Show("ﾄ静｣ x蘯｣y ra l盻擁 khi lﾆｰu: " + ex3.Message, "L盻擁", MessageBoxButton.OK, MessageBoxImage.Hand);
-			LogStatus("Lﾆｰu th蘯･t b蘯｡i");
+			try { File.Delete(tempFile); } catch { }
+			MessageBox.Show("Không lưu được PDF: " + ex3.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Hand);
+			LogStatus("Lưu thất bại");
 			return false;
 		}
 	}

@@ -1,2 +1,2 @@
-﻿- Đã thêm khung và màu nhóm cho thanh công cụ.
-- Đã làm rõ trạng thái chọn và rê chuột trên các nút.
+- Làm lại tính năng sửa chữ PDF và xem trước.
+- Hoàn thiện lưu, hoàn tác và in nội dung đã sửa.

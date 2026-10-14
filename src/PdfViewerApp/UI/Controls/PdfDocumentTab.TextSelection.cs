@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -25,12 +26,18 @@ public partial class PdfDocumentTab
 		}
 		lock (PdfiumEngine.SyncRoot)
 		{
-			nint pageHandle = PdfiumEngine.FPDF_LoadPage(_documentHandle, pageNumber - 1);
+			bool retained = _openedPdfPages.TryGetValue(pageNumber, out nint pageHandle);
+			if (!retained) pageHandle = PdfiumEngine.FPDF_LoadPage(_documentHandle, pageNumber - 1);
 			if (pageHandle == IntPtr.Zero)
 			{
 				return IntPtr.Zero;
 			}
-			value = PdfiumEngine.FPDFText_LoadPage(pageHandle);
+			if (!retained)
+            {
+                try { PdfNativeTextEditor.ApplyPage(_documentHandle, pageHandle, _nativeTextEdits.Where(e => e.PageNumber == pageNumber).ToArray()); }
+                catch { PdfiumEngine.FPDF_ClosePage(pageHandle); throw; }
+            }
+            value = PdfiumEngine.FPDFText_LoadPage(pageHandle);
 			
 			// QUAN TRỌNG: Không ClosePage ở đây để giữ text bắt chuột nhạy bén
 			_openedPdfPages[pageNumber] = pageHandle;

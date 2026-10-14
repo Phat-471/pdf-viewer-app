@@ -22,6 +22,7 @@ public partial class SnapshotActionDialog : Window
     private readonly Size _pageSizePoints;
     internal event Action<PdfSnapshotSelection>? SelectionChanged;
     internal bool EditRegionRequested { get; private set; }
+    internal string? SourceDocumentPath { get; set; }
     private readonly CancellationTokenSource _lifetime = new();
     private BitmapSource? _previewCrop;
     private BitmapSource? _exportCrop;
@@ -248,8 +249,8 @@ public partial class SnapshotActionDialog : Window
         var dialog = new SaveFileDialog
         {
             Filter = "Ảnh PNG (*.png)|*.png", DefaultExt = ".png", AddExtension = true,
-            Title = "Lưu ảnh Snapshot", FileName = $"{Path.GetFileNameWithoutExtension(_snapshot.PdfPath)}_p{_snapshot.PageIndex + 1}_snapshot.png",
-            InitialDirectory = Path.GetDirectoryName(_snapshot.PdfPath)
+            Title = "Lưu ảnh Snapshot", FileName = $"{Path.GetFileNameWithoutExtension(SourceDocumentPath ?? _snapshot.PdfPath)}_p{_snapshot.PageIndex + 1}_snapshot.png",
+            InitialDirectory = Path.GetDirectoryName(SourceDocumentPath ?? _snapshot.PdfPath)
         };
         if (dialog.ShowDialog(this) != true) return;
         SetBusy(true, "Đang tạo và lưu ảnh PNG…");
