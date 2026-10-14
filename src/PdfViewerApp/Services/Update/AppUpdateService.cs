@@ -78,8 +78,18 @@ public sealed class AppUpdateService
                 return false;
             }
 
+            // An old version or another installation must not confirm this attempt.
+            string currentDirectory = Path.GetFullPath(AppContext.BaseDirectory).TrimEnd('\\', '/');
+            if (!currentDirectory.Equals(Path.GetFullPath(state.InstallDirectory).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase) ||
+                ParseVersion(GetAppVersion()) != ParseVersion(state.TargetVersion)) return false;
+
             Directory.CreateDirectory(Path.GetDirectoryName(state.ConfirmationMarkerPath)!);
-            await File.WriteAllTextAsync(state.ConfirmationMarkerPath, DateTimeOffset.UtcNow.ToString("O"), Encoding.UTF8)
+            string confirmation = JsonSerializer.Serialize(new {
+                attempt_id = state.AttemptId, version = ParseVersion(GetAppVersion()).ToString(3),
+                process_id = Environment.ProcessId, exe_path = Environment.ProcessPath,
+                confirmed_utc = DateTimeOffset.UtcNow.ToString("O")
+            });
+            await File.WriteAllTextAsync(state.ConfirmationMarkerPath, confirmation, Encoding.UTF8)
                 .ConfigureAwait(false);
 
             return true;
@@ -410,6 +420,7 @@ public sealed class AppUpdateService
         foreach (var segment in segments)
         {
             if (string.Equals(segment, "backups", StringComparison.OrdinalIgnoreCase) ||
+                segment.StartsWith(".pdfpro-update-", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(segment, "releases", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(segment, "_smoke", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase) ||

@@ -35,6 +35,12 @@ Giải nén toàn bộ ZIP vào một thư mục rồi chạy `install.bat`. Kh�
 
 ## Khi có lỗi
 
+Từ 1.13.1, cập nhật thủ công, cập nhật ngầm và khôi phục dùng chung script nhúng trong ứng dụng. ZIP được giải nén vào thư mục tạm trên cùng ổ đĩa với bản cài, kiểm tra phiên bản rồi thay từng tệp bằng thao tác thay file nguyên tử. EXE được thay sau cùng; không giải nén ghi đè trực tiếp lên EXE đang mở. Các tệp đã thay được giữ riêng để có thể hoàn tác; không xóa toàn bộ thư mục cài đặt khi khôi phục.
+
+Bộ cập nhật chờ app cũ thoát tối đa 60 giây; nếu cửa sổ khác cùng bản cài chưa đóng sau khi được yêu cầu đóng, dừng cập nhật và giữ bản hiện tại. Khóa riêng cho từng thư mục cài ngăn hai bộ cập nhật/khôi phục chạy đồng thời. Thao tác thay file và mở app có thời gian chờ/thử lại nếu Windows chưa nhả file. Xác nhận khởi động kiểm tra đúng phiên bản, thư mục, lượt cập nhật và PID; lỗi khởi động chỉ đóng tiến trình vừa mở trước khi hoàn tác các tệp đã thay.
+
+Lần nâng cấp từ 1.13.0 hoặc cũ hơn vẫn do bộ cập nhật cũ thực hiện. Nếu gặp lỗi khóa EXE, đợi lượt cập nhật kết thúc và kiểm tra app đã tự mở chưa. Có thể dùng bộ cài EXE của bản mới để cài lại tại thư mục hiện tại. Cơ chế mới có hiệu lực sau khi app 1.13.1 được cài. Đã biên dịch và kiểm tra cú pháp script; chưa chạy thử chu trình thay file, khởi động và rollback trên ứng dụng đang sử dụng.
+
 - Lỗi build hoặc tải tệp lên: bản mới chưa được thông báo trong ứng dụng. Sửa nguyên nhân trước khi tiếp tục.
 - Kiểm tra bản nháp thất bại: giữ trạng thái nháp; không công bố hoặc cập nhật WordPress.
 - GitHub đã công bố nhưng WordPress thất bại: tải đủ bốn asset của đúng tag về `releases/`, dùng `tools/publish_release.ps1` để gửi lại metadata và kiểm tra API. Không build lại hoặc thay tệp của bản đã công bố; không tăng phiên bản chỉ để thử lại một lỗi kết nối.

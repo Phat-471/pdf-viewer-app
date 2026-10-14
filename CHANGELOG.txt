@@ -1,3 +1,2 @@
-- Sửa chữ trực tiếp trên trang PDF.
-- Cải thiện giữ font và bố cục chữ khi chỉnh sửa.
-- Tối ưu bản xem trước và thao tác lưu, in.
+- Sửa lỗi mở ứng dụng sau cập nhật.
+- Cải thiện thay tệp và khôi phục khi cập nhật gặp lỗi.

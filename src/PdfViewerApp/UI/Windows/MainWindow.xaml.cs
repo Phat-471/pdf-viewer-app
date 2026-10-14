@@ -136,6 +136,8 @@ public partial class MainWindow : Window, IComponentConnector
 			RefreshRecentFilesDashboard();
 			base.Dispatcher.InvokeAsync((Func<Task>)async delegate
 			{
+                // Confirm a loaded window before a modal notification can delay it.
+                await AppUpdateService.TryConfirmPendingLaunchAsync();
 				string successFlag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update-success.flag");
 				string failedFlag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update-failed.flag");
 
@@ -147,10 +149,9 @@ public partial class MainWindow : Window, IComponentConnector
 				else if (File.Exists(failedFlag))
 				{
 					try { File.Delete(failedFlag); } catch {}
-					MessageBox.Show(this, "Quá trình cập nhật gặp sự cố nên hệ thống đã tự động khôi phục (rollback) về phiên bản hoạt động trước đó để đảm bảo ổn định.", "Cập Nhật Thất Bại", MessageBoxButton.OK, MessageBoxImage.Warning);
+					MessageBox.Show(this, "Không hoàn tất được cập nhật. Ứng dụng đang dùng bản trước. Chi tiết được ghi trong nhật ký cập nhật.", "Cập nhật chưa hoàn tất", MessageBoxButton.OK, MessageBoxImage.Warning);
 				}
 
-				await AppUpdateService.TryConfirmPendingLaunchAsync();
 				await RunUpdateCheckAsync();
 			}, DispatcherPriority.ApplicationIdle);
 		};
@@ -432,13 +433,13 @@ public partial class MainWindow : Window, IComponentConnector
 				return;
 			}
 
-			string scriptPath = Path.Combine(Path.GetTempPath(), "pdfpro_restore_previous.ps1");
+			string scriptPath = Path.Combine(Path.GetDirectoryName(state.StateFilePath) ?? Path.GetTempPath(), "restore-" + Guid.NewGuid().ToString("N") + ".ps1");
 			File.WriteAllText(scriptPath, BuildRestoreScript(), Encoding.UTF8);
 
 			Process.Start(new ProcessStartInfo
 			{
 				FileName = "powershell.exe",
-				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{state.InstallDirectory}\" -BackupZip \"{state.BackupZipPath}\" -AppExe \"{state.AppExecutablePath}\" -CurrentPid {Environment.ProcessId} -TimeoutSeconds 120",
+				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{state.InstallDirectory}\" -BackupZip \"{state.BackupZipPath}\" -AppExe \"{state.AppExecutablePath}\" -TargetVersion \"{previousVersion}\" -RestoreOnly -CurrentPid {Environment.ProcessId} -TimeoutSeconds 120",
 				UseShellExecute = false,
 				CreateNoWindow = true,
 				WindowStyle = ProcessWindowStyle.Hidden
@@ -453,59 +454,7 @@ public partial class MainWindow : Window, IComponentConnector
 		}
 	}
 
-	private static string BuildRestoreScript()
-	{
-		return @"param(
-    [Parameter(Mandatory = $true)]
-    [string]$InstallDir,
-    [Parameter(Mandatory = $true)]
-    [string]$BackupZip,
-    [Parameter(Mandatory = $true)]
-    [string]$AppExe,
-    [Parameter(Mandatory = $true)]
-    [int]$CurrentPid,
-    [int]$TimeoutSeconds = 120
-)
-
-$ErrorActionPreference = 'Stop'
-
-function Remove-Tree([string]$Path) {
-    if (Test-Path -LiteralPath $Path) {
-        Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | ForEach-Object {
-            if ($_.PSIsContainer) {
-                Remove-Tree $_.FullName
-            }
-            else {
-                try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue } catch {}
-            }
-        }
-        try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch {}
-    }
-}
-
-if (-not (Test-Path -LiteralPath $BackupZip)) {
-    throw ""Rollback backup not found: $BackupZip""
-}
-
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-while ((Get-Date) -lt $deadline) {
-    try {
-        Get-Process -Id $CurrentPid -ErrorAction Stop | Out-Null
-        Start-Sleep -Milliseconds 500
-    }
-    catch {
-        break
-    }
-}
-
-Remove-Tree $InstallDir
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Expand-Archive -LiteralPath $BackupZip -DestinationPath $InstallDir -Force
-
-try { Start-Process -FilePath $AppExe } catch {}
-exit 0
-";
-	}
+	private static string BuildRestoreScript() => UpdateInstallerScript.Read();
 
 	private void MainWindow_StateChanged(object? sender, EventArgs e)
 	{
@@ -3643,7 +3592,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
 			{
 				FileName = "powershell.exe",
-				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{rollbackState.InstallDirectory}\" -BackupZip \"{rollbackState.BackupZipPath}\" -UpdateZip \"{rollbackState.DownloadZipPath}\" -MarkerPath \"{rollbackState.ConfirmationMarkerPath}\" -AppExe \"{rollbackState.AppExecutablePath}\" -TargetVersion \"{silentState.TargetVersion}\" -ParentPid {Environment.ProcessId} -TimeoutSeconds 120",
+				Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\" -InstallDir \"{rollbackState.InstallDirectory}\" -BackupZip \"{rollbackState.BackupZipPath}\" -UpdateZip \"{rollbackState.DownloadZipPath}\" -MarkerPath \"{rollbackState.ConfirmationMarkerPath}\" -AppExe \"{rollbackState.AppExecutablePath}\" -TargetVersion \"{silentState.TargetVersion}\" -ExpectedSha256 \"{silentState.Sha256}\" -ParentPid {Environment.ProcessId} -TimeoutSeconds 120",
 				UseShellExecute = false,
 				CreateNoWindow = true,
 				WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
@@ -3660,131 +3609,6 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 	}
 
-	private static string BuildSilentUpdateScript()
-	{
-		// Tái sử dụng hoàn toàn script giống UpdateDialog.BuildRollbackScript()
-		return @"param(
-    [Parameter(Mandatory = $true)]
-    [string]$InstallDir,
-    [Parameter(Mandatory = $true)]
-    [string]$BackupZip,
-    [Parameter(Mandatory = $true)]
-    [string]$UpdateZip,
-    [Parameter(Mandatory = $true)]
-    [string]$MarkerPath,
-    [Parameter(Mandatory = $true)]
-    [string]$AppExe,
-    [Parameter(Mandatory = $true)]
-    [string]$TargetVersion,
-    [int]$ParentPid = 0,
-    [int]$TimeoutSeconds = 120
-)
-
-$ErrorActionPreference = 'Stop'
-
-$AttemptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$LogPath = Join-Path $AttemptDir ""apply-update.log""
-Start-Transcript -Path $LogPath -Append -ErrorAction SilentlyContinue
-
-function Remove-Tree([string]$Path) {
-    if (Test-Path -LiteralPath $Path) {
-        Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue | ForEach-Object {
-            if ($_.PSIsContainer) { Remove-Tree $_.FullName }
-            else { try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue } catch {} }
-        }
-        try { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue } catch {}
-    }
-}
-
-function Get-AppFileVersion([string]$Path) {
-    try {
-        if (Test-Path -LiteralPath $Path) {
-            return ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)).FileVersion
-        }
-    } catch {}
-    return $null
-}
-
-function Normalize-Version([string]$Value) {
-    try {
-        $parsed = [version](($Value -replace '^v', '').Trim())
-        return ""$($parsed.Major).$($parsed.Minor).$($parsed.Build)""
-    } catch { return $null }
-}
-
-function Restore-PreviousInstall {
-    Write-Host ""Restoring previous installation due to failure...""
-    Remove-Tree $InstallDir
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Expand-Archive -LiteralPath $BackupZip -DestinationPath $InstallDir -Force
-    try { Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue } catch {}
-    New-Item -ItemType File -Path (Join-Path $InstallDir ""update-failed.flag"") -Force | Out-Null
-    try { Start-Process -FilePath $AppExe } catch {}
-    Stop-Transcript -ErrorAction SilentlyContinue
-    exit 2
-}
-
-try {
-    if ($ParentPid -gt 0) {
-        Write-Host ""Waiting for parent process $ParentPid to exit...""
-        try {
-            $parentProc = Get-Process -Id $ParentPid -ErrorAction SilentlyContinue
-            if ($parentProc) {
-                $parentProc.WaitForExit(5000)
-                if (-not $parentProc.HasExited) { Stop-Process -Id $ParentPid -Force -ErrorAction SilentlyContinue }
-            }
-        } catch {}
-    }
-
-    Write-Host ""Stopping other PdfViewerApp instances...""
-    Get-Process -Name ""PdfViewerApp"" -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID } | ForEach-Object {
-        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Seconds 1
-
-    if (-not (Test-Path -LiteralPath $BackupZip)) { throw ""Rollback backup not found: $BackupZip"" }
-    if (-not (Test-Path -LiteralPath $UpdateZip)) { throw ""Update package not found: $UpdateZip"" }
-
-    Write-Host ""Extracting update package $UpdateZip to $InstallDir...""
-    Expand-Archive -LiteralPath $UpdateZip -DestinationPath $InstallDir -Force
-
-    $installedVersion = Get-AppFileVersion $AppExe
-    if (-not $installedVersion) { throw ""Could not read installed app version after update."" }
-
-    $normalizedInstalled = Normalize-Version $installedVersion
-    $normalizedTarget = Normalize-Version $TargetVersion
-    if ($normalizedInstalled -ne $normalizedTarget) {
-        throw ""Version mismatch after update. Installed=$installedVersion Target=$TargetVersion""
-    }
-
-    Write-Host ""Starting updated executable $AppExe...""
-    $proc = Start-Process -FilePath $AppExe -WorkingDirectory $InstallDir -PassThru
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    $confirmed = $false
-    while ((Get-Date) -lt $deadline) {
-        if (Test-Path -LiteralPath $MarkerPath) { $confirmed = $true; break }
-        if ($proc.HasExited) {
-            $otherProcs = Get-Process -Name ""PdfViewerApp"" -ErrorAction SilentlyContinue
-            if (-not $otherProcs) { break }
-        }
-        Start-Sleep -Milliseconds 500
-    }
-
-    if ($confirmed) {
-        Write-Host ""Update confirmed successfully!""
-        try { Remove-Item -LiteralPath $MarkerPath -Force -ErrorAction SilentlyContinue } catch {}
-        New-Item -ItemType File -Path (Join-Path $InstallDir ""update-success.flag"") -Force | Out-Null
-        Stop-Transcript -ErrorAction SilentlyContinue
-        exit 0
-    } else {
-        throw ""Update confirmation timeout or process exited.""
-    }
-}
-catch {
-    Write-Host ""Error encountered: $_""
-    Restore-PreviousInstall
-}
-";
-	}
+	private static string BuildSilentUpdateScript() => UpdateInstallerScript.Read();
 }
 

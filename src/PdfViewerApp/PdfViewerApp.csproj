@@ -25,6 +25,7 @@
   <ItemGroup>
     <None Remove="assets\hphat_logo_1780279208636.png" />
     <EmbeddedResource Include="assets\hphat_logo_1780279208636.png" LogicalName="assets/hphat_logo_1780279208636.png" />
+    <EmbeddedResource Include="assets\update\apply-update.ps1" LogicalName="PdfViewerApp.UpdateInstaller.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Fluent">

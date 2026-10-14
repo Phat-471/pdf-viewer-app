@@ -58,6 +58,14 @@ public partial class App : Application
 	{
 		base.Startup += async delegate(object sender, StartupEventArgs e)
 		{
+            // A launch during file replacement yields to the installer, which
+            // opens the application once the entire payload is ready.
+            if (!e.Args.Contains(UpdateClient.UpdateInstallerScript.LaunchArgument) &&
+                UpdateClient.UpdateInstallerScript.IsInstallationBusy(AppContext.BaseDirectory))
+            {
+                Shutdown();
+                return;
+            }
 			SecurityHelper.CheckIntegrity();
 			ExplorerContextMenuService.RepairLabels();
 			string[] args = e.Args;
