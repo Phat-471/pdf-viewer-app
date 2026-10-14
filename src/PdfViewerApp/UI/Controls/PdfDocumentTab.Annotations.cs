@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -181,6 +181,8 @@ public partial class PdfDocumentTab
 
 	public void Undo()
 	{
+        if (_textEditDialogOpen || _savingDocument) { LogStatus("Đang áp dụng hoặc lưu tài liệu. Vui lòng chờ."); return; }
+        if (_inlineTextEditor != null) { _inlineTextEditor.UndoDraft(false); return; }
 		if (_undoStack.Count == 0)
 		{
 			LogStatus("Không có gì để hoàn tác");
@@ -217,6 +219,8 @@ public partial class PdfDocumentTab
 
 	public void Redo()
 	{
+        if (_textEditDialogOpen || _savingDocument) { LogStatus("Đang áp dụng hoặc lưu tài liệu. Vui lòng chờ."); return; }
+        if (_inlineTextEditor != null) { _inlineTextEditor.UndoDraft(true); return; }
 		if (_redoStack.Count == 0)
 		{
 			LogStatus("Không có gì để làm lại");
@@ -978,6 +982,7 @@ public partial class PdfDocumentTab
 		DrawTextSelectionHighlights(canvas, pageNumber);
 		DrawEditTextSelectionBorder(canvas, pageNumber);
 		DrawSnapshotOverlay(canvas, pageNumber);
+		AttachInlineTextEditor(canvas, pageNumber);
 	}
 
 	private void DrawEndTick(Canvas canvas, Point p1, Point p2, Color color)

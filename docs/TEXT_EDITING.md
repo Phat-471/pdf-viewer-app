@@ -4,10 +4,10 @@
 
 1. Mở PDF, chọn **Biên tập → Sửa chữ gốc**.
 2. Chọn khung xanh quanh đoạn chữ. Khung cam có thông báo về giới hạn của vùng chữ.
-3. Nhập nội dung mới. Hộp thoại hiển thị tên font và cỡ chữ sau khi áp dụng ma trận phóng đại của PDF. Rê chuột lên thông tin để xem cỡ chữ lưu và hệ số phóng đại.
-4. Bản xem trước tự làm mới khi ngừng nhập; có thể nhấn **Xem trước**. Ảnh mờ là bản trước đó, chưa được áp dụng.
-5. Nếu font nhúng thiếu ký tự, chọn **Dùng font đầy đủ** để nạp bản cùng tên. Nếu bản đầy đủ cũng thiếu ký tự tiếng Việt, chọn **Đổi sang Noto Sans · tiếng Việt** hoặc **Chọn font TTF…**. Đổi sang font khác sẽ thay hình dáng và chiều rộng chữ; ứng dụng giữ cỡ chữ, màu và vị trí. Nút đang chọn có viền xanh và thông tin font hiển thị ngay bên dưới.
-6. Nhấn **Áp dụng**, rồi **Lưu** hoặc **Lưu dưới dạng**. Ctrl+Z hoàn tác; Ctrl+Y làm lại.
+3. Đặt con trỏ vào chữ và nhập trực tiếp trên trang. Có thể kéo chọn ký tự, dùng phím mũi tên, copy/paste và Ctrl+Z trong ô nhập. Thanh công cụ hiển thị font và cỡ chữ thực tế sau ma trận phóng đại của PDF.
+4. Khi ngừng gõ, ảnh **Bản xem trước PDF** tự làm mới. Ảnh này được dựng bằng font của đối tượng PDF; ô nhập là bề mặt tạm và có thể hiển thị khác font nhúng. Nút **Áp dụng** chỉ bật khi bản xem trước khớp nội dung và lựa chọn font hiện tại; ảnh cũ được xóa khi gõ tiếp.
+5. Mặc định **Giữ font · tự tìm bản đầy đủ**: nếu font nhúng không mã hóa được nội dung mới, tự tìm TTF đầy đủ cùng họ và kiểu chữ. Muốn giữ riêng font nhúng, chọn **Chỉ dùng font nhúng gốc**. Nếu bản đầy đủ cũng thiếu tiếng Việt, chọn **Đổi sang Noto Sans · tiếng Việt** hoặc **TTF…**. Đổi sang họ font khác sẽ thay hình dáng và chiều rộng chữ; thông báo hiển thị màu vàng.
+6. Nhấn **Áp dụng** hoặc Enter/Ctrl+Enter, rồi **Lưu** hoặc **Lưu dưới dạng**. Esc hủy nội dung đang nhập. Ctrl+Z/Ctrl+Y sau khi áp dụng hoàn tác/làm lại thay đổi của tài liệu. Ctrl+S và Ctrl+P hoạt động trong ô nhập; lưu và in cần bản xem trước hợp lệ trước khi nhận nội dung đang nhập.
 
 Để trống nội dung để xóa đối tượng chữ. Chữ mới dài hơn không tự giảm cỡ chữ; cần xem trước để tránh đè lên nội dung bên cạnh. Đóng tài liệu có chữ chưa lưu sẽ có lựa chọn lưu, bỏ thay đổi hoặc hủy đóng.
 
@@ -15,10 +15,11 @@
 
 - Sửa đối tượng chữ trực tiếp trên trang, giữ tài nguyên font, cỡ chữ, màu và ma trận vị trí của đối tượng gốc.
 - Chọn từng đối tượng; không thay toàn bộ các đoạn có cùng nội dung trong trang.
-- Font subset có thể thiếu ký tự hoặc bảng mã. Nội dung không mã hóa được bằng font nhúng được thông báo và có lựa chọn nạp font đầy đủ; không tự thay font.
+- Font subset có thể thiếu ký tự hoặc bảng mã. Chế độ tự động chỉ dùng bản đầy đủ cùng họ và kiểu chữ; chọn họ khác cần thao tác rõ ràng của người dùng.
 - Font đầy đủ chỉ được nhúng khi có quyền nhúng để chỉnh sửa và có đủ ký tự. Hỗ trợ TTF dạng tĩnh, chưa hỗ trợ OTF, TTC và font biến thiên. Font được giữ trong danh sách sửa để lưu, hoàn tác, in và Snapshot dùng cùng dữ liệu.
-- Khi nạp font đầy đủ, giữ cỡ chữ, màu và ma trận vị trí; không tự co chữ. Bản đầy đủ cùng tên có thể khác phiên bản font nhúng, nên cần xem trước. Khoảng cách chữ đặc biệt của nguồn có thể khác khi dựng lại đối tượng.
-- Khi thay font, giữ nguyên thẻ đánh dấu nội dung và tham số của thẻ trong cùng tài liệu, gồm thông tin vùng nhìn của Revit. Chưa nạp font đầy đủ cho chữ có lớp cắt, độ trong suốt hoặc nét viền. Nếu chữ mới giao với đối tượng vẽ sau nó, yêu cầu rút ngắn nội dung để giữ kết quả hiển thị và lưu nhất quán.
+- Khi nạp font đầy đủ, giữ cỡ chữ, màu và ma trận vị trí; không tự co chữ. Với dòng ngang có ánh xạ một ký tự/một glyph rõ ràng và số ký tự không đổi, giữ vị trí từng ký tự gốc, kể cả khi dòng được xoay. Ví dụ thay LEVEL 1 thành LEVEL 2 giữ vị trí các ký tự còn lại. Khi độ dài thay đổi hoặc không đọc được vị trí rõ ràng, dùng khoảng cách của font; thanh công cụ thông báo cơ chế đang dùng.
+- Bản đầy đủ cùng tên có thể khác phiên bản font nhúng. Có thể khác từng pixel; cần kiểm tra bản xem trước. Ô nhập giữ cỡ đọc tối thiểu 12 px để dễ thao tác, cỡ lưu trong PDF vẫn giữ nguyên.
+- Khi thay font, giữ nguyên thẻ đánh dấu nội dung và tham số của thẻ trong cùng tài liệu, gồm thông tin vùng nhìn của Revit. Chưa sửa trực tiếp chữ có lớp cắt, độ trong suốt hoặc nét viền. Nếu chữ mới giao với đối tượng vẽ sau nó khi nạp font, yêu cầu rút ngắn nội dung để giữ kết quả hiển thị và lưu nhất quán.
 - Font không nhúng phụ thuộc font có trên máy; không bảo đảm giống nhau giữa các máy.
 - PDF scan hoặc chữ đã chuyển thành nét vẽ không có đối tượng chữ gốc để sửa. OCR không khôi phục chính xác font từ ảnh.
 - Chữ trong khối dùng chung, PDF không cho sửa và PDF có chữ ký số được thông báo rõ; chưa hỗ trợ sửa các trường hợp này.
@@ -30,7 +31,13 @@
 
 `PdfRenderSession` nhận danh sách sửa bất biến. Khóa cache gồm nội dung sửa để ảnh cũ không xuất hiện sau khi sửa hoặc hoàn tác. Vùng chọn được quy đổi bằng PDFium để theo đúng góc xoay và vùng cắt trang.
 
-Lưu tạo PDF tạm, mở lại để đối chiếu số trang, từng nội dung chữ, font, cỡ chữ, màu và vị trí, rồi thay file đích bằng thao tác thay file nguyên tử. Lỗi lưu giữ danh sách sửa để có thể thử lại. In và Snapshot tạo bản làm việc có nội dung sửa, không tự ghi lên PDF gốc.
+`PreviewSession` mở tài liệu và trang một lần cho mỗi lượt sửa. Mỗi bản xem trước tạo đối tượng chữ tạm, kiểm tra nội dung Unicode, dựng bitmap riêng của chữ rồi trả đối tượng gốc về trang. Không dựng toàn bộ bản vẽ cho mỗi phím gõ. Việc dựng chạy trên nền dưới khóa PDFium; kết quả cũ không cho phép áp dụng nội dung mới. Tài liệu xem trước được đóng khi áp dụng, hủy hoặc đóng tài liệu.
+
+Vùng chữ được tìm từ cuối danh sách đối tượng và dừng khi tìm đủ chữ; cách này giảm số lần gọi native trên bản vẽ Revit đặt chữ sau hàng triệu nét vẽ. Trường hợp chữ trong khối dùng chung vẫn được đánh dấu chưa hỗ trợ.
+
+Lưu tạo PDF tạm, mở lại để đối chiếu số trang, từng nội dung chữ, font, cỡ chữ, màu, ma trận và vị trí ký tự đọc được, rồi thay file đích bằng thao tác thay file nguyên tử. Lỗi lưu giữ danh sách sửa để có thể thử lại. In và Snapshot tạo bản làm việc có nội dung sửa, không tự ghi lên PDF gốc.
+
+Tham khảo thao tác **Edit Text/Edit Object** của [Foxit PhantomPDF 10.0](https://cdn01.foxitsoftware.com/pub/foxit/manual/phantom/en_us/FoxitPhantomPDF10.0_Manual.pdf), trang 153–154 và 162. Ảnh người dùng là PhantomPDF với biểu tượng tím; chưa xác định phiên bản cài đặt từ ảnh. Bản hiện tại sửa từng đối tượng một dòng, chưa có dàn lại đoạn văn như PhantomPDF.
 
 ## Mẫu đã đọc
 

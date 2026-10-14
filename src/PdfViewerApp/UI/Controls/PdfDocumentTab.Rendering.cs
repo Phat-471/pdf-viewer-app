@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -378,6 +378,7 @@ public partial class PdfDocumentTab
 				grid.Children.Add(image);
 				grid.Children.Add(canvas);
 				DrawSnapshotOverlay(canvas, pageNumber);
+				AttachInlineTextEditor(canvas, pageNumber);
 				if (_pageRotations.TryGetValue(pageNumber, out var value) && value != 0)
 				{
 					grid.LayoutTransform = new RotateTransform(value);

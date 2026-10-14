@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -44,7 +44,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private int _selectedEditCharIndex = -1;
 	private bool _skipNextEditTextMouseUp;
 
-	public bool HasOriginalFontEdits => _nativeTextEdits.Count > 0;
+	public bool HasOriginalFontEdits => _nativeTextEdits.Count > 0 || _inlineTextEditor?.HasDraft == true;
 
 	private Point _drawStartPoint;
 
@@ -3364,6 +3364,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void CloseActiveDocument()
 	{
+		CancelInlineTextEditor();
 		_ocrLifetime.Cancel();
 		_ocrLifetime.Dispose();
 		_ocrLifetime = new System.Threading.CancellationTokenSource();

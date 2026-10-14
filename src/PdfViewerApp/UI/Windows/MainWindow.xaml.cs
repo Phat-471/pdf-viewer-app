@@ -635,6 +635,14 @@ exit 0
 
 	private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
 	{
+        var editingTab = GetActiveTab();
+        if (editingTab?.HasNativeFontPopupOpen == true && (e.Key == Key.Escape || e.Key == Key.Enter)) return;
+        if (editingTab?.HandleInlineTextKey(e) == true) return;
+        if (editingTab?.HasInlineTextEditor == true && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (e.Key == Key.S) { e.Handled = true; SavePdf_Click(this, new RoutedEventArgs()); return; }
+            if (e.Key == Key.P) { e.Handled = true; PrintPdf_Click(this, new RoutedEventArgs()); return; }
+        }
 		if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.K)
 		{
 			e.Handled = true;
@@ -743,16 +751,7 @@ exit 0
 				break;
 			case Key.W:
 				e.Handled = true;
-				if (PdfTabControl.SelectedItem is TabItem removeItem)
-				{
-					PdfTabControl.Items.Remove(removeItem);
-					if (PdfTabControl.Items.Count == 0)
-					{
-						LogStatus("Sẵn sàng");
-						UpdatePageIndicator();
-						UpdateZoomText();
-					}
-				}
+                CloseActiveTabFromCommandPalette();
 				break;
 			case Key.Add:
 			case Key.OemPlus:

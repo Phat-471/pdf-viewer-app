@@ -1,2 +1,3 @@
-- Cải thiện sửa chữ và lựa chọn font tiếng Việt.
-- Hiển thị cỡ chữ và giữ thông tin bản vẽ Revit.
+- Sửa chữ trực tiếp trên trang PDF.
+- Cải thiện giữ font và bố cục chữ khi chỉnh sửa.
+- Tối ưu bản xem trước và thao tác lưu, in.
