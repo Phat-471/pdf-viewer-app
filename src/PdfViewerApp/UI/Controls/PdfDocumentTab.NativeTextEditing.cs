@@ -79,7 +79,7 @@ public partial class PdfDocumentTab
             var border = new Rectangle { Width = Math.Max(4, rect.Width), Height = Math.Max(4, rect.Height),
                 Stroke = region.UnsupportedReason == null ? Brushes.DodgerBlue : Brushes.DarkOrange, StrokeThickness = 1,
                 Fill = new SolidColorBrush(Color.FromArgb(12, 56, 189, 248)), Cursor = Cursors.IBeam,
-                ToolTip = region.UnsupportedReason ?? $"{region.Text}\n{region.FontName} · {region.FontSize:0.###} pt" };
+                ToolTip = region.UnsupportedReason ?? $"{region.Text}\n{region.FontName} · {region.DisplayFontSize:0.###} pt" };
             Canvas.SetLeft(border, rect.Left); Canvas.SetTop(border, rect.Top); canvas.Children.Add(border);
             border.MouseLeftButtonDown += (_, e) => { e.Handled = true; _skipNextEditTextMouseUp = true; OpenNativeTextEditor(region); };
         }

@@ -22,6 +22,14 @@ internal static class PdfTextFontSource
 
     internal static bool Matches(string original, string fullName) => Key(original) == Key(fullName);
 
+    internal static PdfNativeTextFont ReadVietnameseFont(string original)
+    {
+        string key = Key(original);
+        bool bold = key.Contains("bold"), italic = key.Contains("italic") || key.Contains("oblique");
+        string face = bold ? (italic ? "BoldItalic" : "Bold") : (italic ? "Italic" : "Regular");
+        return Read(Path.Combine(AppContext.BaseDirectory, "assets", "fonts", $"NotoSans-{face}.ttf"));
+    }
+
     internal static PdfNativeTextFont Read(string path)
     {
         var info = new FileInfo(path);
@@ -81,8 +89,13 @@ internal static class PdfTextFontSource
 
     internal static void ValidateText(PdfNativeTextFont font, string text)
     {
-        var supported = new HashSet<char>(font.Characters);
-        string missing = new(text.Where(c => !supported.Contains(c)).Distinct().Take(12).ToArray());
+        string missing = MissingCharacters(font, text);
         if (missing.Length > 0) throw new InvalidOperationException($"Font {font.Name} thiếu ký tự: {missing}. Hãy chọn font TTF có các ký tự này.");
+    }
+
+    internal static string MissingCharacters(PdfNativeTextFont font, string text)
+    {
+        var supported = new HashSet<char>(font.Characters);
+        return new(text.Where(c => !supported.Contains(c)).Distinct().Take(12).ToArray());
     }
 }

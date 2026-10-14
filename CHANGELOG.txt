@@ -1,2 +1,2 @@
-- Sửa lỗi chỉnh chữ tiếng Việt trong PDF dùng font nhúng.
-- Bổ sung font đầy đủ và cải thiện xem trước khi sửa chữ.
+- Cải thiện sửa chữ và lựa chọn font tiếng Việt.
+- Hiển thị cỡ chữ và giữ thông tin bản vẽ Revit.

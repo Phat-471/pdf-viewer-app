@@ -19,7 +19,9 @@ internal sealed class PdfTextEditDialog : Window
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
     private readonly TextBlock _fontStatus;
     private readonly Button _fullFontButton;
-    private PdfNativeTextFont? _selectedFont, _matchingFont, _validatedFont;
+    private readonly Button _originalFontButton, _vietnameseFontButton;
+    private readonly PdfNativeTextRegion _region;
+    private PdfNativeTextFont? _selectedFont, _matchingFont, _vietnameseFont, _validatedFont;
     private bool _previewRunning, _refreshPending, _fontLoading;
     private string? _validated;
     private int _generation;
@@ -30,9 +32,9 @@ internal sealed class PdfTextEditDialog : Window
     internal PdfTextEditDialog(PdfNativeTextRegion region, PdfNativeTextFont? initialFont,
         Func<string, PdfNativeTextFont?, Task<PdfTextEditPreview>> preview)
     {
-        _preview = preview; _selectedFont = initialFont;
+        _preview = preview; _selectedFont = initialFont; _region = region;
         Title = "Sửa chữ gốc trong PDF";
-        Width = 900; Height = 680; MinWidth = 780; MinHeight = 600;
+        Width = 950; Height = 720; MinWidth = 780; MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("#0F172A"); Foreground = Brush("#F8FAFC"); FontFamily = new FontFamily("Segoe UI");
         var root = new Grid { Margin = new Thickness(24) };
@@ -40,9 +42,10 @@ internal sealed class PdfTextEditDialog : Window
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Content = root;
-        Add(root, new TextBlock { Text = "Sửa chữ · Giữ định dạng gốc", FontSize = 22, FontWeight = FontWeights.SemiBold }, 0);
-        Add(root, new TextBlock { Text = $"Trang {region.PageNumber}   •   {region.FontName}   •   {region.FontSize:0.###} pt   •   " +
+        Add(root, new TextBlock { Text = "Sửa chữ trong PDF", FontSize = 22, FontWeight = FontWeights.SemiBold }, 0);
+        Add(root, new TextBlock { Text = $"Trang {region.PageNumber}   •   {region.FontName}   •   {region.DisplayFontSize:0.###} pt   •   " +
             (region.Embedded ? "Font nhúng trong PDF" : "Font không nhúng — hiển thị phụ thuộc font trên máy"),
+            ToolTip = $"Cỡ chữ lưu trong PDF: {region.FontSize:0.###} pt; hệ số phóng đại: {region.TextScale:0.###}.",
             Foreground = Brush("#94A3B8"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 14) }, 1);
         Add(root, new TextBlock { Text = "Nội dung mới", Margin = new Thickness(0, 0, 0, 6) }, 2);
         _input = new TextBox { Text = region.Text, FontSize = 16, Padding = new Thickness(12),
@@ -50,15 +53,17 @@ internal sealed class PdfTextEditDialog : Window
             AcceptsReturn = false, MaxLength = 20000, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
         Add(root, _input, 3);
         var fontPanel = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
-        var fontActions = new StackPanel { Orientation = Orientation.Horizontal };
-        var originalFontButton = Button("Font nhúng gốc", false);
+        var fontActions = new WrapPanel();
+        _originalFontButton = Button("Font nhúng gốc", false);
         _fullFontButton = Button("Dùng font đầy đủ", false); _fullFontButton.IsEnabled = false;
+        _vietnameseFontButton = Button("Đổi sang Noto Sans · tiếng Việt", false); _vietnameseFontButton.IsEnabled = false;
         var chooseFontButton = Button("Chọn font TTF…", false);
-        fontActions.Children.Add(originalFontButton); fontActions.Children.Add(_fullFontButton); fontActions.Children.Add(chooseFontButton);
+        fontActions.Children.Add(_originalFontButton); fontActions.Children.Add(_fullFontButton);
+        fontActions.Children.Add(_vietnameseFontButton); fontActions.Children.Add(chooseFontButton);
         fontPanel.Children.Add(fontActions);
         _fontStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brush("#38BDF8"), Margin = new Thickness(0, 8, 0, 0) };
         fontPanel.Children.Add(_fontStatus); Add(root, fontPanel, 4);
-        Add(root, new TextBlock { Text = "Giữ cỡ chữ, màu và vị trí. Font đầy đủ cùng tên có thể khác phiên bản font nhúng; kiểm tra xem trước. Để trống để xóa chữ.",
+        Add(root, new TextBlock { Text = "Giữ cỡ chữ, màu và vị trí. Đổi sang font khác sẽ thay hình dáng và chiều rộng chữ; cần kiểm tra xem trước. Để trống để xóa chữ.",
             Foreground = Brush("#94A3B8"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 14) }, 5);
         _image = new Image { Stretch = Stretch.Uniform, Margin = new Thickness(10) };
         Add(root, new Border { Background = Brushes.White, CornerRadius = new CornerRadius(6), Child = _image }, 6);
@@ -74,8 +79,9 @@ internal sealed class PdfTextEditDialog : Window
         footer.Children.Add(actions); Add(root, footer, 7);
         _input.TextChanged += (_, _) => InvalidatePreview();
         _refreshTimer.Tick += async (_, _) => { _refreshTimer.Stop(); await UpdatePreviewAsync(); };
-        originalFontButton.Click += (_, _) => { _selectedFont = null; UpdateFontStatus(); InvalidatePreview(); };
+        _originalFontButton.Click += (_, _) => { _selectedFont = null; UpdateFontStatus(); InvalidatePreview(); };
         _fullFontButton.Click += (_, _) => { _selectedFont = _matchingFont; UpdateFontStatus(); InvalidatePreview(); };
+        _vietnameseFontButton.Click += (_, _) => { _selectedFont = _vietnameseFont; UpdateFontStatus(); InvalidatePreview(); };
         chooseFontButton.Click += async (_, _) =>
         {
             var picker = new Microsoft.Win32.OpenFileDialog { Title = "Chọn font TrueType có quyền nhúng", Filter = "Font TrueType (*.ttf)|*.ttf" };
@@ -98,11 +104,15 @@ internal sealed class PdfTextEditDialog : Window
             var previewTask = UpdatePreviewAsync();
             try
             {
-                _matchingFont = initialFont ?? await Task.Run(() => PdfTextFontSource.FindMatching(region.FontName));
+                var fonts = await Task.Run(() => (Matching: PdfTextFontSource.FindMatching(region.FontName),
+                    Vietnamese: PdfTextFontSource.ReadVietnameseFont(region.FontName)));
+                _matchingFont = fonts.Matching; _vietnameseFont = fonts.Vietnamese;
                 if (!_closed)
                 {
                     _fullFontButton.IsEnabled = _matchingFont != null;
                     _fullFontButton.ToolTip = _matchingFont == null ? "Chưa tìm được bản đầy đủ cùng font. Có thể chọn file TTF." : _matchingFont.Name;
+                    _vietnameseFontButton.IsEnabled = true;
+                    _vietnameseFontButton.ToolTip = $"Dùng {_vietnameseFont.Name}. Font sẽ đổi; cỡ chữ, màu và vị trí được giữ nguyên.";
                     UpdateFontStatus();
                 }
             }
@@ -113,9 +123,24 @@ internal sealed class PdfTextEditDialog : Window
         UpdateFontStatus();
     }
 
-    private void UpdateFontStatus() => _fontStatus.Text = _selectedFont == null
-        ? "Đang dùng font nhúng. Nếu thiếu ký tự, chọn Dùng font đầy đủ hoặc Chọn font TTF."
-        : $"Đang dùng: {_selectedFont.Name} · nhúng toàn bộ font vào PDF. Nội dung được kiểm tra bằng font này.";
+    private void UpdateFontStatus()
+    {
+        bool changedFamily = _selectedFont != null && !PdfTextFontSource.Matches(_region.FontName, _selectedFont.Name);
+        _fontStatus.Foreground = Brush(changedFamily ? "#FBBF24" : "#38BDF8");
+        _fontStatus.Text = _selectedFont == null
+            ? "Đang dùng font nhúng gốc. Nếu thiếu ký tự, có thể dùng bản đầy đủ cùng tên hoặc chọn font khác."
+            : $"Đang dùng: {_selectedFont.Name} · " + (changedFamily
+                ? "Đã đổi font. Hình dáng và chiều rộng chữ có thể khác bản gốc."
+                : "Bản đầy đủ cùng tên; có thể khác phiên bản font nhúng.");
+        foreach (var button in new[] { _originalFontButton, _fullFontButton, _vietnameseFontButton })
+        {
+            bool selected = button == _originalFontButton ? _selectedFont == null
+                : button == _fullFontButton ? _matchingFont != null && Equals(_selectedFont, _matchingFont)
+                : _vietnameseFont != null && Equals(_selectedFont, _vietnameseFont);
+            button.BorderBrush = Brush(selected ? "#38BDF8" : "#334155");
+            button.Background = Brush(selected ? "#164E63" : "#1E293B");
+        }
+    }
 
     private void InvalidatePreview()
     {
@@ -139,7 +164,12 @@ internal sealed class PdfTextEditDialog : Window
         _status.Text = "Đang kiểm tra ký tự và tạo bản xem trước…";
         try
         {
+            if (font != null) PdfTextFontSource.ValidateText(font, text);
             var result = await _preview(text, font);
+            // Keep the first original preview as a reference even if typing made
+            // its request stale. Never authorize Apply from a stale result.
+            if (!_closed && _image.Source == null && text == _region.Text)
+            { _image.Source = result.Image; _image.Opacity = 0.35; }
             if (_closed || generation != _generation) return;
             _image.Source = result.Image; _image.Opacity = 1;
             _status.Foreground = Brush("#94A3B8"); _status.Text = result.Message;
@@ -150,6 +180,11 @@ internal sealed class PdfTextEditDialog : Window
             if (_closed || generation != _generation) return;
             _image.Opacity = 0.35; _status.Foreground = Brush("#FBBF24"); _status.Text = ex.Message +
                 (_image.Source == null ? "" : " Ảnh mờ vẫn là bản trước đó.");
+            if (font == null && _matchingFont != null)
+            {
+                string missing = PdfTextFontSource.MissingCharacters(_matchingFont, text);
+                if (missing.Length > 0) _status.Text += $" Bản đầy đủ {_matchingFont.Name} trên máy cũng thiếu: {missing}. Có thể chọn Đổi sang Noto Sans · tiếng Việt.";
+            }
         }
         finally
         {

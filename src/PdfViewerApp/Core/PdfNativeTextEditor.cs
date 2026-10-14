@@ -13,7 +13,11 @@ namespace PdfViewerApp;
 internal sealed record PdfNativeTextEdit(int PageNumber, int ObjectIndex, string OriginalText, string ReplacementText,
     PdfNativeTextFont? Font = null);
 internal sealed record PdfNativeTextRegion(int PageNumber, int ObjectIndex, string OriginalText, string Text,
-    Rect Bounds, Rect DisplayBounds, string FontName, double FontSize, bool Embedded, string? UnsupportedReason);
+    Rect Bounds, Rect DisplayBounds, string FontName, double FontSize, bool Embedded, string? UnsupportedReason)
+{
+    internal double TextScale { get; init; } = 1;
+    internal double DisplayFontSize => FontSize * TextScale;
+}
 internal sealed record PdfTextEditPreview(BitmapSource? Image, Rect Bounds, string Message);
 
 // All borrowed PDFium objects live only inside the document/page scope and global native lock.
@@ -45,6 +49,10 @@ internal static class PdfNativeTextEditor
     [DllImport(Dll)] private static extern nint FPDFPageObj_GetClipPath(nint obj);
     [DllImport(Dll)] private static extern int FPDFClipPath_CountPaths(nint clip);
     [DllImport(Dll)] private static extern int FPDFPageObj_CountMarks(nint obj);
+    [DllImport(Dll)] private static extern nint FPDFPageObj_GetMark(nint obj, uint index);
+    [DllImport(Dll)] private static extern bool FPDFPageObj_AddExistingMark(nint obj, nint mark);
+    [DllImport(Dll)] private static extern bool FPDFPageObjMark_GetName(nint mark, [Out] byte[]? buffer, uint length, out uint size);
+    [DllImport(Dll)] private static extern int FPDFPageObjMark_CountParams(nint mark);
     [DllImport(Dll)] private static extern void FPDFPageObj_Destroy(nint obj);
     [DllImport(Dll)] private static extern bool FPDFPage_GenerateContent(nint page);
     [DllImport(Dll)] private static extern bool FPDF_SaveAsCopy(nint document, ref FileWrite writer, uint flags);
@@ -58,13 +66,13 @@ internal static class PdfNativeTextEditor
     [StructLayout(LayoutKind.Sequential)] private struct FileWrite { public int Version; public nint Callback; }
     [StructLayout(LayoutKind.Sequential)] private struct Matrix { public float A, B, C, D, E, F; }
     private sealed record TextState(string Text, string Font, float Size, Matrix Placement,
-        uint Red, uint Green, uint Blue, uint Alpha, int Mode)
+        uint Red, uint Green, uint Blue, uint Alpha, int Mode, string Marks)
     {
         public bool SameFormat(TextState other) => Math.Abs(Size - other.Size) < 0.001 &&
             Math.Abs(Placement.A - other.Placement.A) < 0.001 && Math.Abs(Placement.B - other.Placement.B) < 0.001 &&
             Math.Abs(Placement.C - other.Placement.C) < 0.001 && Math.Abs(Placement.D - other.Placement.D) < 0.001 &&
             Math.Abs(Placement.E - other.Placement.E) < 0.001 && Math.Abs(Placement.F - other.Placement.F) < 0.001 &&
-            Red == other.Red && Green == other.Green && Blue == other.Blue && Alpha == other.Alpha && Mode == other.Mode;
+            Red == other.Red && Green == other.Green && Blue == other.Blue && Alpha == other.Alpha && Mode == other.Mode && Marks == other.Marks;
     }
 
     private static string ObjectText(nint obj, nint textPage)
@@ -148,6 +156,8 @@ internal static class PdfNativeTextEditor
                     var edit = topLevel ? edits.FirstOrDefault(e => e.PageNumber == pageNumber && e.ObjectIndex == index) : null;
                     nint font = FPDFTextObj_GetFont(item.Key);
                     FPDFTextObj_GetFontSize(item.Key, out float size);
+                    double textScale = FPDFPageObj_GetMatrix(item.Key, out var placement)
+                        ? Math.Sqrt(placement.C * (double)placement.C + placement.D * (double)placement.D) : 1;
                     Rect pdfBox = item.Value;
                     FPDF_PageToDevice(page, 0, 0, 100000, 100000, 0, pdfBox.Left, pdfBox.Top, out int x1, out int y1);
                     FPDF_PageToDevice(page, 0, 0, 100000, 100000, 0, pdfBox.Right, pdfBox.Bottom, out int x2, out int y2);
@@ -155,7 +165,8 @@ internal static class PdfNativeTextEditor
                         Math.Abs(x2 - x1) / 100000.0, Math.Abs(y2 - y1) / 100000.0);
                     result.Add(new(pageNumber, topLevel ? index : -1, edit?.OriginalText ?? text, text, pdfBox, displayBox,
                         FontName(font), size, FPDFFont_GetIsEmbedded(font) == 1,
-                        restriction ?? (!topLevel ? "Chữ nằm trong khối PDF dùng chung. Xuất lại từ file nguồn để sửa riêng vùng này." : null)));
+                        restriction ?? (!topLevel ? "Chữ nằm trong khối PDF dùng chung. Xuất lại từ file nguồn để sửa riêng vùng này." : null))
+                        { TextScale = textScale });
                 }
             }
             finally { PdfiumEngine.FPDFText_ClosePage(textPage); }
@@ -171,7 +182,8 @@ internal static class PdfNativeTextEditor
         string? restriction = DocumentRestriction(doc);
         if (restriction != null) throw new InvalidOperationException(restriction);
         var targets = edits.Select(e => (Edit: e, Object: FPDFPage_GetObject(page, e.ObjectIndex))).ToArray();
-        foreach (var target in targets)
+        int deleted = 0;
+        foreach (var target in targets.OrderBy(t => t.Edit.ObjectIndex))
         {
             if (target.Object == 0 || FPDFPageObj_GetType(target.Object) != 1) throw new InvalidOperationException("Đối tượng chữ đã thay đổi. Hãy mở lại PDF.");
             nint textPage = PdfiumEngine.FPDFText_LoadPage(page);
@@ -188,12 +200,13 @@ internal static class PdfNativeTextEditor
                 if (!FPDFPage_RemoveObject(page, target.Object)) throw new InvalidOperationException("Không xóa được đối tượng chữ.");
                 FPDFPageObj_Destroy(target.Object);
                 replacements[target.Object] = 0;
+                deleted++;
                 continue;
             }
             nint current = target.Object;
             if (target.Edit.Font != null)
             {
-                current = ReplaceWithFullFont(doc, page, target.Object, replacement, target.Edit.Font);
+                current = ReplaceWithFullFont(doc, page, target.Object, target.Edit.ObjectIndex - deleted, replacement, target.Edit.Font);
                 replacements[target.Object] = current;
             }
             else if (!FPDFText_SetText(current, replacement))
@@ -211,14 +224,13 @@ internal static class PdfNativeTextEditor
         return replacements;
     }
 
-    private static nint ReplaceWithFullFont(nint doc, nint page, nint original, string text, PdfNativeTextFont source)
+    private static nint ReplaceWithFullFont(nint doc, nint page, nint original, int index, string text, PdfNativeTextFont source)
     {
         PdfTextFontSource.ValidateText(source, text);
-        // The public API cannot copy these properties. Keep the original-font
-        // route available instead of silently dropping them on replacement.
+        // Clipping and transparency cannot be reproduced by the public API.
         nint clip = FPDFPageObj_GetClipPath(original);
-        if ((clip != 0 && FPDFClipPath_CountPaths(clip) != 0) || FPDFPageObj_HasTransparency(original) || FPDFPageObj_CountMarks(original) != 0)
-            throw new InvalidOperationException("Vùng chữ có lớp cắt, độ trong suốt hoặc thẻ cấu trúc. Chưa thể nạp font đầy đủ cho vùng này; hãy dùng font nhúng hoặc sửa file nguồn.");
+        if ((clip != 0 && FPDFClipPath_CountPaths(clip) != 0) || FPDFPageObj_HasTransparency(original))
+            throw new InvalidOperationException("Vùng chữ có lớp cắt hoặc độ trong suốt. Chưa thể nạp font đầy đủ cho vùng này; hãy dùng font nhúng hoặc sửa file nguồn.");
         int mode = FPDFTextObj_GetTextRenderMode(original);
         if (mode is not (0 or 3)) throw new InvalidOperationException("Chưa hỗ trợ nạp font cho chữ có nét viền hoặc dùng làm vùng cắt.");
         if (!FPDFTextObj_GetFontSize(original, out float size) || !FPDFPageObj_GetMatrix(original, out var matrix))
@@ -234,9 +246,18 @@ internal static class PdfNativeTextEditor
                 !FPDFTextObj_SetTextRenderMode(created, mode)) throw new InvalidOperationException("Không tạo được chữ bằng font đầy đủ.");
             if (!FPDFPageObj_GetFillColor(original, out uint r, out uint g, out uint b, out uint a) ||
                 !FPDFPageObj_SetFillColor(created, r, g, b, a)) throw new InvalidOperationException("Không giữ được màu chữ gốc.");
-            int count = FPDFPage_CountObjects(page), index = -1;
-            for (int i = 0; i < count; i++) if (FPDFPage_GetObject(page, i) == original) { index = i; break; }
-            if (index < 0 || !FPDFPageObj_GetBounds(created, out float left, out float bottom, out float right, out float top))
+            // Retain entire dictionaries/references in the same document, including
+            // Revit viewport metadata. Copy before destroying the source object.
+            int markCount = FPDFPageObj_CountMarks(original);
+            if (markCount < 0) throw new InvalidOperationException("Không đọc được thẻ của chữ gốc.");
+            for (uint i = 0; i < markCount; i++)
+            {
+                nint mark = FPDFPageObj_GetMark(original, i);
+                if (mark == 0 || !FPDFPageObj_AddExistingMark(created, mark))
+                    throw new InvalidOperationException("Không giữ được thẻ của chữ gốc. Chưa thay nội dung PDF.");
+            }
+            int count = FPDFPage_CountObjects(page);
+            if (index < 0 || FPDFPage_GetObject(page, index) != original || !FPDFPageObj_GetBounds(created, out float left, out float bottom, out float right, out float top))
                 throw new InvalidOperationException("Không xác định được vị trí chữ mới.");
             var bounds = new Rect(left, bottom, Math.Max(0, right - left), Math.Max(0, top - bottom));
             // PDFium saves newly created objects in a trailing stream. Reject
@@ -289,7 +310,7 @@ internal static class PdfNativeTextEditor
             string message = removed ? "Đối tượng chữ sẽ được xóa khỏi PDF." : selected.Width > region.Bounds.Width * 1.05 || selected.Height > region.Bounds.Height * 1.05
                 ? "Chữ mới rộng hơn vùng gốc. Kiểm tra phần chữ lân cận; cỡ chữ vẫn giữ nguyên." : "Nhấn Áp dụng, sau đó Lưu để ghi vào file.";
             var edit = edits.FirstOrDefault(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
-            if (!removed) message = (edit?.Font == null ? "Xem trước bằng font nhúng gốc. " : $"Xem trước bằng {edit.Font.Name} đầy đủ · {region.FontSize:0.###} pt. ") + message;
+            if (!removed) message = (edit?.Font == null ? "Xem trước bằng font nhúng gốc. " : $"Xem trước bằng {edit.Font.Name} đầy đủ · {region.DisplayFontSize:0.###} pt. ") + message;
             result = new(image, selected, message);
         });
         return result!;
@@ -383,10 +404,27 @@ internal static class PdfNativeTextEditor
                 if (!FPDFPageObj_GetMatrix(obj, out var matrix) || !FPDFPageObj_GetFillColor(obj, out uint r, out uint g, out uint b, out uint a))
                     throw new IOException("Không đọc được định dạng chữ để đối chiếu PDF.");
                 result.Add(new(ObjectText(obj, textPage), FontName(FPDFTextObj_GetFont(obj)), size, matrix, r, g, b, a,
-                    FPDFTextObj_GetTextRenderMode(obj)));
+                    FPDFTextObj_GetTextRenderMode(obj), MarkIdentity(obj)));
             }
         }
         finally { PdfiumEngine.FPDFText_ClosePage(textPage); }
         return result;
+    }
+
+    private static string MarkIdentity(nint obj)
+    {
+        var result = new StringBuilder();
+        int count = FPDFPageObj_CountMarks(obj);
+        if (count < 0) throw new IOException("Không đọc được thẻ của chữ PDF.");
+        for (uint i = 0; i < count; i++)
+        {
+            nint mark = FPDFPageObj_GetMark(obj, i);
+            if (mark == 0 || !FPDFPageObjMark_GetName(mark, null, 0, out uint length) || length > 65536)
+                throw new IOException("Không đọc được tên thẻ của chữ PDF.");
+            var bytes = new byte[length];
+            if (!FPDFPageObjMark_GetName(mark, bytes, length, out _)) throw new IOException("Không đọc được tên thẻ của chữ PDF.");
+            result.Append(Convert.ToBase64String(bytes)).Append(':').Append(FPDFPageObjMark_CountParams(mark)).Append(';');
+        }
+        return result.ToString();
     }
 }

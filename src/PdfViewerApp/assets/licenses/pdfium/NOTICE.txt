@@ -1,0 +1,9 @@
+PDFium 157.0.8100.0 (Windows x64, no V8)
+Source: https://pdfium.googlesource.com/pdfium/+/refs/heads/chromium/8100
+Binary distributor: https://github.com/bblanchon/pdfium-binaries/releases/tag/chromium/8100
+Archive: pdfium-win-x64.tgz
+Archive SHA-256: 51621bcc1d9be9ea448f4b84b0516862b928e3968d3fca899af1a6d6e2848d6d
+pdfium.dll SHA-256: ae913f407e8d3f5cdbf08a9869564d647b13e132e01eb376c0a5a33b7a227a45
+
+The original DLL and license files are distributed without modification.
+PDFium and its third-party components retain their respective licenses in this folder.
