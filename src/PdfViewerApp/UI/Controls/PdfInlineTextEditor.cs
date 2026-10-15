@@ -212,6 +212,7 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
             }
             if (_closed || generation != _generation) return;
             _resolvedFont = font; _validatedText = text;
+            SetInputTypeface(font?.Name ?? _region.SourceFontName);
             _previewImage.Source = result.Image; _previewImage.Visibility = result.Image == null ? Visibility.Collapsed : Visibility.Visible;
             _status.Foreground = Brush(font != null && !PdfTextFontSource.Matches(_region.SourceFontName, font.Name) ? "#FBBF24" : "#38BDF8");
             _status.Text = "Bản xem trước PDF: " + result.Message +
@@ -226,11 +227,16 @@ internal sealed class PdfInlineTextEditor : Canvas, IDisposable
     private void SetInputTypeface(string name)
     {
         if (name.Length > 7 && name[6] == '+') name = name[7..];
+        name = name.Replace("TimesNewRomanPS", "TimesNewRoman", StringComparison.OrdinalIgnoreCase)
+            .Replace("PSMT", "", StringComparison.OrdinalIgnoreCase);
         _input.FontWeight = name.Contains("Bold", StringComparison.OrdinalIgnoreCase) ? FontWeights.Bold : FontWeights.Normal;
         _input.FontStyle = name.Contains("Italic", StringComparison.OrdinalIgnoreCase) || name.Contains("Oblique", StringComparison.OrdinalIgnoreCase) ? FontStyles.Italic : FontStyles.Normal;
-        name = System.Text.RegularExpressions.Regex.Replace(name, "[- ]?(BoldItalic|Bold|Italic|Oblique|Regular)$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        name = System.Text.RegularExpressions.Regex.Replace(name, "[- ]?(Bold[ -]?(Italic|Oblique)|Bold|Italic|Oblique|Regular)(MT)?$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (name.Equals("ArialNarrow", StringComparison.OrdinalIgnoreCase)) name = "Arial Narrow";
+        if (name.Equals("TimesNewRoman", StringComparison.OrdinalIgnoreCase) || name.Equals("TimesNewRomanPSMT", StringComparison.OrdinalIgnoreCase)) name = "Times New Roman";
+        if (name.Equals("CourierNew", StringComparison.OrdinalIgnoreCase)) name = "Courier New";
         if (name.Equals("NotoSans", StringComparison.OrdinalIgnoreCase)) name = "Noto Sans";
+        if (name.Equals("ArialMT", StringComparison.OrdinalIgnoreCase)) name = "Arial";
         _input.FontFamily = new FontFamily(name);
         if (_page != null) Place(_page, _placementBounds);
     }

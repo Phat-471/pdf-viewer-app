@@ -1,2 +1,2 @@
-- Sửa lỗi nhận diện font và hiển thị chữ sau khi chỉnh sửa.
-- Cải thiện ô nhập và xử lý lỗi khi áp dụng thay đổi.
+- Cải thiện chỉnh sửa chữ và hiển thị font.
+- Sửa lỗi kiểm tra nội dung khi xem trước.

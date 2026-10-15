@@ -49,7 +49,9 @@ internal sealed class PdfTrueTypeFont
             throw new InvalidOperationException("Font chỉ cho phép nhúng ảnh, không dùng được để sửa chữ PDF.");
     }
 
-    internal string ReadCharacters()
+    internal string ReadCharacters() => new(ReadGlyphMap().Keys.ToArray());
+
+    internal SortedDictionary<char, ushort> ReadGlyphMap()
     {
         var cmap = Table("cmap", 4);
         int count = U16(cmap.Offset + 2);
@@ -72,12 +74,12 @@ internal sealed class PdfTrueTypeFont
         int length = chosen.Format == 4 ? U16(start + 2) : checked((int)U32(start + 4));
         InTable(cmap, start, length);
         var sub = (Offset: start, Length: length);
-        var supported = new SortedSet<char>();
+        var supported = new SortedDictionary<char, ushort>();
         int glyphCount = U16(Table("maxp", 6).Offset + 4);
         void Add(int code, uint glyph)
         {
             if (glyph >= glyphCount) throw Invalid();
-            if (glyph != 0 && code < 0xFFFF && code is not (>= 0xD800 and <= 0xDFFF)) supported.Add((char)code);
+            if (glyph != 0 && code < 0xFFFF && code is not (>= 0xD800 and <= 0xDFFF)) supported.Add((char)code, (ushort)glyph);
         }
         if (chosen.Format == 4)
         {
@@ -126,7 +128,7 @@ internal sealed class PdfTrueTypeFont
             }
         }
         if (supported.Count == 0) throw new InvalidOperationException("Không đọc được ký tự Unicode trong font. Hãy chọn TTF khác.");
-        return new string(supported.ToArray());
+        return supported;
     }
 
     private Dictionary<int, string> ReadNames()

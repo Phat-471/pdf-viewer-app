@@ -111,9 +111,7 @@ internal static partial class PdfNativeTextEditor
                     PdfTextFontSource.ValidateText(source, text);
                     if (!_fonts.TryGetValue(source, out font))
                     {
-                        byte[] data = Convert.FromBase64String(source.DataBase64);
-                        font = FPDFText_LoadFont(_doc, data, (uint)data.Length, 2, 1);
-                        if (font == 0) throw new InvalidOperationException("Không nhúng được font đã chọn.");
+                        font = LoadUnicodeFont(_doc, source);
                         _fonts.Add(source, font);
                     }
                 }
@@ -141,7 +139,7 @@ internal static partial class PdfNativeTextEditor
                     if (tp == 0) throw new InvalidOperationException("Không kiểm tra được nội dung mới.");
                     try
                     {
-                        if (ObjectText(candidate, tp) != text) throw new PdfTextEncodingException("Font nhúng thiếu ký tự hoặc bảng mã không hỗ trợ chữ mới.");
+                        VerifyObjectText(candidate, tp, text, source);
                     }
                     finally { PdfiumEngine.FPDFText_ClosePage(tp); }
                     if (!FPDFPageObj_GetBounds(candidate, out float l, out float btm, out float right, out float top))

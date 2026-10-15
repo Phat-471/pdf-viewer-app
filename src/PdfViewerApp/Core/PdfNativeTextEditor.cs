@@ -35,7 +35,6 @@ internal static partial class PdfNativeTextEditor
     [DllImport(Dll)] private static extern nint FPDFPage_GetObject(nint page, int index);
     [DllImport(Dll)] private static extern int FPDFPageObj_GetType(nint obj);
     [DllImport(Dll)] private static extern nint FPDFText_GetTextObject(nint textPage, int index);
-    [DllImport(Dll)] private static extern uint FPDFTextObj_GetText(nint obj, nint textPage, [Out] byte[]? buffer, uint length);
     [DllImport(Dll)] private static extern nint FPDFTextObj_GetFont(nint obj);
     [DllImport(Dll)] private static extern bool FPDFTextObj_GetFontSize(nint obj, out float size);
     [DllImport(Dll)] private static extern nuint FPDFFont_GetBaseFontName(nint font, [Out] byte[]? buffer, nuint length);
@@ -43,7 +42,8 @@ internal static partial class PdfNativeTextEditor
     [DllImport(Dll, CharSet = CharSet.Unicode, ExactSpelling = true)] private static extern bool FPDFText_SetText(nint obj, string text);
     [DllImport(Dll)] private static extern bool FPDFPage_RemoveObject(nint page, nint obj);
     [DllImport(Dll)] private static extern bool FPDFPage_InsertObjectAtIndex(nint page, nint obj, nuint index);
-    [DllImport(Dll)] private static extern nint FPDFText_LoadFont(nint doc, byte[] data, uint size, int type, int cid);
+    [DllImport(Dll, CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern nint FPDFText_LoadCidType2Font(nint doc, byte[] data, uint size, string toUnicode, byte[] cidToGid, uint cidToGidSize);
     [DllImport(Dll)] private static extern void FPDFFont_Close(nint font);
     [DllImport(Dll)] private static extern nint FPDFPageObj_CreateTextObj(nint doc, nint font, float size);
     [DllImport(Dll)] private static extern bool FPDFPageObj_GetMatrix(nint obj, out Matrix matrix);
@@ -86,12 +86,65 @@ internal static partial class PdfNativeTextEditor
 
     private static string ObjectText(nint obj, nint textPage)
     {
-        uint length = FPDFTextObj_GetText(obj, textPage, null, 0);
-        if (length < 2) return "";
-        if (length > 2000000) throw new InvalidOperationException("Đối tượng chữ quá lớn để sửa.");
-        var bytes = new byte[length];
-        FPDFTextObj_GetText(obj, textPage, bytes, length);
-        return Encoding.Unicode.GetString(bytes).TrimEnd('\0');
+        // GetTextByObject also appends whitespace inferred from neighbouring
+        // objects. Only compare characters actually owned by this object.
+        var text = new StringBuilder();
+        int count = PdfiumEngine.FPDFText_CountChars(textPage);
+        for (int i = 0; i < count; i++)
+        {
+            if (FPDFText_GetTextObject(textPage, i) != obj || FPDFText_IsGenerated(textPage, i) != 0) continue;
+            uint value = FPDFText_GetUnicode(textPage, i);
+            if (value > 0x10FFFF || value is >= 0xD800 and <= 0xDFFF) throw new InvalidOperationException("PDF có mã ký tự không hợp lệ.");
+            text.Append(char.ConvertFromUtf32((int)value));
+            if (text.Length > 1000000) throw new InvalidOperationException("Đối tượng chữ quá lớn để sửa.");
+        }
+        return text.ToString();
+    }
+
+    private static void VerifyObjectText(nint obj, nint textPage, string expected, PdfNativeTextFont? source)
+    {
+        string actual = ObjectText(obj, textPage);
+        if (actual == expected) return;
+        if (source == null) throw new PdfTextEncodingException("Font nhúng không mã hóa đúng nội dung mới.");
+        int index = 0;
+        while (index < actual.Length && index < expected.Length && actual[index] == expected[index]) index++;
+        string wanted = index < expected.Length ? $"U+{(int)expected[index]:X4}" : "hết dòng";
+        string received = index < actual.Length ? $"U+{(int)actual[index]:X4}" : "hết dòng";
+        throw new InvalidOperationException($"Đã nạp {source.Name}, nhưng chữ PDF đọc lại khác tại ký tự {index + 1}: cần {wanted}, nhận {received}. Chưa áp dụng; hãy chọn TTF khác.");
+    }
+
+    private static nint LoadUnicodeFont(nint doc, PdfNativeTextFont source)
+    {
+        byte[] data = Convert.FromBase64String(source.DataBase64);
+        var parsed = new PdfTrueTypeFont(data);
+        parsed.CheckEmbeddingRights();
+        var glyphs = parsed.ReadGlyphMap();
+        // Give every Unicode its own CID, even when SPACE and NBSP share a
+        // glyph. FPDFText_LoadFont's automatic glyph->Unicode map is ambiguous
+        // for aliases and can change extracted text despite correct glyphs.
+        var entries = glyphs.ToArray();
+        // Dense CIDs keep font widths and the glyph map small even for fonts
+        // with sparse Unicode coverage near the end of the BMP.
+        var cidToGid = new byte[(entries.Length + 1) * 2];
+        var cmap = new StringBuilder("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> def\n/CMapName /PDFPro-Unicode def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
+        for (int start = 0; start < entries.Length; start += 100)
+        {
+            int count = Math.Min(100, entries.Length - start);
+            cmap.Append(count).Append(" beginbfchar\n");
+            for (int i = start; i < start + count; i++)
+            {
+                int cid = i + 1, code = entries[i].Key, glyph = entries[i].Value;
+                cidToGid[cid * 2] = (byte)(glyph >> 8);
+                cidToGid[cid * 2 + 1] = (byte)glyph;
+                cmap.Append('<').Append(cid.ToString("X4", System.Globalization.CultureInfo.InvariantCulture))
+                    .Append("> <").Append(code.ToString("X4", System.Globalization.CultureInfo.InvariantCulture)).Append(">\n");
+            }
+            cmap.Append("endbfchar\n");
+        }
+        cmap.Append("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        nint font = FPDFText_LoadCidType2Font(doc, data, checked((uint)data.Length), cmap.ToString(), cidToGid, checked((uint)cidToGid.Length));
+        if (font == 0) throw new InvalidOperationException($"Không nhúng được bảng mã Unicode cho {source.Name}. Hãy chọn TTF khác.");
+        return font;
     }
 
     private static string FontName(nint font)
@@ -246,8 +299,7 @@ internal static partial class PdfNativeTextEditor
             if (textPage == 0) throw new InvalidOperationException("Không đọc lại được chữ mới.");
             try
             {
-                if (ObjectText(current, textPage) != replacement)
-                    throw new PdfTextEncodingException("Font nhúng thiếu ký tự hoặc bảng mã không hỗ trợ chữ mới.");
+                VerifyObjectText(current, textPage, replacement, target.Edit.Font);
             }
             finally { PdfiumEngine.FPDFText_ClosePage(textPage); }
         }
@@ -266,9 +318,7 @@ internal static partial class PdfNativeTextEditor
         if (mode is not (0 or 3)) throw new InvalidOperationException("Chưa hỗ trợ nạp font cho chữ có nét viền hoặc dùng làm vùng cắt.");
         if (!FPDFTextObj_GetFontSize(original, out float size) || !FPDFPageObj_GetMatrix(original, out var matrix))
             throw new InvalidOperationException("Không đọc được định dạng chữ gốc.");
-        byte[] data = Convert.FromBase64String(source.DataBase64);
-        nint font = FPDFText_LoadFont(doc, data, checked((uint)data.Length), 2, 1);
-        if (font == 0) throw new InvalidOperationException("Không nhúng được font TTF đã chọn.");
+        nint font = LoadUnicodeFont(doc, source);
         nint created = 0;
         try
         {

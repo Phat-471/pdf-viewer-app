@@ -19,10 +19,12 @@ internal static class PdfTextFontSource
     {
         if (name.Length > 7 && name[6] == '+' && name.Take(6).All(c => c is >= 'A' and <= 'Z')) name = name[7..];
         string key = new string(name.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        key = key.Replace("timesnewromanps", "timesnewroman", StringComparison.Ordinal);
         if (key.EndsWith("psmt", StringComparison.Ordinal)) key = key[..^4];
-        else if (key.StartsWith("arial", StringComparison.Ordinal) && key.EndsWith("mt", StringComparison.Ordinal)) key = key[..^2];
-        foreach (string suffix in new[] { "regular", "normal", "roman" })
+        else if ((key.StartsWith("arial", StringComparison.Ordinal) || key.StartsWith("timesnewroman", StringComparison.Ordinal)) && key.EndsWith("mt", StringComparison.Ordinal)) key = key[..^2];
+        foreach (string suffix in new[] { "regular", "normal" })
             if (key.EndsWith(suffix, StringComparison.Ordinal)) return key[..^suffix.Length];
+        if (key != "timesnewroman" && key.EndsWith("roman", StringComparison.Ordinal)) return key[..^5];
         return key.EndsWith("oblique", StringComparison.Ordinal) ? key[..^7] + "italic" : key;
     }
 

@@ -58,3 +58,13 @@ Làm mới trang sau khi áp dụng sẽ xóa cả lớp ảnh nét cao. Khóa c
 Nếu áp dụng lỗi, danh sách sửa trước đó được khôi phục và nội dung đang nhập vẫn được giữ. Chỉ thêm bước hoàn tác và đóng ô sửa sau khi trang đã mở lại với nội dung mới. Nhấn Lưu để ghi thay đổi vào PDF.
 
 Bộ đọc TTF hỗ trợ bảng Unicode cmap 4, 12 và 13 cho ký tự BMP; vẫn chưa hỗ trợ OTF, TTC, font biến thiên hoặc emoji. Đã đối chiếu dữ liệu font và đọc mã; chưa chạy kiểm thử thao tác sửa/lưu trên giao diện.
+
+## Sửa lỗi trong 1.13.3
+
+Font đầy đủ được nạp bằng `FPDFText_LoadCidType2Font`: mỗi mã Unicode BMP có CID riêng, bảng `CIDToGIDMap` trỏ tới glyph từ đúng bảng cmap của file TTF, còn `ToUnicode` ánh xạ ngược một CID về đúng một mã Unicode. Dấu cách U+0020 và khoảng trắng không ngắt U+00A0 vẫn có hai mã riêng dù font dùng chung glyph. Cơ chế này dùng chung cho xem trước, áp dụng, lưu, in và Snapshot; không phụ thuộc tên hoặc đường dẫn của PDF.
+
+PDFium có [lỗi bảng mã tự sinh khi nhiều Unicode dùng chung glyph](https://pdfium.googlesource.com/pdfium/+/6c8196a1478e4c37dac543210c73e276d4c06386%5E!/). Dữ liệu Times New Roman trên máy có U+0020 và U+00A0 cùng glyph; font có đủ ký tự tiêu đề trong mẫu được đọc. Đây là căn cứ để thay cách tạo bảng mã, chưa phải kết luận đã chạy thành công thao tác sửa trên mẫu.
+
+Đối chiếu nội dung chỉ lấy ký tự thực sự thuộc đối tượng, bỏ ký tự do bộ đọc tự suy diễn và không ghép khoảng trắng từ đối tượng lân cận. Vẫn yêu cầu nội dung đọc lại khớp chính xác, không bỏ dấu hoặc quy đổi khoảng trắng để cho qua lỗi. Nếu đã nạp font đầy đủ nhưng nội dung đọc lại khác, thông báo nêu vị trí và mã Unicode khác nhau; không kết luận chung là font thiếu ký tự.
+
+Ô nhập nhận diện tên Times New Roman, Courier New và các hậu tố kiểu chữ thông dụng. Sau khi tự tìm được font đầy đủ, ô nhập và thông báo cập nhật theo font đã dùng cho bản xem trước. Đã biên dịch; chưa chạy kiểm thử sửa/lưu/in trên giao diện.
