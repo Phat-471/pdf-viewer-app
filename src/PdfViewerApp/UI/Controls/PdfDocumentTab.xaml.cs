@@ -379,6 +379,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
+		PdfPerfLogger.LogUiAction($"Page gesture start: {ActiveTool}", $"page={num}; clickCount={e.ClickCount}; x={e.GetPosition(canvas).X:0.0}; y={e.GetPosition(canvas).Y:0.0}");
 
 		if (ActiveTool == "EditText")
 		{
@@ -1045,6 +1046,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
+		PdfPerfLogger.LogUiAction($"Page gesture end: {ActiveTool}", $"page={num}; clickCount={e.ClickCount}; drawing={_isDrawing}; x={e.GetPosition(canvas).X:0.0}; y={e.GetPosition(canvas).Y:0.0}");
 
 		if (_isSelectingText)
 		{
@@ -1398,8 +1400,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void RequestAiSnapshot(Canvas canvas, Rectangle? tempRect, double x, double y, double w, double h, int pageNumber)
 	{
+		PdfPerfLogger.LogTestStatus("AI Snapshot capture", $"Bắt đầu xử lý vùng chọn; page={pageNumber}; width={w:0.0}; height={h:0.0}.");
 		if (string.IsNullOrEmpty(CurrentPdfPath))
 		{
+			PdfPerfLogger.LogTestStatus("AI Snapshot capture", "Lỗi: không có PDF đang mở.");
 			if (tempRect != null)
 			{
 				canvas.Children.Remove(tempRect);
@@ -1408,6 +1412,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		if (w < 10.0 || h < 10.0)
 		{
+			PdfPerfLogger.LogTestStatus("AI Snapshot capture", "Lỗi kiểm tra đầu vào: vùng chọn nhỏ hơn 10 px.");
 			if (tempRect != null)
 			{
 				canvas.Children.Remove(tempRect);
@@ -1417,14 +1422,21 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		try
 		{
+			if (canvas.Width <= 0 || canvas.Height <= 0)
+			{
+				throw new InvalidOperationException($"Canvas size is invalid: {canvas.Width} x {canvas.Height}.");
+			}
 			PdfSnapshotSelection pdfSnapshotSelection = new PdfSnapshotSelection(CurrentPdfPath, pageNumber - 1, Math.Clamp(x / canvas.Width, 0.0, 1.0), Math.Clamp(y / canvas.Height, 0.0, 1.0), Math.Clamp(w / canvas.Width, 0.001, 1.0), Math.Clamp(h / canvas.Height, 0.001, 1.0));
+			PdfPerfLogger.LogTestStatus("AI Snapshot render", "Đang dựng ảnh PNG của vùng chọn PDF.");
 			string pngBase = AiSnapshotImageRenderer.RenderSnapshotToPngBase64(pdfSnapshotSelection);
+			PdfPerfLogger.LogTestStatus("AI Snapshot render", $"Đã dựng ảnh PNG; bytesBase64={pngBase.Length}.");
 			AiSnapshotRequest e = new AiSnapshotRequest(string.Empty, pngBase, pageNumber, pdfSnapshotSelection.X, pdfSnapshotSelection.Y, pdfSnapshotSelection.Width, pdfSnapshotSelection.Height);
 			this.AiSnapshotRequested?.Invoke(this, e);
 			LogStatus("AI snapshot captured");
 		}
 		catch (Exception ex)
 		{
+			PdfPerfLogger.LogDiagnosticError("AI Snapshot capture/render/event dispatch", ex);
 			MessageBox.Show("AI snapshot failed: " + ex.Message, "AI Snapshot", MessageBoxButton.OK, MessageBoxImage.Hand);
 			LogStatus("AI snapshot failed");
 		}
@@ -1439,6 +1451,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void ShowTextBoxInput(Canvas canvas, double x, double y, double w, double h, int pageNumber)
 	{
+		PdfPerfLogger.LogUiAction("Text box editor shown", $"page={pageNumber}; width={w:0.0}; height={h:0.0}");
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
 			Width = w,
@@ -1491,11 +1504,16 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfTextBoxAnnotation);
 				SelectedAnnotation = pdfTextBoxAnnotation;
+				PdfPerfLogger.LogTestStatus("Text box annotation", $"PASS: text committed and annotation added on page {pageNumber}.");
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
 					LogStatus("ﾄ静｣ t蘯｡o h盻冪 vﾄハ b蘯｣n. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select ﾄ黛ｻ・kﾃｩo ho蘯ｷc co giﾃ｣n khung.");
 				}
+			}
+			else
+			{
+				PdfPerfLogger.LogTestStatus("Text box annotation", "INFO: editor closed without text; no annotation was saved.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -1528,6 +1546,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void ShowCalloutTextBoxInput(Canvas canvas, Point arrowTip, double x, double y, double w, double h, int pageNumber)
 	{
+		PdfPerfLogger.LogUiAction("Callout text editor shown", $"page={pageNumber}; width={w:0.0}; height={h:0.0}");
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
 			Width = w,
@@ -1575,11 +1594,16 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				SaveUndoState();
 				Annotations.Add(pdfCalloutAnnotation);
 				SelectedAnnotation = pdfCalloutAnnotation;
+				PdfPerfLogger.LogTestStatus("Callout annotation", $"PASS: callout text committed and annotation added on page {pageNumber}.");
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
 					LogStatus("ﾄ静｣ t蘯｡o mﾅｩi tﾃｪn ch盻・d蘯ｫn. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select; mu盻創 t蘯｡o mﾅｩi tﾃｪn n盻ｯa hﾃ｣y ch盻肱 l蘯｡i.");
 				}
+			}
+			else
+			{
+				PdfPerfLogger.LogTestStatus("Callout annotation", "INFO: editor closed without text; no annotation was saved.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -1684,6 +1708,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	private void ShowStickyNoteEdit(Canvas canvas, PdfStickyNoteAnnotation sticky, int pageNumber)
 	{
+		PdfPerfLogger.LogUiAction("Sticky note editor shown", $"page={pageNumber}");
 		double num = 240.0;
 		double num2 = 120.0;
 		double num3 = sticky.X * canvas.Width;
@@ -1746,6 +1771,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				SaveUndoState();
 				sticky.NoteText = text;
+				PdfPerfLogger.LogTestStatus("Sticky note annotation", $"PASS: note text committed on page {pageNumber}.");
+			}
+			else
+			{
+				PdfPerfLogger.LogTestStatus("Sticky note annotation", "INFO: editor closed without text; note remains empty.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -4361,6 +4391,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void LogStatus(string message)
 	{
 		LastStatusMessage = message;
+		PdfPerfLogger.LogTestStatus($"PdfDocumentTab tool={ActiveTool}", message);
 		if (Dispatcher.CheckAccess())
 		{
 			this.StatusChanged?.Invoke(this, EventArgs.Empty);

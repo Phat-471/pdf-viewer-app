@@ -1,6 +1,6 @@
 [package]
 name = "pdf_core"
-version = "1.13.8"
+version = "1.13.9"
 edition = "2021"
 
 [lib]

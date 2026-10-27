@@ -26,6 +26,66 @@ public static class PdfPerfLogger
 		}
 	}
 
+	public static void LogUiAction(string action, string context)
+	{
+		try
+		{
+			Log($"TEST_TRACE|ACTION|{action}|{context}");
+		}
+		catch
+		{
+			// Diagnostics must never interrupt the user's operation.
+		}
+	}
+
+	public static void LogUiCommand(string command, string context)
+	{
+		try
+		{
+			Log($"TEST_TRACE|ACTION|{command}|{context}");
+			Log($"TEST_TRACE|DISPATCHED|{command}|Click handler returned; async work may still be running.");
+		}
+		catch
+		{
+			// Diagnostics must never interrupt the user's operation.
+		}
+	}
+
+	public static void LogTestStatus(string source, string message)
+	{
+		try
+		{
+			string normalized = message.ToLowerInvariant();
+			string result = normalized.StartsWith("fail", StringComparison.Ordinal) || normalized.Contains("failed") || normalized.Contains("failure") || normalized.Contains("lỗi") ||
+				normalized.Contains("không thể") || normalized.Contains("thất bại")
+				? "FAIL"
+				: normalized.StartsWith("pass", StringComparison.Ordinal) || normalized.Contains("thành công") || normalized.Contains("đã lưu") || normalized.Contains("đã mở") ||
+				  normalized.Contains("đã tạo") || normalized.Contains("đã gộp") || normalized.Contains("đã xóa") ||
+				  normalized.Contains("đã chuyển") || normalized.Contains("đã bật") || normalized.Contains("đã chọn") ||
+				  normalized.Contains("captured") || normalized.Contains("completed") || normalized.Contains("success") ||
+				  normalized.Contains("received") || normalized.Contains("saved")
+					? "PASS"
+					: "INFO";
+			Log($"TEST_TRACE|{result}|{source}|{message}");
+		}
+		catch
+		{
+			// Diagnostics must never interrupt the user's operation.
+		}
+	}
+
+	public static void LogDiagnosticError(string source, Exception exception)
+	{
+		try
+		{
+			Log($"TEST_TRACE|ERROR|{source}|{exception}");
+		}
+		catch
+		{
+			// Diagnostics must never interrupt the user's operation.
+		}
+	}
+
 	public static void Measure(string label, Action action)
 	{
 		Stopwatch stopwatch = Stopwatch.StartNew();

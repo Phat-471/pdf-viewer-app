@@ -11,7 +11,9 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -104,6 +106,7 @@ public partial class MainWindow : Window, IComponentConnector
 	public MainWindow()
 	{
 		InitializeComponent();
+		AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(TraceFunctionButtonClick), true);
 		_aiSnapshotRouter = new AiSnapshotRouter(_aiSettings);
 		EnsureWelcomeDashboardHost();
 		EnsureAiPanelHost();
@@ -773,10 +776,6 @@ public partial class MainWindow : Window, IComponentConnector
 				e.Handled = true;
 				SnapshotTool_Click(this, new RoutedEventArgs());
 				break;
-			case Key.A:
-				e.Handled = true;
-				AiSnapshotTool_Click(this, new RoutedEventArgs());
-				break;
 			case Key.Next:
 				e.Handled = true;
 				GoRelativePage(1);
@@ -1243,6 +1242,37 @@ public partial class MainWindow : Window, IComponentConnector
 	private void LogStatus(string message)
 	{
 		StatusMessage.Text = "Status: " + message;
+		PdfPerfLogger.LogTestStatus("MainWindow", message);
+	}
+
+	private void TraceFunctionButtonClick(object sender, RoutedEventArgs e)
+	{
+		if ((e.OriginalSource as ButtonBase ?? e.Source as ButtonBase) is not ButtonBase button)
+		{
+			return;
+		}
+
+		string label = AutomationProperties.GetName(button);
+		if (string.IsNullOrWhiteSpace(label) && button.GetType().GetProperty("Header")?.GetValue(button) is string header)
+		{
+			label = header;
+		}
+		if (string.IsNullOrWhiteSpace(label) && button is ContentControl contentControl && contentControl.Content is string content)
+		{
+			label = content;
+		}
+		if (string.IsNullOrWhiteSpace(label))
+		{
+			label = button.Name;
+		}
+		if (string.IsNullOrWhiteSpace(label))
+		{
+			label = button.GetType().Name;
+		}
+
+		PdfDocumentTab activeTab = GetActiveTab();
+		string context = $"tool={activeTab?.ActiveTool ?? "None"}; page={activeTab?.SelectedPageNumber.ToString() ?? "None"}; button={button.Name}";
+		PdfPerfLogger.LogUiCommand(label, context);
 	}
 
 	private void PageJumpTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1761,8 +1791,8 @@ public partial class MainWindow : Window, IComponentConnector
 
 	private void ShowPerformanceTrace_Click(object sender, RoutedEventArgs e)
 	{
-		string report = BuildPerformanceTraceReport();
 		LogStatus("Performance trace opened");
+		string report = BuildPerformanceTraceReport();
 		ShowReportWindow("Performance Trace", report);
 	}
 
@@ -2165,7 +2195,9 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	{
 		string currentLogPath = PdfPerfLogger.CurrentLogPath;
 		StringBuilder stringBuilder = new StringBuilder();
-		stringBuilder.AppendLine("PDF Pro - Performance Trace");
+		stringBuilder.AppendLine("PDF Pro - Nhật ký kiểm thử chức năng");
+		stringBuilder.AppendLine("Cách dùng: thử từng chức năng một; ACTION là lần bấm/mở đầu vào, PASS/FAIL/INFO là trạng thái, ERROR chứa vị trí và stack trace.");
+		stringBuilder.AppendLine("TEST_TRACE lưu cục bộ; không ghi bytes PDF hoặc prompt AI. Một số trạng thái/stack trace có thể chứa tên tệp hoặc đường dẫn.");
 		StringBuilder stringBuilder2 = stringBuilder;
 		StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(10, 1, stringBuilder2);
 		handler.AppendLiteral("Log file: ");
@@ -2258,7 +2290,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		});
 		TextBlock element = new TextBlock
 		{
-			Text = "Kiểm tra thư viện",
+			Text = title,
 			FontWeight = FontWeights.SemiBold,
 			FontSize = 16.0,
 			Margin = new Thickness(0.0, 0.0, 0.0, 10.0)
@@ -2281,20 +2313,46 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		};
 		Grid.SetRow(element2, 1);
 		grid.Children.Add(element2);
-		Button button = new Button
+		StackPanel buttons = new StackPanel
+		{
+			Orientation = Orientation.Horizontal,
+			HorizontalAlignment = HorizontalAlignment.Right,
+			Margin = new Thickness(0.0, 12.0, 0.0, 0.0)
+		};
+		Button copyButton = new Button
+		{
+			Content = "Sao chép báo cáo",
+			MinWidth = 140.0,
+			Margin = new Thickness(0.0, 0.0, 8.0, 0.0)
+		};
+		copyButton.Click += delegate
+		{
+			try
+			{
+				Clipboard.SetText(element2.Text);
+				PdfPerfLogger.LogUiAction("Diagnostic report copied", "report window");
+				MessageBox.Show(dialog, "Đã sao chép báo cáo. Bạn có thể dán vào tin nhắn hỗ trợ.", "Chẩn đoán", MessageBoxButton.OK, MessageBoxImage.Information);
+			}
+			catch (Exception ex)
+			{
+				PdfPerfLogger.LogDiagnosticError("Copy diagnostic report", ex);
+				MessageBox.Show(dialog, "Không thể sao chép báo cáo: " + ex.Message, "Chẩn đoán", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
+		};
+		Button closeButton = new Button
 		{
 			Content = "Đóng",
 			Width = 90.0,
-			HorizontalAlignment = HorizontalAlignment.Right,
-			Margin = new Thickness(0.0, 12.0, 0.0, 0.0),
 			IsDefault = true
 		};
-		button.Click += delegate
+		closeButton.Click += delegate
 		{
 			dialog.Close();
 		};
-		Grid.SetRow(button, 2);
-		grid.Children.Add(button);
+		buttons.Children.Add(copyButton);
+		buttons.Children.Add(closeButton);
+		Grid.SetRow(buttons, 2);
+		grid.Children.Add(buttons);
 		dialog.Content = grid;
 		dialog.ShowDialog();
 	}
@@ -2795,20 +2853,33 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	{
 		if (EnsureActivated())
 		{
+			PdfPerfLogger.LogUiAction("AI Snapshot armed", "explicit tool command");
 			ActiveTool = "AiSnapshot";
 			PdfDocumentTab activeTab = GetActiveTab();
 			if (activeTab != null)
 			{
 				activeTab.ActiveTool = "AiSnapshot";
 			}
-			ShowAiPanel();
+			ShowAiPanel("AI Snapshot tool selected");
 			LogStatus("Đã chuyển sang AI Snapshot. Kéo chọn một vùng bản vẽ đểhỏi AI.");
 		}
 	}
 
 	private void DocTab_AiSnapshotRequested(object? sender, AiSnapshotRequest request)
 	{
-		ShowAiPanel();
+		if (sender is not PdfDocumentTab sourceTab || !ReferenceEquals(sourceTab, GetActiveTab()) || ActiveTool != "AiSnapshot")
+		{
+			PdfPerfLogger.LogUiAction("AI Snapshot request ignored", $"activeTool={ActiveTool}; senderIsActiveTab={sender is PdfDocumentTab tab && ReferenceEquals(tab, GetActiveTab())}");
+			return;
+		}
+		if (string.IsNullOrWhiteSpace(request.PngBase64))
+		{
+			PdfPerfLogger.LogTestStatus("AI Snapshot", "Lỗi: dữ liệu ảnh vùng chọn đang trống.");
+			return;
+		}
+
+		PdfPerfLogger.LogTestStatus("AI Snapshot", $"Đã chụp trang {request.PageNumber}; ảnh {request.PngBase64.Length} ký tự.");
+		ShowAiPanel("valid snapshot captured from active PDF tab");
 		_lastCapturedSnapshotBase64 = request.PngBase64;
 		_lastCapturedSnapshotPageNumber = request.PageNumber;
 
@@ -2826,6 +2897,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 	private async void AiPanel_SendChatRequested(object? sender, string prompt)
 	{
 		if (_aiPanelControl == null) return;
+		PdfPerfLogger.LogUiAction("AI request started", $"promptLength={prompt?.Length ?? 0}; tool={ActiveTool}");
 
 		var activeTab = GetActiveTab();
 		if (activeTab == null)
@@ -2897,13 +2969,16 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 				History: historyToSend
 			);
 
+			PdfPerfLogger.LogTestStatus("AI request", $"Gửi yêu cầu tới provider; page={pageNumber}; imagePresent={!string.IsNullOrWhiteSpace(imageBase64)}.");
 			string reply = await _aiSnapshotRouter.AskSnapshotAsync(request, CancellationToken.None);
 			
 			_aiPanelControl.GetChatHistory()[aiMessageIndex].Text = reply;
 			UpdateLastAiMessageInUi(reply);
+			PdfPerfLogger.LogTestStatus("AI request", "AI response received.");
 		}
 		catch (Exception ex)
 		{
+			PdfPerfLogger.LogDiagnosticError("AI request/provider response", ex);
 			string err = "Lỗi kết nối AI: " + ex.Message;
 			_aiPanelControl.GetChatHistory()[aiMessageIndex].Text = err;
 			UpdateLastAiMessageInUi(err);
@@ -2941,8 +3016,9 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 	}
 
-	private void ShowAiPanel()
+	private void ShowAiPanel(string reason)
 	{
+		PdfPerfLogger.LogUiAction("AI panel opened", reason);
 		EnsureAiPanelHost();
 		if (_aiPanelControl != null)
 		{
@@ -2954,9 +3030,18 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 
 	private void CloseAiPanel_Click(object sender, RoutedEventArgs e)
 	{
+		PdfPerfLogger.LogUiAction("AI panel closed", $"activeTool={ActiveTool}");
 		if (_aiPanelControl != null)
 		{
 			_aiPanelControl.HidePanel();
+		}
+		if (ActiveTool == "AiSnapshot")
+		{
+			ActiveTool = "Select";
+			if (GetActiveTab() is PdfDocumentTab activeTab)
+			{
+				activeTab.ActiveTool = "Select";
+			}
 		}
 		AiPanelColumn.Width = new GridLength(0.0);
 		AiPanelHostContainer.Visibility = Visibility.Collapsed;
@@ -2988,7 +3073,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 
 	private async void CheckAi_Click(object sender, RoutedEventArgs e)
 	{
-		ShowAiPanel();
+		ShowAiPanel("user requested AI system check");
 		if (_aiPanelControl != null)
 		{
 			_aiPanelControl.SetOutput("Dang kiem tra AI...");

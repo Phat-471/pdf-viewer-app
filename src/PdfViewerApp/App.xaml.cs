@@ -174,6 +174,7 @@ public partial class App : Application
 		};
 		base.DispatcherUnhandledException += delegate(object _, DispatcherUnhandledExceptionEventArgs e)
 		{
+			PdfPerfLogger.LogDiagnosticError("UI dispatcher unhandled exception", e.Exception);
 			File.WriteAllText("crash.log", e.Exception.ToString());
 			PdfViewerApp.Services.Diagnostics.ErrorReportingService.SendCrashTelemetry(e.Exception);
 			MessageBox.Show(e.Exception.ToString(), "Application error", MessageBoxButton.OK, MessageBoxImage.Hand);
@@ -182,6 +183,10 @@ public partial class App : Application
 		};
 		AppDomain.CurrentDomain.UnhandledException += delegate(object _, UnhandledExceptionEventArgs e)
 		{
+			if (e.ExceptionObject is Exception diagnosticException)
+			{
+				PdfPerfLogger.LogDiagnosticError("AppDomain unhandled exception", diagnosticException);
+			}
 			string contents = $"[{DateTime.Now}] Fatal Error: {e.ExceptionObject?.ToString()}\n";
 			File.AppendAllText("debug_pdfpro.log", contents);
 			if (e.ExceptionObject is Exception ex)
@@ -189,6 +194,10 @@ public partial class App : Application
 				PdfViewerApp.Services.Diagnostics.ErrorReportingService.SendCrashTelemetry(ex);
 			}
 			MessageBox.Show(e.ExceptionObject?.ToString() ?? "Unknown fatal error", "Fatal error", MessageBoxButton.OK, MessageBoxImage.Hand);
+		};
+		TaskScheduler.UnobservedTaskException += (_, e) =>
+		{
+			PdfPerfLogger.LogDiagnosticError("Unobserved background task exception", e.Exception);
 		};
 	}
 

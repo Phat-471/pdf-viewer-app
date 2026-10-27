@@ -7,7 +7,8 @@ This file is the starting point for AI agents and developers exploring this repo
 1. [Project roadmap and architecture](docs/PROJECT_ROADMAP.md) — system boundaries, feature flows, source locations, risks, and proposed work.
 2. [Interactive code relationship graph](graphify-out/graph.html) — browse code symbols and extracted relationships; use [graph data](graphify-out/graph.json) for programmatic search.
 3. [Generated architecture report](graphify-out/GRAPH_REPORT.md) — graph clusters, high-connectivity nodes, and extraction limits.
-4. [Release and update workflow](docs/RELEASE_UPDATES.md) — packaging and update behavior. Check [AGENTS.md](AGENTS.md) before edits.
+4. [Function test and diagnostics guide](docs/FUNCTION_TEST_DIAGNOSTICS.md) — test one operation at a time and copy its trace when it fails.
+5. [Release and update workflow](docs/RELEASE_UPDATES.md) — packaging and update behavior. Check [AGENTS.md](AGENTS.md) before edits.
 
 ## Repository scope
 
