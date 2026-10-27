@@ -211,10 +211,10 @@ public partial class MainRibbon : UserControl
 	{
 		_currentTheme = theme;
 		ApplyRibbonSurfaceTheme(theme);
-        Resources["RibbonIconBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-            theme.IsLight ? theme.AccentDark : theme.AccentColor));
-		var accent = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
-		var foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		var foxitPurple = Color.FromRgb(123, 31, 162);
+		Resources["RibbonIconBrush"] = new SolidColorBrush(foxitPurple);
+		var accent = new SolidColorBrush(foxitPurple);
+		var foreground = new SolidColorBrush(Color.FromRgb(38, 38, 38));
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.Accent", "Fluent.Ribbon.Brushes.AccentBase" })
 			MyRibbon.Resources[key] = accent;
 		var selectedBackground = (Brush)Resources["RibbonSelectedBrush"];
@@ -261,17 +261,17 @@ public partial class MainRibbon : UserControl
 
 		if (MyBackstage != null)
 		{
-			MyBackstage.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.AccentDark));
+			MyBackstage.Background = new SolidColorBrush(foxitPurple);
 			MyBackstage.Foreground = Brushes.White;
 			PdfPerfLogger.Log("ApplyTheme: MyBackstage background updated.");
 		}
 
 		if (MyRibbon != null)
 		{
-			var bgBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.TitleBarBackground));
+			var bgBrush = new SolidColorBrush(Colors.White);
 			MyRibbon.Background = bgBrush;
-			MyRibbon.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
-			MyRibbon.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.BorderColor));
+			MyRibbon.Foreground = foreground;
+			MyRibbon.BorderBrush = new SolidColorBrush(Color.FromRgb(212, 212, 216));
 
 			// Override Fluent.Ribbon resource brushes globally and locally using correct keys
 			string[] keys = new string[]
@@ -326,24 +326,26 @@ public partial class MainRibbon : UserControl
             brush.Freeze();
             Resources[key] = brush;
         }
-        var panel = Parse(theme.PanelBackground);
-        var accent = Parse(theme.IsLight ? theme.AccentDark : theme.AccentColor);
+        // Keep the command ribbon in Foxit's light purple visual language even
+        // when the document canvas or surrounding application uses dark mode.
+        var panel = Colors.White;
+        var accent = Color.FromRgb(123, 31, 162);
         Token("RibbonButtonBackground", panel);
-        Token("RibbonGroupBackground", Parse(theme.SurfaceBackground));
-        Token("RibbonBorderBrush", Mix(Parse(theme.BorderColor), Parse(theme.ForegroundPrimary), theme.IsLight ? 0.12 : 0.16));
-        Token("RibbonTextBrush", Parse(theme.ForegroundPrimary));
+        Token("RibbonGroupBackground", Colors.White);
+        Token("RibbonBorderBrush", Color.FromRgb(212, 212, 216));
+        Token("RibbonTextBrush", Color.FromRgb(38, 38, 38));
         Token("RibbonAccentBrush", accent);
-        Token("RibbonHoverBrush", Mix(panel, accent, theme.IsLight ? 0.10 : 0.16));
-        Token("RibbonSelectedBrush", Mix(panel, accent, theme.IsLight ? 0.22 : 0.30));
+        Token("RibbonHoverBrush", Mix(panel, accent, 0.08));
+        Token("RibbonSelectedBrush", Mix(panel, accent, 0.18));
         var groupColors = new Dictionary<string, string>
         {
-            ["Document"] = theme.IsLight ? "#0F766E" : "#5EEAD4",
-            ["Navigation"] = theme.IsLight ? "#0369A1" : "#7DD3FC",
-            ["Pages"] = theme.IsLight ? "#1D4ED8" : "#93C5FD",
-            ["Comments"] = theme.IsLight ? "#B45309" : "#FCD34D",
-            ["Measure"] = theme.IsLight ? "#7E22CE" : "#D8B4FE",
-            ["Ocr"] = theme.IsLight ? "#047857" : "#86EFAC",
-            ["Utilities"] = theme.ForegroundSecondary
+            ["Document"] = "#666666",
+            ["Navigation"] = "#666666",
+            ["Pages"] = "#666666",
+            ["Comments"] = "#666666",
+            ["Measure"] = "#666666",
+            ["Ocr"] = "#666666",
+            ["Utilities"] = "#666666"
         };
         foreach (var groupColor in groupColors)
             Token("RibbonGroup" + groupColor.Key + "Brush", Parse(groupColor.Value));

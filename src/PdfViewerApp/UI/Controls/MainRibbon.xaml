@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="PdfViewerApp.MainRibbon"
+<UserControl x:Class="PdfViewerApp.MainRibbon"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:fluent="urn:fluent-ribbon"
@@ -6,12 +6,12 @@
   <UserControl.Resources>
     <!-- Shared ribbon surfaces; ApplyTheme updates these tokens for every theme. -->
     <SolidColorBrush x:Key="RibbonButtonBackground" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="RibbonGroupBackground" Color="#F1F5F9" />
-    <SolidColorBrush x:Key="RibbonBorderBrush" Color="#B8C5D5" />
-    <SolidColorBrush x:Key="RibbonTextBrush" Color="#0F172A" />
-    <SolidColorBrush x:Key="RibbonAccentBrush" Color="#0F766E" />
-    <SolidColorBrush x:Key="RibbonHoverBrush" Color="#E0F2F1" />
-    <SolidColorBrush x:Key="RibbonSelectedBrush" Color="#CCFBF1" />
+    <SolidColorBrush x:Key="RibbonGroupBackground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="RibbonBorderBrush" Color="#D4D4D8" />
+    <SolidColorBrush x:Key="RibbonTextBrush" Color="#262626" />
+    <SolidColorBrush x:Key="RibbonAccentBrush" Color="#7B1FA2" />
+    <SolidColorBrush x:Key="RibbonHoverBrush" Color="#F7EFFA" />
+    <SolidColorBrush x:Key="RibbonSelectedBrush" Color="#EEDDF4" />
     <SolidColorBrush x:Key="RibbonGroupDocumentBrush" Color="#0F766E" />
     <SolidColorBrush x:Key="RibbonGroupNavigationBrush" Color="#0369A1" />
     <SolidColorBrush x:Key="RibbonGroupPagesBrush" Color="#1D4ED8" />
@@ -22,7 +22,7 @@
     <Style TargetType="fluent:Button" BasedOn="{StaticResource Fluent.Ribbon.Styles.Button}">
       <Setter Property="Background" Value="{DynamicResource RibbonButtonBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource RibbonBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
@@ -45,7 +45,7 @@
     <Style TargetType="fluent:ToggleButton" BasedOn="{StaticResource Fluent.Ribbon.Styles.RibbonToggleButton}">
       <Setter Property="Background" Value="{DynamicResource RibbonButtonBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource RibbonBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
@@ -72,7 +72,7 @@
     <Style TargetType="fluent:SplitButton" BasedOn="{StaticResource Fluent.Ribbon.Styles.RibbonSplitButton}">
       <Setter Property="Background" Value="{DynamicResource RibbonButtonBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource RibbonBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
@@ -99,17 +99,17 @@
     <Style TargetType="fluent:RibbonGroupBox" BasedOn="{StaticResource Fluent.Ribbon.Styles.RibbonGroupBox}">
       <Setter Property="Background" Value="{DynamicResource RibbonGroupBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource RibbonBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Foreground" Value="{DynamicResource RibbonAccentBrush}" />
-      <Setter Property="Margin" Value="2,0" />
+      <Setter Property="Foreground" Value="#666666" />
+      <Setter Property="Margin" Value="1,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0,0,1,0" />
       <Setter Property="IsSeparatorVisible" Value="False" />
       <Setter Property="HeaderTemplate">
         <Setter.Value>
           <DataTemplate>
-            <Border BorderThickness="0,1,0,0" Padding="3,1,3,0"
-                    BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=fluent:RibbonGroupBox}}">
-              <TextBlock Text="{Binding}" FontSize="10" FontWeight="SemiBold" TextAlignment="Center"
-                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=fluent:RibbonGroupBox}}"
+            <Border BorderThickness="0" Padding="3,1,3,0">
+              <TextBlock Text="{Binding}" FontSize="10" FontWeight="Normal" TextAlignment="Center"
+                         Foreground="#666666"
                          TextTrimming="CharacterEllipsis" />
             </Border>
           </DataTemplate>
@@ -380,7 +380,7 @@
         </fluent:BackstageTabControl>
       </fluent:Backstage>
     </fluent:Ribbon.Menu>
-    <fluent:RibbonTabItem Header="Trang chủ">
+    <fluent:RibbonTabItem Header="Home">
       <fluent:RibbonGroupBox Header="Tệp" Tag="Document">
         <fluent:Button Header="Mở" LargeIcon="{StaticResource IconOpen}" Size="Large" Margin="2,0" Click="OpenPdf_Click" ToolTip="Mở PDF (Ctrl+O)" />
         <fluent:SplitButton Header="Lưu" LargeIcon="{StaticResource IconSave}" Size="Large" Margin="2,0" Click="SavePdf_Click" ToolTip="Lưu PDF (Ctrl+S)">
@@ -420,7 +420,15 @@
         <fluent:Button Header="OCR" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="2,0" Click="OcrText_Click" ToolTip="Nhận dạng chữ trên trang hiện tại" />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Biên tập">
+    <fluent:RibbonTabItem Header="Convert">
+      <fluent:RibbonGroupBox Header="Nhận dạng văn bản" Tag="Ocr">
+        <fluent:Button Header="Nhận dạng chữ" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="3,0" Click="OcrText_Click" ToolTip="Nhận dạng chữ trên trang hiện tại" />
+        <fluent:Button Header="Xuất văn bản" LargeIcon="{StaticResource IconText}" Size="Large" Margin="3,0" Click="ExportOcrText_Click" ToolTip="Lưu kết quả nhận dạng thành tệp văn bản" />
+        <fluent:Button Header="PDF có thể tìm kiếm" LargeIcon="{StaticResource IconSave}" Size="Large" Margin="3,0" Click="ExportSearchablePdf_Click" ToolTip="Thêm lớp văn bản nhận dạng vào PDF" />
+        <fluent:Button Header="Xuất Word" LargeIcon="{StaticResource IconDownload}" Size="Large" Margin="3,0" Click="ExportDocx_Click" ToolTip="Xuất văn bản sang Word" />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Edit">
       <fluent:RibbonGroupBox Header="Trích xuất" Tag="Pages">
         <fluent:Button Header="Nhân bản" LargeIcon="{StaticResource IconBlankPage}" Size="Large" Margin="4,0" Click="DuplicatePage_Click" ToolTip="Nhân bản trang hiện tại" />
         <fluent:Button Name="SplitCurrentPageBtn" Header="Tách trang" LargeIcon="{StaticResource IconTach}" Size="Large" Margin="4,0" Click="SplitCurrentPage_Click" ToolTip="Tách riêng trang hiện tại ra thành một tệp tin PDF độc lập" />
@@ -479,68 +487,7 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Chú thích">
-      <fluent:RibbonGroupBox Header="Công cụ vẽ &amp; hình học" Tag="Comments">
-        <fluent:ToggleButton Name="SelectToolBtn" Header="Con trỏ chọn" Margin="3,0" Click="SelectTool_Click" ToolTip="Quay lại công cụ chọn để di chuyển, chỉnh sửa hoặc xóa chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="InkToolBtn" Header="Bút vẽ" Margin="3,0" Click="InkTool_Click" ToolTip="Vẽ các nét vẽ tự do trên tài liệu">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="RectToolBtn" Header="Chữ nhật" Margin="3,0" Click="RectTool_Click" ToolTip="Vẽ hình hộp chữ nhật để khoanh vùng chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="OvalToolBtn" Header="Hình tròn" Margin="3,0" Click="OvalTool_Click" ToolTip="Vẽ hình tròn hoặc hình elip chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="LineToolBtn" Header="Đường thẳng" Margin="3,0" Click="LineTool_Click" ToolTip="Vẽ đường thẳng chú thích hoặc chỉ dẫn">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Chú thích văn bản" Tag="Comments">
-        <fluent:ToggleButton Name="TextBoxToolBtn" Header="Hộp văn bản" Margin="3,0" Click="TextBoxTool_Click" ToolTip="Thêm một hộp văn bản ghi chú trực tiếp trên tài liệu">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="CalloutToolBtn" Header="Mũi tên chỉ dẫn" Margin="3,0" Click="CalloutTool_Click" ToolTip="Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="StickyNoteToolBtn" Header="Ghi chú" Margin="3,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú nhỏ (Sticky Note) để ghi lại các bình luận">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="HighlightToolBtn" Header="Tô màu (highlight)" Margin="3,0" Click="HighlightTool_Click" ToolTip="Tô màu nền (Highlight) vùng chữ được chọn">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7E6;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Chụp ảnh &amp; AI" Tag="Ocr">
-        <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" Margin="3,0" Click="AiSnapshotTool_Click" ToolTip="Chụp một vùng trên tài liệu để gửi cho trợ lý AI phân tích, dịch thuật">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Tùy chọn" Tag="Utilities" Visibility="Collapsed">
-        <fluent:CheckBox Name="KeepToolsActiveCheckBox" Header="Sử dụng liên tục" Click="KeepToolsActiveCheckBox_Click" ToolTip="Giữ các công cụ vẽ, chú thích, chụp ảnh hoạt động liên tục cho đến khi nhấn ESC" IsChecked="False" />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Đo đạc và ký số" x:Name="MeasureSignTab">
+    <fluent:RibbonTabItem Header="Fill &amp; Sign" x:Name="MeasureSignTab">
       <!-- Branding / Logo Group -->
       <fluent:RibbonGroupBox Header="Công cụ" Tag="Measure" Margin="10,0,0,0">
         <Grid Width="100" HorizontalAlignment="Center">
@@ -662,15 +609,7 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="OCR">
-      <fluent:RibbonGroupBox Header="Nhận dạng văn bản" Tag="Ocr">
-        <fluent:Button Header="Nhận dạng chữ" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="3,0" Click="OcrText_Click" ToolTip="Nhận dạng chữ trên trang hiện tại" />
-        <fluent:Button Header="Xuất văn bản" LargeIcon="{StaticResource IconText}" Size="Large" Margin="3,0" Click="ExportOcrText_Click" ToolTip="Lưu kết quả nhận dạng thành tệp văn bản" />
-        <fluent:Button Header="PDF có thể tìm kiếm" LargeIcon="{StaticResource IconSave}" Size="Large" Margin="3,0" Click="ExportSearchablePdf_Click" ToolTip="Thêm lớp văn bản nhận dạng vào PDF" />
-        <fluent:Button Header="Xuất Word" LargeIcon="{StaticResource IconDownload}" Size="Large" Margin="3,0" Click="ExportDocx_Click" ToolTip="Xuất văn bản sang Word" />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Xử lý nâng cao">
+    <fluent:RibbonTabItem Header="Organize">
       <fluent:RibbonGroupBox Header="Ghép &amp; so sánh" Tag="Pages">
         <fluent:Button Name="MergeFilesBtn" Header="Ghép nhiều file" Margin="3,0" Click="MergeFiles_Click" ToolTip="Hợp nhất các tài liệu PDF đang mở lại thành một file duy nhất">
           <fluent:Button.LargeIcon>
@@ -723,7 +662,85 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Trợ giúp">
+    <fluent:RibbonTabItem Header="Comment">
+      <fluent:RibbonGroupBox Header="Công cụ vẽ &amp; hình học" Tag="Comments">
+        <fluent:ToggleButton Name="SelectToolBtn" Header="Con trỏ chọn" Margin="3,0" Click="SelectTool_Click" ToolTip="Quay lại công cụ chọn để di chuyển, chỉnh sửa hoặc xóa chú thích">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="InkToolBtn" Header="Bút vẽ" Margin="3,0" Click="InkTool_Click" ToolTip="Vẽ các nét vẽ tự do trên tài liệu">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="RectToolBtn" Header="Chữ nhật" Margin="3,0" Click="RectTool_Click" ToolTip="Vẽ hình hộp chữ nhật để khoanh vùng chú thích">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="OvalToolBtn" Header="Hình tròn" Margin="3,0" Click="OvalTool_Click" ToolTip="Vẽ hình tròn hoặc hình elip chú thích">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="LineToolBtn" Header="Đường thẳng" Margin="3,0" Click="LineTool_Click" ToolTip="Vẽ đường thẳng chú thích hoặc chỉ dẫn">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Chú thích văn bản" Tag="Comments">
+        <fluent:ToggleButton Name="TextBoxToolBtn" Header="Hộp văn bản" Margin="3,0" Click="TextBoxTool_Click" ToolTip="Thêm một hộp văn bản ghi chú trực tiếp trên tài liệu">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="CalloutToolBtn" Header="Mũi tên chỉ dẫn" Margin="3,0" Click="CalloutTool_Click" ToolTip="Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="StickyNoteToolBtn" Header="Ghi chú" Margin="3,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú nhỏ (Sticky Note) để ghi lại các bình luận">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="HighlightToolBtn" Header="Tô màu (highlight)" Margin="3,0" Click="HighlightTool_Click" ToolTip="Tô màu nền (Highlight) vùng chữ được chọn">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7E6;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Chụp ảnh &amp; AI" Tag="Ocr">
+        <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" Margin="3,0" Click="AiSnapshotTool_Click" ToolTip="Chụp một vùng trên tài liệu để gửi cho trợ lý AI phân tích, dịch thuật">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Tùy chọn" Tag="Utilities" Visibility="Collapsed">
+        <fluent:CheckBox Name="KeepToolsActiveCheckBox" Header="Sử dụng liên tục" Click="KeepToolsActiveCheckBox_Click" ToolTip="Giữ các công cụ vẽ, chú thích, chụp ảnh hoạt động liên tục cho đến khi nhấn ESC" IsChecked="False" />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="View">
+      <fluent:RibbonGroupBox Header="Page Display" Tag="Navigation">
+        <fluent:Button Name="ViewFitPageBtn" Header="Fit Page" LargeIcon="{StaticResource IconFit}" Size="Large" Click="FitPage_Click" ToolTip="Hiển thị toàn bộ trang PDF trong vùng xem." />
+        <fluent:Button Name="ViewFitWidthBtn" Header="Fit Width" LargeIcon="{StaticResource IconFit}" Size="Large" Click="FitWidth_Click" ToolTip="Điều chỉnh trang theo chiều rộng vùng xem." />
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Zoom" Tag="Navigation">
+        <fluent:Button Name="ViewZoomOutBtn" Header="Zoom Out" LargeIcon="{StaticResource IconZoomOut}" Size="Large" Click="ZoomOut_Click" />
+        <fluent:Button Name="ViewZoomInBtn" Header="Zoom In" LargeIcon="{StaticResource IconZoomIn}" Size="Large" Click="ZoomIn_Click" />
+        <fluent:Button Name="ViewSidebarBtn" Header="Page Panel" LargeIcon="{StaticResource IconSidebar}" Size="Large" Click="ToggleSidebar_Click" ToolTip="Hiện hoặc ẩn danh sách trang." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Protect">
+      <fluent:RibbonGroupBox Header="Document Security" Tag="Utilities">
+        <fluent:Button Name="ProtectPdfBtn" Header="Protect PDF" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="PdfSecurity_Click" ToolTip="Thiết lập mật khẩu và quyền truy cập cho PDF." />
+        <fluent:Button Name="ProtectWatermarkBtn" Header="Watermark" LargeIcon="{StaticResource IconText}" Size="Large" Click="Watermark_Click" ToolTip="Thêm dấu bản quyền hoặc nội dung nhận diện vào PDF." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Help">
       <fluent:RibbonGroupBox Header="Thiết lập" Tag="Utilities">
         <fluent:ToggleButton Name="ThemeToggleBtn" Header="Tối" Margin="3,0" IsChecked="True" Click="ThemeToggle_Click" ToolTip="Chuyển đổi chủ đề màu sắc giao diện sáng hoặc tối">
           <fluent:ToggleButton.LargeIcon>
