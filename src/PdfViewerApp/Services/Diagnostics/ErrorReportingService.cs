@@ -54,8 +54,7 @@ namespace PdfViewerApp.Services.Diagnostics
 				{
 					try
 					{
-						using HttpClient client = new HttpClient();
-						client.Timeout = TimeSpan.FromSeconds(3);
+						var client = HttpHelper.Client;
 						var payload = new
 						{
 							app_version = ActivationLicense.AppVersion,

@@ -1,2 +1,3 @@
-- Nâng cấp công cụ ghi chú và mũi tên chỉ dẫn.
-- Tối ưu giao diện thanh công cụ và in ấn.
+- Chuẩn hóa hệ thống tab menu Ribbon theo chuẩn Foxit PhantomPDF (Công cụ, Hiển thị, Chỉnh sửa, Chú thích, Tổ chức trang, Chuyển đổi).
+- Bổ sung công cụ Bàn tay (Hand Tool) kéo cuộn trang mượt mà và nút hiển thị kích thước 100% (Actual Size).
+- Tinh chỉnh đồng bộ màu chữ, màu nền nhóm và viền cho cả giao diện Sáng và Tối (Light/Dark themes).

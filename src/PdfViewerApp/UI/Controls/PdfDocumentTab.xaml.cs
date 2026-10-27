@@ -268,6 +268,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		set
 		{
 			_currentActiveTool = value;
+			if (DocumentScrollViewer != null && !_isPanning)
+			{
+				DocumentScrollViewer.Cursor = (value == "Hand") ? Cursors.Hand : Cursors.Arrow;
+			}
 			if (_editingSnapshot && value != "Select")
 			{
 				_editingSnapshot = false;
@@ -895,6 +899,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			canvas.Cursor = ActiveTool switch
 			{
+				"Hand" => Cursors.Hand,
 				"Callout" => Cursors.Pen,
 				"StickyNote" => Cursors.Hand,
 				"TextBox" => Cursors.IBeam,

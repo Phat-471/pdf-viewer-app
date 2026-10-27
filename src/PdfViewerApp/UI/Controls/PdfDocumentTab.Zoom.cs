@@ -398,7 +398,8 @@ namespace PdfViewerApp
 		{
 			bool num = e.ChangedButton == MouseButton.Middle;
 			bool flag = e.ChangedButton == MouseButton.Left && Keyboard.IsKeyDown(Key.Space);
-			if (num || flag)
+			bool isHandTool = e.ChangedButton == MouseButton.Left && ActiveTool == "Hand";
+			if (num || flag || isHandTool)
 			{
 				_isPanning = true;
 				_panStartPoint = e.GetPosition(DocumentScrollViewer);
@@ -424,6 +425,13 @@ namespace PdfViewerApp
 				DocumentScrollViewer.ScrollToVerticalOffset(_panStartVerticalOffset - vector.Y);
 				e.Handled = true;
 			}
+			else if (ActiveTool == "Hand")
+			{
+				if (DocumentScrollViewer.Cursor != Cursors.Hand)
+				{
+					DocumentScrollViewer.Cursor = Cursors.Hand;
+				}
+			}
 		}
 
 		private void DocumentScrollViewer_PreviewMouseUp(object sender, MouseButtonEventArgs e)
@@ -438,7 +446,7 @@ namespace PdfViewerApp
 		private void EndPan()
 		{
 			_isPanning = false;
-			DocumentScrollViewer.Cursor = Cursors.Arrow;
+			DocumentScrollViewer.Cursor = (ActiveTool == "Hand") ? Cursors.Hand : Cursors.Arrow;
 			if (DocumentScrollViewer.IsMouseCaptured)
 			{
 				DocumentScrollViewer.ReleaseMouseCapture();

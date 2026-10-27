@@ -2660,11 +2660,14 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			return;
 		}
-		if (ActiveTool == "Select")
+		if (ActiveTool == "Select" || ActiveTool == "Hand")
 		{
 			ActiveToolStatusBarItem.Visibility = Visibility.Collapsed;
 			ActiveToolSeparator.Visibility = Visibility.Collapsed;
-			ActiveToolOverlay.Visibility = Visibility.Collapsed;
+			if (ActiveToolOverlay != null)
+			{
+				ActiveToolOverlay.Visibility = Visibility.Collapsed;
+			}
 			return;
 		}
 		string text = ActiveTool switch
@@ -2713,6 +2716,17 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 			activeTab.ActiveTool = "Select";
 		}
 		LogStatus("Đã chuyển sang công cụ chọn để thực hiện kích hoạt");
+	}
+
+	private void HandTool_Click(object sender, RoutedEventArgs e)
+	{
+		ActiveTool = "Hand";
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab != null)
+		{
+			activeTab.ActiveTool = "Hand";
+		}
+		LogStatus("Đã chuyển sang công cụ Bàn tay. Kéo thả chuột để cuộn trang.");
 	}
 
 	private void InkTool_Click(object sender, RoutedEventArgs e)
@@ -3306,6 +3320,8 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		_mainRibbon.ZoomOutRequested += ZoomOut_Click;
 		_mainRibbon.FitWidthRequested += FitWidth_Click;
 		_mainRibbon.FitPageRequested += (_, _) => GetActiveTab()?.FitPage();
+		_mainRibbon.HandToolRequested += HandTool_Click;
+		_mainRibbon.ActualSizeRequested += (_, _) => GetActiveTab()?.SetZoomPercent(100.0);
 		_mainRibbon.SelectTextToolRequested += SelectTextTool_Click;
 		_mainRibbon.EditTextToolRequested += EditTextTool_Click;
 		_mainRibbon.ExportOcrTextRequested += ExportOcrText_Click;

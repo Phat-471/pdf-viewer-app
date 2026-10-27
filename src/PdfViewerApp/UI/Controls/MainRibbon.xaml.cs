@@ -57,6 +57,10 @@ public partial class MainRibbon : UserControl
 
 	public event RoutedEventHandler? FitWidthRequested;
 
+	public event RoutedEventHandler? HandToolRequested;
+
+	public event RoutedEventHandler? ActualSizeRequested;
+
 	public event RoutedEventHandler? SelectTextToolRequested;
 
 	public event RoutedEventHandler? EditTextToolRequested;
@@ -211,10 +215,11 @@ public partial class MainRibbon : UserControl
 	{
 		_currentTheme = theme;
 		ApplyRibbonSurfaceTheme(theme);
-		var foxitPurple = Color.FromRgb(123, 31, 162);
+		bool isLight = theme.IsLight;
+		var foxitPurple = isLight ? Color.FromRgb(123, 31, 162) : Color.FromRgb(167, 139, 250);
 		Resources["RibbonIconBrush"] = new SolidColorBrush(foxitPurple);
 		var accent = new SolidColorBrush(foxitPurple);
-		var foreground = new SolidColorBrush(Color.FromRgb(38, 38, 38));
+		var foreground = new SolidColorBrush(isLight ? Color.FromRgb(30, 41, 59) : Color.FromRgb(248, 250, 252));
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.Accent", "Fluent.Ribbon.Brushes.AccentBase" })
 			MyRibbon.Resources[key] = accent;
 		var selectedBackground = (Brush)Resources["RibbonSelectedBrush"];
@@ -222,7 +227,7 @@ public partial class MainRibbon : UserControl
 			MyRibbon.Resources[key] = selectedBackground;
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.RibbonTabItem.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.Foreground", "Fluent.Ribbon.Brushes.RibbonTabItem.Selected.MouseOver.Foreground", "Fluent.Ribbon.Brushes.RibbonTabControl.Content.Foreground" })
 			MyRibbon.Resources[key] = foreground;
-		MyRibbon.Resources["Fluent.Ribbon.Brushes.RibbonGroupBox.Header.Foreground"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
+		MyRibbon.Resources["Fluent.Ribbon.Brushes.RibbonGroupBox.Header.Foreground"] = (Brush)Resources["RibbonGroupHeaderBrush"];
 		MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.MouseOver.Background"] = Resources["RibbonHoverBrush"];
         MyRibbon.Resources["Fluent.Ribbon.Brushes.Button.Pressed.Background"] = selectedBackground;
         foreach (string key in new[] { "Fluent.Ribbon.Brushes.Button.MouseOver.Border", "Fluent.Ribbon.Brushes.Button.Pressed.Border",
@@ -261,17 +266,17 @@ public partial class MainRibbon : UserControl
 
 		if (MyBackstage != null)
 		{
-			MyBackstage.Background = new SolidColorBrush(foxitPurple);
+			MyBackstage.Background = new SolidColorBrush(Color.FromRgb(123, 31, 162));
 			MyBackstage.Foreground = Brushes.White;
 			PdfPerfLogger.Log("ApplyTheme: MyBackstage background updated.");
 		}
 
 		if (MyRibbon != null)
 		{
-			var bgBrush = new SolidColorBrush(Colors.White);
+			var bgBrush = new SolidColorBrush(isLight ? Colors.White : Color.FromRgb(30, 41, 59));
 			MyRibbon.Background = bgBrush;
 			MyRibbon.Foreground = foreground;
-			MyRibbon.BorderBrush = new SolidColorBrush(Color.FromRgb(212, 212, 216));
+			MyRibbon.BorderBrush = new SolidColorBrush(isLight ? Color.FromRgb(226, 232, 240) : Color.FromRgb(51, 65, 85));
 
 			// Override Fluent.Ribbon resource brushes globally and locally using correct keys
 			string[] keys = new string[]
@@ -326,26 +331,31 @@ public partial class MainRibbon : UserControl
             brush.Freeze();
             Resources[key] = brush;
         }
-        // Keep the command ribbon in Foxit's light purple visual language even
-        // when the document canvas or surrounding application uses dark mode.
-        var panel = Colors.White;
-        var accent = Color.FromRgb(123, 31, 162);
+
+        bool isLight = theme.IsLight;
+        var panel = isLight ? Colors.White : Color.FromRgb(30, 41, 59);
+        var accent = isLight ? Color.FromRgb(123, 31, 162) : Color.FromRgb(167, 139, 250);
+        var text = isLight ? Color.FromRgb(30, 41, 59) : Color.FromRgb(248, 250, 252);
+        var groupHeader = isLight ? Color.FromRgb(100, 116, 139) : Color.FromRgb(148, 163, 184);
+        var border = isLight ? Color.FromRgb(226, 232, 240) : Color.FromRgb(51, 65, 85);
+
         Token("RibbonButtonBackground", panel);
-        Token("RibbonGroupBackground", Colors.White);
-        Token("RibbonBorderBrush", Color.FromRgb(212, 212, 216));
-        Token("RibbonTextBrush", Color.FromRgb(38, 38, 38));
+        Token("RibbonGroupBackground", panel);
+        Token("RibbonBorderBrush", border);
+        Token("RibbonTextBrush", text);
+        Token("RibbonGroupHeaderBrush", groupHeader);
         Token("RibbonAccentBrush", accent);
-        Token("RibbonHoverBrush", Mix(panel, accent, 0.08));
-        Token("RibbonSelectedBrush", Mix(panel, accent, 0.18));
+        Token("RibbonHoverBrush", Mix(panel, accent, isLight ? 0.08 : 0.22));
+        Token("RibbonSelectedBrush", Mix(panel, accent, isLight ? 0.18 : 0.38));
         var groupColors = new Dictionary<string, string>
         {
-            ["Document"] = "#666666",
-            ["Navigation"] = "#666666",
-            ["Pages"] = "#666666",
-            ["Comments"] = "#666666",
-            ["Measure"] = "#666666",
-            ["Ocr"] = "#666666",
-            ["Utilities"] = "#666666"
+            ["Document"] = isLight ? "#64748B" : "#94A3B8",
+            ["Navigation"] = isLight ? "#64748B" : "#94A3B8",
+            ["Pages"] = isLight ? "#64748B" : "#94A3B8",
+            ["Comments"] = isLight ? "#64748B" : "#94A3B8",
+            ["Measure"] = isLight ? "#64748B" : "#94A3B8",
+            ["Ocr"] = isLight ? "#64748B" : "#94A3B8",
+            ["Utilities"] = isLight ? "#64748B" : "#94A3B8"
         };
         foreach (var groupColor in groupColors)
             Token("RibbonGroup" + groupColor.Key + "Brush", Parse(groupColor.Value));
@@ -434,16 +444,39 @@ public partial class MainRibbon : UserControl
 
 	public void SetActiveTool(string activeTool)
 	{
-		HomeSelectToolBtn.IsChecked = activeTool == "Select";
-		HomeTextToolBtn.IsChecked = activeTool == "TextBox";
+		if (HomeHandToolBtn != null)
+		{
+			HomeHandToolBtn.IsChecked = activeTool == "Hand";
+		}
+		if (HomeSelectToolBtn != null)
+		{
+			HomeSelectToolBtn.IsChecked = activeTool == "Select";
+		}
+		if (HomeSnapshotToolBtn != null)
+		{
+			HomeSnapshotToolBtn.IsChecked = activeTool == "Snapshot";
+		}
+		if (HomeEditTextToolBtn != null)
+		{
+			HomeEditTextToolBtn.IsChecked = activeTool == "EditText";
+		}
+		if (HomeTextToolBtn != null)
+		{
+			HomeTextToolBtn.IsChecked = activeTool == "TextBox";
+		}
 		if (HomeCalloutToolBtn != null)
 		{
 			HomeCalloutToolBtn.IsChecked = activeTool == "Callout";
 		}
-		HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
-		HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
-		HomeDistanceToolBtn.IsChecked = activeTool == "MeasureDistance";
-		HomeAreaToolBtn.IsChecked = activeTool == "MeasureArea";
+		if (HomeHighlightToolBtn != null)
+		{
+			HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
+		}
+		if (HomeNoteToolBtn != null)
+		{
+			HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
+		}
+
 		if (SelectTextToolBtn != null)
 		{
 			SelectTextToolBtn.IsChecked = activeTool == "SelectText";
@@ -714,6 +747,10 @@ public partial class MainRibbon : UserControl
 	private void ZoomOut_Click(object sender, RoutedEventArgs e) => ZoomOutRequested?.Invoke(this, e);
 
 	private void FitWidth_Click(object sender, RoutedEventArgs e) => FitWidthRequested?.Invoke(this, e);
+
+	private void HandTool_Click(object sender, RoutedEventArgs e) => HandToolRequested?.Invoke(this, e);
+
+	private void ActualSize_Click(object sender, RoutedEventArgs e) => ActualSizeRequested?.Invoke(this, e);
 
 	private void SelectTextTool_Click(object sender, RoutedEventArgs e) => SelectTextToolRequested?.Invoke(this, e);
 
