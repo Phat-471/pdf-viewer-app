@@ -1,1 +1,2 @@
-- Hoàn thiện đầy đủ các tab menu kiểu Foxit; nối lệnh sẵn có và đánh dấu rõ các mục chưa được hỗ trợ.
+- Nâng cấp công cụ ghi chú và mũi tên chỉ dẫn.
+- Tối ưu giao diện thanh công cụ và in ấn.

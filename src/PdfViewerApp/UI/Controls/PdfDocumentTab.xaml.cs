@@ -521,7 +521,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				}
 				else
 				{
-					LogStatus("Vﾃｹng nﾃy khﾃｴng cﾃｳ vﾄハ b蘯｣n cﾃｳ th盻・ch盻肱 (PDF d蘯｡ng 蘯｣nh/scan).");
+					LogStatus("Vùng này không có văn bản có thể chọn (PDF dạng ảnh/scan).");
 				}
 				return;
 			}
@@ -700,7 +700,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				X = position.X / canvas.Width,
 				Y = position.Y / canvas.Height,
 				ColorHex = "#FCD34D",
-				NoteText = "Nh蘯ｭp ghi chﾃｺ nhanh..."
+				NoteText = "Nhập ghi chú nhanh..."
 			};
 			SaveUndoState();
 			Annotations.Add(pdfStickyNoteAnnotation);
@@ -890,6 +890,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			_lastPointerX = Math.Clamp(pointer.X / canvas.Width, 0.0, 1.0);
 			_lastPointerY = Math.Clamp(pointer.Y / canvas.Height, 0.0, 1.0);
 			_hasLastPointerPosition = true;
+		}
+		if (!_isDrawing && !_isDraggingAnn && !_isResizingAnn && !_isDraggingArrowHandle)
+		{
+			canvas.Cursor = ActiveTool switch
+			{
+				"Callout" => Cursors.Pen,
+				"StickyNote" => Cursors.Hand,
+				"TextBox" => Cursors.IBeam,
+				"ShapeRect" or "ShapeOval" or "ShapeLine" or "MeasureDistance" or "MeasureArea" or "MeasurePerimeter" or "Snapshot" or "AiSnapshot" => Cursors.Cross,
+				"Ink" => Cursors.Pen,
+				"SelectText" or "EditText" or "Highlight" => Cursors.IBeam,
+				_ => Cursors.Arrow
+			};
 		}
 		if (e.LeftButton != MouseButtonState.Pressed && IsMouseInteractionActive())
 		{
@@ -1234,6 +1247,11 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				double w4 = 150.0;
 				double h4 = 60.0;
 				_tempLine = null;
+				if ((position - drawStartPoint).Length < 10.0)
+				{
+					x4 = Math.Min(canvas.Width - w4 - 10.0, drawStartPoint.X + 50.0);
+					y4 = Math.Max(10.0, Math.Min(canvas.Height - h4 - 10.0, drawStartPoint.Y - 40.0));
+				}
 				ShowCalloutTextBoxInput(canvas, drawStartPoint, x4, y4, w4, h4, num);
 			}
 			else if (ActiveTool == "ShapeLine" && _tempLine != null)
@@ -1551,7 +1569,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Width = w,
 			Height = h,
-			Text = "Nh蘯ｭp ghi chﾃｺ...",
+			Text = "Nhập ghi chú...",
 			FontFamily = new FontFamily(ActiveFontFamily),
 			FontSize = ActiveFontSize,
 			FontWeight = (ActiveIsBold ? FontWeights.Bold : FontWeights.Normal),
@@ -1570,40 +1588,37 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			string text = tbInput.Text.Trim();
 			canvas.Children.Remove(tbInput);
-			if (!string.IsNullOrEmpty(text) && text != "Nh蘯ｭp ghi chﾃｺ...")
+			if (string.IsNullOrEmpty(text) || text == "Nhập ghi chú..." || text == "Nh蘯ｭp ghi chﾃｺ...")
 			{
-				PdfCalloutAnnotation pdfCalloutAnnotation = new PdfCalloutAnnotation
-				{
-					PageIndex = pageNumber - 1,
-					X = x / canvas.Width,
-					Y = y / canvas.Height,
-					Width = w / canvas.Width,
-					Height = h / canvas.Height,
-					Text = text,
-					ArrowX = arrowTip.X / canvas.Width,
-					ArrowY = arrowTip.Y / canvas.Height,
-					FontFamily = ActiveFontFamily,
-					FontSize = ActiveFontSize,
-					IsBold = ActiveIsBold,
-					IsItalic = ActiveIsItalic,
-					IsUnderline = ActiveIsUnderline,
-					StrokeColor = ActiveStrokeColor,
-					BgColor = ActiveBgColor,
-					Opacity = ActiveOpacity
-				};
-				SaveUndoState();
-				Annotations.Add(pdfCalloutAnnotation);
-				SelectedAnnotation = pdfCalloutAnnotation;
-				PdfPerfLogger.LogTestStatus("Callout annotation", $"PASS: callout text committed and annotation added on page {pageNumber}.");
-				if (!IsContinuousTool(ActiveTool))
-				{
-					ActiveTool = "Select";
-					LogStatus("ﾄ静｣ t蘯｡o mﾅｩi tﾃｪn ch盻・d蘯ｫn. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select; mu盻創 t蘯｡o mﾅｩi tﾃｪn n盻ｯa hﾃ｣y ch盻肱 l蘯｡i.");
-				}
+				text = "Ghi chú";
 			}
-			else
+			PdfCalloutAnnotation pdfCalloutAnnotation = new PdfCalloutAnnotation
 			{
-				PdfPerfLogger.LogTestStatus("Callout annotation", "INFO: editor closed without text; no annotation was saved.");
+				PageIndex = pageNumber - 1,
+				X = x / canvas.Width,
+				Y = y / canvas.Height,
+				Width = w / canvas.Width,
+				Height = h / canvas.Height,
+				Text = text,
+				ArrowX = arrowTip.X / canvas.Width,
+				ArrowY = arrowTip.Y / canvas.Height,
+				FontFamily = ActiveFontFamily,
+				FontSize = ActiveFontSize,
+				IsBold = ActiveIsBold,
+				IsItalic = ActiveIsItalic,
+				IsUnderline = ActiveIsUnderline,
+				StrokeColor = ActiveStrokeColor,
+				BgColor = ActiveBgColor,
+				Opacity = ActiveOpacity
+			};
+			SaveUndoState();
+			Annotations.Add(pdfCalloutAnnotation);
+			SelectedAnnotation = pdfCalloutAnnotation;
+			PdfPerfLogger.LogTestStatus("Callout annotation", $"PASS: callout text committed and annotation added on page {pageNumber}.");
+			if (!IsContinuousTool(ActiveTool))
+			{
+				ActiveTool = "Select";
+				LogStatus("Đã tạo mũi tên chỉ dẫn. Công cụ đã quay về Select; muốn tạo mũi tên nữa hãy chọn lại.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -1616,7 +1631,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			else if (ev.Key == Key.Escape)
 			{
 				canvas.Children.Remove(tbInput);
-				ActiveTool = "Select";
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, pageNumber);
 			}
 		};
@@ -1737,7 +1755,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		editorBorder.Child = stackPanel;
 		TextBlock element = new TextBlock
 		{
-			Text = "Ghi chﾃｺ nhanh",
+			Text = "Ghi chú nhanh",
 			FontWeight = FontWeights.Bold,
 			FontSize = 11.0,
 			Foreground = (Brush)new BrushConverter().ConvertFromString("#B45309"),
@@ -1748,7 +1766,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			Width = num - 12.0,
 			Height = num2 - 32.0,
-			Text = ((sticky.NoteText == "Nh蘯ｭp ghi chﾃｺ nhanh...") ? "" : sticky.NoteText),
+			Text = ((sticky.NoteText == "Nhập ghi chú nhanh..." || sticky.NoteText == "Nhập ghi chú nhanh ở đây..." || sticky.NoteText == "Nh蘯ｭp ghi chﾃｺ nhanh...") ? "" : sticky.NoteText),
 			FontFamily = new FontFamily("Segoe UI"),
 			FontSize = 12.0,
 			TextWrapping = TextWrapping.Wrap,
@@ -1773,9 +1791,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				sticky.NoteText = text;
 				PdfPerfLogger.LogTestStatus("Sticky note annotation", $"PASS: note text committed on page {pageNumber}.");
 			}
-			else
+			else if (sticky.NoteText == "Nhập ghi chú nhanh..." || sticky.NoteText == "Nhập ghi chú nhanh ở đây..." || sticky.NoteText == "Nh蘯ｭp ghi chﾃｺ nhanh...")
 			{
-				PdfPerfLogger.LogTestStatus("Sticky note annotation", "INFO: editor closed without text; note remains empty.");
+				sticky.NoteText = "Ghi chú";
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
 		};
@@ -1840,7 +1858,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (SelectedAnnotation != null)
 		{
 			_copiedAnnotation = CloneAnnotation(SelectedAnnotation);
-			LogStatus("ﾄ静｣ sao chﾃｩp chﾃｺ thﾃｭch");
+			LogStatus("Đã sao chép chú thích");
 		}
 	}
 
@@ -3698,7 +3716,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			break;
 		}
-		LogStatus($"ﾄ静｣ xoay trang {pageNumber} trﾃｪn mﾃn hﾃｬnh ({num}ﾂｰ).");
+		LogStatus($"Đã xoay trang {pageNumber} trên màn hình ({num}°).");
 	}
 
 	private async Task<bool> SaveDocumentCoreAsync(string? outputPath = null)

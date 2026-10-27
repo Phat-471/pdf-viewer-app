@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -2802,8 +2802,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "TextBox";
 		}
-		_mainRibbon?.SelectMeasureAndSignTab();
-		LogStatus("Đã chuyển sang công cụ Hộp văn bản để thực hiện kích hoạt. Hãy kéo chuột trên trang bản vẽ để tạo.");
+		LogStatus("Đã chuyển sang công cụ Hộp văn bản. Hãy kéo chuột trên trang để tạo hộp văn bản.");
 	}
 
 	private void HighlightTool_Click(object sender, RoutedEventArgs e)
@@ -2834,8 +2833,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		{
 			activeTab.ActiveTool = "Callout";
 		}
-		_mainRibbon?.SelectMeasureAndSignTab();
-		LogStatus("Đã chuyển sang công cụ Mũi tên chệdẫn để thực hiện kích hoạt. Nhập chuỗi để tạo mũi tên, kéo để tạo ghi chú.");
+		LogStatus("Đã chuyển sang công cụ Mũi tên chỉ dẫn (Callout). Bấm hoặc kéo chuột trên trang để tạo chú thích.");
 	}
 
 	private void SnapshotTool_Click(object sender, RoutedEventArgs e)

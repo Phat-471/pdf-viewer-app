@@ -409,8 +409,13 @@
       <fluent:RibbonGroupBox Header="Chú thích" Tag="Comments">
         <fluent:ToggleButton Name="HomeSelectToolBtn" Header="Chọn" LargeIcon="{StaticResource IconSelect}" Size="Large" Margin="2,0" Click="SelectTool_Click" ToolTip="Chọn" />
         <fluent:ToggleButton Name="HomeTextToolBtn" Header="Chữ" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="TextBoxTool_Click" ToolTip="Chữ" />
-        <fluent:ToggleButton Name="HomeHighlightToolBtn" Header="Đánh dấu" LargeIcon="{StaticResource IconHighlight}" Size="Large" Margin="2,0" Click="HighlightTool_Click" ToolTip="Đánh dấu" />
+        <fluent:ToggleButton Name="HomeCalloutToolBtn" Header="Mũi tên" Size="Large" Margin="2,0" Click="CalloutTool_Click" ToolTip="Mũi tên chỉ dẫn (Callout): Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể">
+          <fluent:ToggleButton.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+          </fluent:ToggleButton.LargeIcon>
+        </fluent:ToggleButton>
         <fluent:ToggleButton Name="HomeNoteToolBtn" Header="Ghi chú" LargeIcon="{StaticResource IconNote}" Size="Large" Margin="2,0" Click="StickyNoteTool_Click" ToolTip="Ghi chú" />
+        <fluent:ToggleButton Name="HomeHighlightToolBtn" Header="Đánh dấu" LargeIcon="{StaticResource IconHighlight}" Size="Large" Margin="2,0" Click="HighlightTool_Click" ToolTip="Đánh dấu" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Đo đạc" Tag="Measure">
         <fluent:ToggleButton Name="HomeDistanceToolBtn" Header="Khoảng cách" LargeIcon="{StaticResource IconDistance}" Size="Large" Margin="2,0" Click="MeasureDistanceTool_Click" ToolTip="Khoảng cách" />
@@ -662,7 +667,7 @@
         </fluent:Button>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
-    <fluent:RibbonTabItem Header="Comment">
+    <fluent:RibbonTabItem x:Name="CommentTab" Header="Chú thích">
       <fluent:RibbonGroupBox Header="Công cụ vẽ &amp; hình học" Tag="Comments">
         <fluent:ToggleButton Name="SelectToolBtn" Header="Con trỏ chọn" Margin="3,0" Click="SelectTool_Click" ToolTip="Quay lại công cụ chọn để di chuyển, chỉnh sửa hoặc xóa chú thích">
           <fluent:ToggleButton.LargeIcon>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -253,6 +253,20 @@ public class PdfDocumentPaginator : DocumentPaginator, IDisposable
 						formattedText.MaxTextWidth = Math.Max(1.0, num23 - 8.0);
 						formattedText.MaxTextHeight = Math.Max(1.0, num24 - 8.0);
 						drawingContext.DrawText(formattedText, new Point(num25 + 4.0, num26 + 4.0));
+					}
+					else if (item is PdfStickyNoteAnnotation stickyNote)
+					{
+						double noteX = num18 + stickyNote.X * num16;
+						double noteY = num19 + stickyNote.Y * num17;
+						double noteSize = 24.0 * num15;
+						Color noteColor = Colors.Goldenrod;
+						try { noteColor = (Color)ColorConverter.ConvertFromString(stickyNote.ColorHex ?? "#FCD34D"); } catch { }
+						Brush noteBg = new SolidColorBrush(noteColor);
+						Pen noteBorder = new Pen(Brushes.Goldenrod, 1.2);
+						drawingContext.DrawRoundedRectangle(noteBg, noteBorder, new Rect(noteX, noteY, noteSize, noteSize), 3.0 * num15, 3.0 * num15);
+						Typeface iconTypeface = new Typeface(new FontFamily("Segoe UI Emoji, Segoe UI Symbol, Arial"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+						FormattedText noteIconText = new FormattedText("\ud83d\udcdd", CultureInfo.CurrentCulture, FlowDirection.LeftToRight, iconTypeface, 12.0 * num15, Brushes.Black, 96.0);
+						drawingContext.DrawText(noteIconText, new Point(noteX + 4.0 * num15, noteY + 3.0 * num15));
 					}
 				}
 				drawingContext.Pop();

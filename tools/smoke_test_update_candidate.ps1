@@ -96,7 +96,15 @@ finally {
     }
 
     if (-not $KeepExtracted) {
-        Remove-Item -LiteralPath $extractDir -Recurse -Force
+        for ($retry = 0; $retry -lt 5; $retry++) {
+            try {
+                Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction Stop
+                break
+            }
+            catch {
+                Start-Sleep -Milliseconds 1000
+            }
+        }
     }
 }
 

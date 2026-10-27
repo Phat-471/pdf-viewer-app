@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -414,7 +414,7 @@ public partial class MainRibbon : UserControl
 
 	public void SelectMeasureAndSignTab()
 	{
-		if (MyRibbon != null)
+		if (MyRibbon != null && MeasureSignTab != null)
 		{
 			MyRibbon.SelectedTabItem = MeasureSignTab;
 		}
@@ -436,6 +436,10 @@ public partial class MainRibbon : UserControl
 	{
 		HomeSelectToolBtn.IsChecked = activeTool == "Select";
 		HomeTextToolBtn.IsChecked = activeTool == "TextBox";
+		if (HomeCalloutToolBtn != null)
+		{
+			HomeCalloutToolBtn.IsChecked = activeTool == "Callout";
+		}
 		HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
 		HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
 		HomeDistanceToolBtn.IsChecked = activeTool == "MeasureDistance";
