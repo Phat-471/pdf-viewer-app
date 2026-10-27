@@ -1514,6 +1514,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		};
 	}
 
+	private void FocusTextInputWhenLoaded(System.Windows.Controls.TextBox textBox)
+	{
+		textBox.Loaded += delegate
+		{
+			Dispatcher.BeginInvoke(new Action(() =>
+			{
+				textBox.Focus();
+				textBox.SelectAll();
+			}), DispatcherPriority.Input);
+		};
+	}
+
 	private void ShowCalloutTextBoxInput(Canvas canvas, Point arrowTip, double x, double y, double w, double h, int pageNumber)
 	{
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
@@ -1534,8 +1546,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Canvas.SetLeft(tbInput, x);
 		Canvas.SetTop(tbInput, y);
 		canvas.Children.Add(tbInput);
-		tbInput.Focus();
-		tbInput.SelectAll();
+		FocusTextInputWhenLoaded(tbInput);
 		tbInput.LostFocus += delegate
 		{
 			string text = tbInput.Text.Trim();
@@ -1726,8 +1737,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Canvas.SetLeft(editorBorder, num3);
 		Canvas.SetTop(editorBorder, num4);
 		canvas.Children.Add(editorBorder);
-		tbInput.Focus();
-		tbInput.SelectAll();
+		FocusTextInputWhenLoaded(tbInput);
 		tbInput.LostFocus += delegate
 		{
 			string text = tbInput.Text.Trim();
@@ -1773,8 +1783,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Canvas.SetLeft(tbInput, length);
 		Canvas.SetTop(tbInput, length2);
 		canvas.Children.Add(tbInput);
-		tbInput.Focus();
-		tbInput.SelectAll();
+		FocusTextInputWhenLoaded(tbInput);
 		tbInput.LostFocus += delegate
 		{
 			SaveUndoState();
