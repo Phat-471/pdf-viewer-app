@@ -1103,6 +1103,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			_isDrawing = false;
 			Point position = e.GetPosition(canvas);
+			// Release the canvas capture before opening the in-place editor. Otherwise
+			// mouse clicks stay routed to the canvas and the TextBox never loses focus
+			// to commit the annotation.
+			if (canvas.IsMouseCaptured)
+			{
+				canvas.ReleaseMouseCapture();
+			}
 			if (ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot")
 				_drawStartPoint = new Point(_snapshotDragStart.X * canvas.Width, _snapshotDragStart.Y * canvas.Height);
 			if (ActiveTool == "TextBox" && _tempRect != null)
@@ -1110,8 +1117,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				canvas.Children.Remove(_tempRect);
 				double x = Math.Min(_drawStartPoint.X, position.X);
 				double y = Math.Min(_drawStartPoint.Y, position.Y);
-				double w = Math.Max(40.0, Math.Abs(_drawStartPoint.X - position.X));
-				double h = Math.Max(25.0, Math.Abs(_drawStartPoint.Y - position.Y));
+				double dragWidth = Math.Abs(_drawStartPoint.X - position.X);
+				double dragHeight = Math.Abs(_drawStartPoint.Y - position.Y);
+				double w = Math.Min(canvas.Width, dragWidth < 20.0 ? 220.0 : Math.Max(40.0, dragWidth));
+				double h = Math.Min(canvas.Height, dragHeight < 20.0 ? 70.0 : Math.Max(25.0, dragHeight));
+				x = Math.Clamp(x, 0.0, Math.Max(0.0, canvas.Width - w));
+				y = Math.Clamp(y, 0.0, Math.Max(0.0, canvas.Height - h));
 				_tempRect = null;
 				ShowTextBoxInput(canvas, x, y, w, h, num);
 			}
@@ -1446,8 +1457,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		Canvas.SetLeft(tbInput, x);
 		Canvas.SetTop(tbInput, y);
 		canvas.Children.Add(tbInput);
-		tbInput.Focus();
-		tbInput.SelectAll();
+		tbInput.Loaded += delegate
+		{
+			Dispatcher.BeginInvoke(new Action(() =>
+			{
+				tbInput.Focus();
+				tbInput.SelectAll();
+			}), DispatcherPriority.Input);
+		};
 		tbInput.LostFocus += delegate
 		{
 			string text = tbInput.Text.Trim();
