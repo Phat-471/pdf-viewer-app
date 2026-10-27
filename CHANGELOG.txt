@@ -1,1 +1,1 @@
-- Sửa vùng công cụ đang dùng để không chặn thao tác trên trang.
+﻿- Bổ sung bản đồ kiến trúc và roadmap giúp AI tra cứu dự án.
