@@ -688,7 +688,7 @@ public partial class MainWindow : Window, IComponentConnector
 			}
 			case Key.V:
 				e.Handled = true;
-				GetActiveTab()?.PasteAnnotation(inPlace: false);
+				PasteToActivePdf();
 				break;
 			case Key.H:
 				e.Handled = true;
@@ -1649,7 +1649,14 @@ public partial class MainWindow : Window, IComponentConnector
 
 	private void Paste_Click(object sender, RoutedEventArgs e)
 	{
-		GetActiveTab()?.PasteAnnotation(inPlace: false);
+		PasteToActivePdf();
+	}
+
+	private void PasteToActivePdf()
+	{
+		PdfDocumentTab activeTab = GetActiveTab();
+		if (activeTab == null || !activeTab.TryPasteClipboardText())
+			activeTab?.PasteAnnotation(inPlace: false);
 	}
 
 	private void Cut_Click(object sender, RoutedEventArgs e)

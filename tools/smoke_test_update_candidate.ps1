@@ -72,7 +72,7 @@ $process = $null
 
 try {
     Write-Host "Launching app for $StartupSeconds seconds..." -ForegroundColor Cyan
-    $process = Start-Process -FilePath $exePath -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
+    $process = Start-Process -FilePath $exePath -ArgumentList '--new-window' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds $StartupSeconds
 
     if ($process.HasExited) {

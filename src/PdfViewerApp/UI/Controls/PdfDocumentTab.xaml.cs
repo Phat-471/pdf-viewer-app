@@ -116,6 +116,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private int _selectionEndIndex = -1;
 
 	private string _selectedText = "";
+	private int _lastPointerPageNumber = 1;
+	private double _lastPointerX = 0.1;
+	private double _lastPointerY = 0.1;
+	private bool _hasLastPointerPosition;
 
 	private readonly Dictionary<int, nint> _textPages = new Dictionary<int, nint>();
 
@@ -877,6 +881,14 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		if (!(sender is Canvas { Tag: var tag } canvas) || !(tag is int num))
 		{
 			return;
+		}
+		if (canvas.Width > 0 && canvas.Height > 0)
+		{
+			Point pointer = e.GetPosition(canvas);
+			_lastPointerPageNumber = num;
+			_lastPointerX = Math.Clamp(pointer.X / canvas.Width, 0.0, 1.0);
+			_lastPointerY = Math.Clamp(pointer.Y / canvas.Height, 0.0, 1.0);
+			_hasLastPointerPosition = true;
 		}
 		if (e.LeftButton != MouseButtonState.Pressed && IsMouseInteractionActive())
 		{
@@ -1774,6 +1786,62 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			_copiedAnnotation = CloneAnnotation(SelectedAnnotation);
 			LogStatus("ﾄ静｣ sao chﾃｩp chﾃｺ thﾃｭch");
 		}
+	}
+
+	public bool TryPasteClipboardText()
+	{
+		string text;
+		try
+		{
+			if (!Clipboard.ContainsText(TextDataFormat.UnicodeText)) return false;
+			text = Clipboard.GetText(TextDataFormat.UnicodeText).Trim();
+		}
+		catch (Exception ex)
+		{
+			LogStatus("Không đọc được văn bản trong Clipboard: " + ex.Message);
+			return true;
+		}
+		if (string.IsNullOrWhiteSpace(text)) return false;
+		if (PageCount <= 0)
+		{
+			LogStatus("Mở một PDF trước khi dán văn bản.");
+			return true;
+		}
+
+		int pageNumber = _hasLastPointerPosition
+			? Math.Clamp(_lastPointerPageNumber, 1, PageCount)
+			: Math.Clamp(SelectedPageNumber, 1, PageCount);
+		double width = Math.Clamp(0.18 + Math.Min(text.Length, 70) * 0.006, 0.18, 0.72);
+		int lineCount = Math.Max(1, text.Count(c => c == '\n') + 1);
+		double height = Math.Clamp(0.055 + lineCount * 0.035, 0.08, 0.35);
+		double x = _hasLastPointerPosition ? _lastPointerX : 0.1;
+		double y = _hasLastPointerPosition ? _lastPointerY : 0.1;
+		var annotation = new PdfTextBoxAnnotation
+		{
+			PageIndex = pageNumber - 1,
+			X = Math.Clamp(x, 0.0, 1.0 - width),
+			Y = Math.Clamp(y, 0.0, 1.0 - height),
+			Width = width,
+			Height = height,
+			Text = text,
+			FontFamily = ActiveFontFamily,
+			FontSize = ActiveFontSize,
+			IsBold = ActiveIsBold,
+			IsItalic = ActiveIsItalic,
+			IsUnderline = ActiveIsUnderline,
+			StrokeColor = ActiveStrokeColor,
+			BgColor = ActiveBgColor,
+			Opacity = ActiveOpacity
+		};
+		SaveUndoState();
+		Annotations.Add(annotation);
+		SelectedAnnotation = annotation;
+		ActiveTool = "Select";
+		if (Window.GetWindow(this) is MainWindow mainWindow)
+			mainWindow.ActiveTool = "Select";
+		RedrawAllPageAnnotations();
+		LogStatus($"Đã dán văn bản lên trang {pageNumber}. Nhấn Lưu để ghi vào PDF.");
+		return true;
 	}
 
 	public void PasteAnnotation(bool inPlace)
