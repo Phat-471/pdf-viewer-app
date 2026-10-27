@@ -1,2 +1,1 @@
-- Bổ sung nhật ký kiểm thử chức năng và khắc phục việc tự mở Trợ lý AI.
-- Tái thiết kế menu ribbon PDF theo bố cục và màu tím kiểu Foxit; thêm tab View và Protect.
+- Hoàn thiện đầy đủ các tab menu kiểu Foxit; nối lệnh sẵn có và đánh dấu rõ các mục chưa được hỗ trợ.

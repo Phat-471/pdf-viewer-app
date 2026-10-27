@@ -734,10 +734,60 @@
         <fluent:Button Name="ViewSidebarBtn" Header="Page Panel" LargeIcon="{StaticResource IconSidebar}" Size="Large" Click="ToggleSidebar_Click" ToolTip="Hiện hoặc ẩn danh sách trang." />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Form">
+      <fluent:RibbonGroupBox Header="Form Fields" Tag="Utilities">
+        <fluent:Button Header="Push Button" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo nút biểu mẫu." />
+        <fluent:Button Header="Check Box" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo ô chọn biểu mẫu." />
+        <fluent:Button Header="Radio Button" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo nút chọn biểu mẫu." />
+        <fluent:Button Header="Combo Box" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo danh sách chọn biểu mẫu." />
+        <fluent:Button Header="List Box" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo hộp danh sách biểu mẫu." />
+        <fluent:Button Header="Text Field" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo trường nhập biểu mẫu." />
+        <fluent:Button Header="Signature Field" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo trường chữ ký biểu mẫu." />
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Form Tools" Tag="Utilities">
+        <fluent:Button Header="Run Form Recognition" IsEnabled="False" ToolTip="Nhận dạng và tạo trường biểu mẫu chưa được hỗ trợ." />
+        <fluent:Button Header="Reset Form" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ đặt lại dữ liệu biểu mẫu." />
+        <fluent:Button Header="Import Data" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ nhập dữ liệu biểu mẫu." />
+        <fluent:Button Header="Export Data" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ xuất dữ liệu biểu mẫu." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Protect">
       <fluent:RibbonGroupBox Header="Document Security" Tag="Utilities">
         <fluent:Button Name="ProtectPdfBtn" Header="Protect PDF" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="PdfSecurity_Click" ToolTip="Thiết lập mật khẩu và quyền truy cập cho PDF." />
         <fluent:Button Name="ProtectWatermarkBtn" Header="Watermark" LargeIcon="{StaticResource IconText}" Size="Large" Click="Watermark_Click" ToolTip="Thêm dấu bản quyền hoặc nội dung nhận diện vào PDF." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Share">
+      <fluent:RibbonGroupBox Header="Share Document" Tag="Utilities">
+        <fluent:Button Header="Email" IsEnabled="False" ToolTip="Gửi PDF qua email chưa được hỗ trợ." />
+        <fluent:Button Header="Create Link" IsEnabled="False" ToolTip="Tạo liên kết chia sẻ PDF chưa được hỗ trợ." />
+        <fluent:Button Header="Send for Review" IsEnabled="False" ToolTip="Quy trình gửi PDF để nhận xét chưa được hỗ trợ." />
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Review" Tag="Comments">
+        <fluent:Button Header="Import Comments" IsEnabled="False" ToolTip="Nhập nhận xét từ dịch vụ chia sẻ chưa được hỗ trợ." />
+        <fluent:Button Header="Export Comments" IsEnabled="False" ToolTip="Xuất nhận xét để chia sẻ chưa được hỗ trợ." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Connect">
+      <fluent:RibbonGroupBox Header="AI Providers" Tag="Ocr">
+        <fluent:Button Header="Gemini API Key" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="OpenGeminiApiKey_Click" ToolTip="Mở trang quản lý khóa API Gemini." />
+        <fluent:Button Header="OpenAI API Key" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="OpenOpenAiApiKey_Click" ToolTip="Mở trang quản lý khóa API OpenAI." />
+        <fluent:Button Header="Ollama" LargeIcon="{StaticResource IconDownload}" Size="Large" Click="OpenOllamaDownload_Click" ToolTip="Mở trang tải Ollama để thiết lập mô hình AI cục bộ." />
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Services" Tag="Utilities">
+        <fluent:Button Header="Check Components" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="CheckLibraries_Click" ToolTip="Kiểm tra các thành phần và thư viện ứng dụng." />
+        <fluent:Button Header="Cloud Storage" IsEnabled="False" ToolTip="Kết nối dịch vụ lưu trữ đám mây chưa được hỗ trợ." />
+      </fluent:RibbonGroupBox>
+    </fluent:RibbonTabItem>
+    <fluent:RibbonTabItem Header="Accessibility">
+      <fluent:RibbonGroupBox Header="Accessibility Check" Tag="Utilities">
+        <fluent:Button Header="Check Accessibility" IsEnabled="False" ToolTip="PDF Pro chưa có công cụ kiểm tra khả năng truy cập PDF." />
+        <fluent:Button Header="Reading Order" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ chỉnh thứ tự đọc nội dung." />
+        <fluent:Button Header="Add Tags" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ gắn thẻ cấu trúc truy cập cho PDF." />
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Read Aloud" Tag="Utilities">
+        <fluent:Button Header="Read Current Page" IsEnabled="False" ToolTip="Đọc nội dung trang hiện tại chưa được hỗ trợ." />
+        <fluent:Button Header="Read Document" IsEnabled="False" ToolTip="Đọc toàn bộ tài liệu chưa được hỗ trợ." />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
     <fluent:RibbonTabItem Header="Help">
