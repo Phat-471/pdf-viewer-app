@@ -1,1 +1,1 @@
-- Hỗ trợ dán văn bản từ Clipboard vào PDF.
+- Sửa vùng công cụ đang dùng để không chặn thao tác trên trang.
