@@ -13,7 +13,7 @@ internal sealed class AppPreferences
 	/// </summary>
 	public string ThemeName
 	{
-		get => _themeName ?? AppThemeRegistry.Dark;
+		get => _themeName ?? AppThemeRegistry.Light;
 		set => _themeName = value;
 	}
 

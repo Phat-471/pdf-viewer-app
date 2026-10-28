@@ -23,6 +23,7 @@ using System.Windows.Threading;
 using ControlzEx.Theming;
 using Microsoft.Win32;
 using PdfViewerApp.Ai;
+using PdfViewerApp.Services;
 using PdfViewerApp.UpdateClient;
 using System.Net.Http;
 
@@ -522,6 +523,11 @@ public partial class MainWindow : Window, IComponentConnector
 		{
 			TitleBarSubtitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 		}
+		Resources["TitleBarIconBrush"] = new SolidColorBrush(isDark ? Color.FromRgb(203, 213, 225) : Color.FromRgb(51, 65, 85));
+		Resources["TitleBarHoverBrush"] = new SolidColorBrush(isDark ? Color.FromRgb(30, 41, 59) : Color.FromRgb(226, 232, 240));
+		Resources["TitleBarBorderBrush"] = new SolidColorBrush(isDark ? Color.FromRgb(51, 65, 85) : Color.FromRgb(203, 213, 225));
+		Resources["TitleBarTextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundPrimary));
+		Resources["TitleBarSubtitleBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.ForegroundSecondary));
 		if (TabEmptyState != null)
 		{
 			TabEmptyState.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(theme.PanelBackground));
@@ -636,6 +642,13 @@ public partial class MainWindow : Window, IComponentConnector
 		{
 			GetActiveTab()?.HandleDeleteKey();
 			e.Handled = true;
+		}
+		else if ((e.Key == Key.F2 || e.Key == Key.Enter) && Keyboard.Modifiers == ModifierKeys.None)
+		{
+			if (GetActiveTab()?.TryEditSelectedAnnotation() == true)
+			{
+				e.Handled = true;
+			}
 		}
 		else if (Keyboard.Modifiers == (ModifierKeys.Alt | ModifierKeys.Control) && e.Key == Key.V)
 		{
@@ -972,20 +985,121 @@ public partial class MainWindow : Window, IComponentConnector
 			string[] source = Environment.GetCommandLineArgs().Skip(1).ToArray();
 			bool flag = source.Any((string arg) => arg.Equals("--merge", StringComparison.OrdinalIgnoreCase));
 			bool flag2 = source.Any((string arg) => arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase));
-			string[] array = FilterPdfFiles(source.Where((string arg) => !arg.Equals("--merge", StringComparison.OrdinalIgnoreCase) && !arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase))).OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+			var nonMergeArgs = source.Where((string arg) => !arg.Equals("--merge", StringComparison.OrdinalIgnoreCase) && !arg.Equals("--exit-after-merge", StringComparison.OrdinalIgnoreCase) && !arg.Equals("--new-window", StringComparison.OrdinalIgnoreCase)).ToArray();
+			string[] pdfFiles = FilterPdfFiles(nonMergeArgs).OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+			string[] imageFiles = ImageToPdfService.FilterImageFiles(nonMergeArgs).OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+
 			if (flag || flag2)
 			{
 				Hide();
-				await HandleExplorerMergeStartupAsync(array);
+				await HandleExplorerMergeStartupAsync(pdfFiles);
 			}
-			else if (array.Length == 1)
+			else if (imageFiles.Length > 0 || pdfFiles.Length > 0)
 			{
-				OpenPdfTab(array[0]);
+				var allFiles = pdfFiles.Concat(imageFiles).ToArray();
+				if (allFiles.Length == 1)
+				{
+					OpenFileOrImage(allFiles[0]);
+				}
+				else if (imageFiles.Length == 0 && pdfFiles.Length > 1)
+				{
+					await ShowMergeDialogAsync(pdfFiles, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+				}
+				else
+				{
+					OpenMultipleFilesOrImages(allFiles);
+				}
 			}
-			else if (array.Length > 1)
+		}
+	}
+
+	public void OpenFileOrImage(string filePath)
+	{
+		if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+
+		if (ImageToPdfService.IsSupportedImage(filePath))
+		{
+			try
 			{
-				await ShowMergeDialogAsync(array, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+				LogStatus($"Đang chuyển đổi ảnh '{Path.GetFileName(filePath)}' sang PDF...");
+				string convertedPdf = ImageToPdfService.ConvertImageToPdf(filePath);
+				string displayTitle = $"{Path.GetFileName(filePath)} (PDF)";
+				OpenPdfTab(convertedPdf, originalSourcePath: filePath, displayTitle: displayTitle);
+				LogStatus("Đã mở ảnh dưới dạng PDF thành công!");
 			}
+			catch (Exception ex)
+			{
+				PdfPerfLogger.LogDiagnosticError("Chuyển đổi ảnh sang PDF thất bại", ex);
+				MessageBox.Show(this, $"Không thể chuyển đổi ảnh sang PDF:\n{ex.Message}", "Lỗi mở ảnh", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
+		}
+		else
+		{
+			OpenPdfTab(filePath);
+		}
+	}
+
+	public void OpenMultipleFilesOrImages(IEnumerable<string> filePaths)
+	{
+		var list = filePaths.Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f)).ToList();
+		if (list.Count == 0) return;
+
+		var pdfFiles = list.Where(f => Path.GetExtension(f).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).ToList();
+		var imgFiles = list.Where(f => ImageToPdfService.IsSupportedImage(f)).ToList();
+
+		foreach (var pdf in pdfFiles)
+		{
+			OpenPdfTab(pdf);
+		}
+
+		if (imgFiles.Count == 1)
+		{
+			OpenFileOrImage(imgFiles[0]);
+		}
+		else if (imgFiles.Count > 1)
+		{
+			var result = MessageBox.Show(this,
+				$"Bạn đã chọn {imgFiles.Count} tệp hình ảnh.\n\n" +
+				"• Bấm YES (Có): Ghép tất cả ảnh thành 1 tài liệu PDF nhiều trang.\n" +
+				"• Bấm NO (Không): Mở từng ảnh thành các tab PDF riêng biệt.",
+				"Mở tệp hình ảnh", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+
+			if (result == MessageBoxResult.Yes)
+			{
+				try
+				{
+					LogStatus($"Đang ghép {imgFiles.Count} ảnh thành 1 tài liệu PDF...");
+					string convertedPdf = ImageToPdfService.ConvertMultipleImagesToPdf(imgFiles);
+					string displayTitle = $"Ghép_{imgFiles.Count}_ảnh.pdf";
+					OpenPdfTab(convertedPdf, originalSourcePath: imgFiles[0], displayTitle: displayTitle);
+					LogStatus($"Đã ghép và mở {imgFiles.Count} ảnh thành PDF thành công!");
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show(this, $"Lỗi ghép ảnh sang PDF: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+				}
+			}
+			else if (result == MessageBoxResult.No)
+			{
+				foreach (var img in imgFiles)
+				{
+					OpenFileOrImage(img);
+				}
+			}
+		}
+	}
+
+	private void CreatePdfFromImages_Click(object sender, RoutedEventArgs e)
+	{
+		OpenFileDialog openFileDialog = new OpenFileDialog
+		{
+			Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.tiff)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.tiff;*.tif;*.gif|Tất cả tệp (*.*)|*.*",
+			Title = "Chọn hình ảnh để tạo PDF",
+			Multiselect = true
+		};
+		if (openFileDialog.ShowDialog() == true && openFileDialog.FileNames.Length > 0)
+		{
+			OpenMultipleFilesOrImages(openFileDialog.FileNames);
 		}
 	}
 
@@ -993,33 +1107,40 @@ public partial class MainWindow : Window, IComponentConnector
 	{
 		OpenFileDialog openFileDialog = new OpenFileDialog
 		{
-			Filter = "PDF documents (*.pdf)|*.pdf",
-			Title = "MởFile PDF",
+			Filter = "Tất cả định dạng hỗ trợ (*.pdf;*.png;*.jpg;...)|*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.tiff;*.tif;*.gif|Tài liệu PDF (*.pdf)|*.pdf|Tệp hình ảnh (*.png;*.jpg;*.bmp;...)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.tiff;*.tif;*.gif|Tất cả tệp (*.*)|*.*",
+			Title = "Mở tệp PDF hoặc Tệp hình ảnh",
 			Multiselect = true
 		};
-		if (openFileDialog.ShowDialog() == true)
+		if (openFileDialog.ShowDialog() == true && openFileDialog.FileNames.Length > 0)
 		{
-			string[] fileNames = openFileDialog.FileNames;
-			foreach (string path in fileNames)
-			{
-				OpenPdfTab(path);
-			}
+			OpenMultipleFilesOrImages(openFileDialog.FileNames);
 		}
 	}
 
-	public void OpenPdfTab(string path)
+	public void OpenPdfTab(string path) => OpenPdfTab(path, null, null);
+
+	public void OpenPdfTab(string path, string? originalSourcePath, string? displayTitle)
 	{
 		foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
 		{
-			if (item.Content is PdfDocumentTab pdfDocumentTab && pdfDocumentTab.CurrentPdfPath == path)
+			if (item.Content is PdfDocumentTab pdfDocumentTab &&
+				(pdfDocumentTab.CurrentPdfPath == path || (!string.IsNullOrEmpty(originalSourcePath) && pdfDocumentTab.ConvertedFromImagePath == originalSourcePath)))
 			{
 				PdfTabControl.SelectedItem = item;
-				RecentFilesService.Record(path);
+				RecentFilesService.Record(originalSourcePath ?? path);
 				RefreshRecentFilesDashboard();
 				return;
 			}
 		}
 		PdfDocumentTab pdfDocumentTab2 = new PdfDocumentTab(path);
+		if (!string.IsNullOrEmpty(originalSourcePath))
+		{
+			pdfDocumentTab2.ConvertedFromImagePath = originalSourcePath;
+		}
+		if (!string.IsNullOrEmpty(displayTitle))
+		{
+			pdfDocumentTab2.CustomTabTitle = displayTitle;
+		}
 		pdfDocumentTab2.KeepToolsActive = (_mainRibbon != null && _mainRibbon.KeepToolsActive);
 		pdfDocumentTab2.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
 		pdfDocumentTab2.StatusChanged += DocTab_StatusChanged;
@@ -1036,7 +1157,7 @@ public partial class MainWindow : Window, IComponentConnector
 		};
 		TextBlock element = new TextBlock
 		{
-			Text = Path.GetFileName(path),
+			Text = displayTitle ?? Path.GetFileName(path),
 			Margin = new Thickness(0.0, 0.0, 10.0, 0.0),
 			VerticalAlignment = VerticalAlignment.Center
 		};
@@ -1073,7 +1194,7 @@ public partial class MainWindow : Window, IComponentConnector
 		};
 		PdfTabControl.Items.Add(tabItem2);
 		PdfTabControl.SelectedItem = tabItem2;
-		RecentFilesService.Record(path);
+		RecentFilesService.Record(originalSourcePath ?? path);
 		RefreshRecentFilesDashboard();
 		UpdateTabEmptyState();
 	}
@@ -1344,12 +1465,31 @@ public partial class MainWindow : Window, IComponentConnector
 			MessageBox.Show("Vui lòng mở một file PDF trước khi lưu.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Asterisk);
 			return;
 		}
+
+		string defaultFileName;
+		string? defaultDirectory = null;
+
+		if (!string.IsNullOrEmpty(activeTab.ConvertedFromImagePath))
+		{
+			defaultFileName = Path.GetFileNameWithoutExtension(activeTab.ConvertedFromImagePath) + ".pdf";
+			defaultDirectory = Path.GetDirectoryName(activeTab.ConvertedFromImagePath);
+		}
+		else if (!string.IsNullOrEmpty(activeTab.CurrentPdfPath) && activeTab.CurrentPdfPath.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase))
+		{
+			defaultFileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_edited.pdf";
+		}
+		else
+		{
+			defaultFileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_edited.pdf";
+			defaultDirectory = Path.GetDirectoryName(activeTab.CurrentPdfPath);
+		}
+
 		SaveFileDialog saveFileDialog = new SaveFileDialog
 		{
-			Filter = "PDF documents (*.pdf)|*.pdf",
+			Filter = "Tài liệu PDF (*.pdf)|*.pdf",
 			Title = "Lưu file PDF dưới dạng",
-			FileName = Path.GetFileNameWithoutExtension(activeTab.CurrentPdfPath) + "_edited.pdf",
-			InitialDirectory = Path.GetDirectoryName(activeTab.CurrentPdfPath)
+			FileName = defaultFileName,
+			InitialDirectory = defaultDirectory
 		};
 		if (saveFileDialog.ShowDialog() == true)
 		{
@@ -1760,19 +1900,26 @@ public partial class MainWindow : Window, IComponentConnector
 		{
 			return;
 		}
-		string[] array = FilterPdfFiles(files);
-		if (array.Length == 0)
+
+		var validFiles = files.Where(f => !string.IsNullOrWhiteSpace(f) && File.Exists(f) &&
+			(Path.GetExtension(f).Equals(".pdf", StringComparison.OrdinalIgnoreCase) || ImageToPdfService.IsSupportedImage(f))).ToArray();
+
+		if (validFiles.Length == 0) return;
+
+		bool hasImages = validFiles.Any(f => ImageToPdfService.IsSupportedImage(f));
+
+		if (validFiles.Length == 1)
 		{
-			return;
+			OpenFileOrImage(validFiles[0]);
 		}
-		if (array.Length == 1)
+		else if (!hasImages && EnsureActivated())
 		{
-			OpenPdfTab(array[0]);
-		}
-		else if (EnsureActivated())
-		{
-			string[] initialFiles = array.OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
+			string[] initialFiles = validFiles.OrderBy((string path) => path, NaturalFilePathComparer.Instance).ToArray();
 			await ShowMergeDialogAsync(initialFiles, autoStartMerge: true, sortByName: true, openMergedExternally: false);
+		}
+		else
+		{
+			OpenMultipleFilesOrImages(validFiles);
 		}
 	}
 
@@ -3304,6 +3451,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		}
 
 		_mainRibbon.OpenPdfRequested += OpenPdf_Click;
+		_mainRibbon.CreatePdfFromImagesRequested += CreatePdfFromImages_Click;
 		_mainRibbon.SavePdfRequested += SavePdf_Click;
 		_mainRibbon.SavePdfAsRequested += SavePdfAs_Click;
 		_mainRibbon.ComparePdfsRequested += ComparePdfs_Click;
@@ -3464,6 +3612,7 @@ Add-Printer -Name $printerName -DriverName $driverName -PortName $portName
 		RibbonHostContainer.Children.Clear();
 		RibbonHostContainer.Children.Add(_mainRibbon);
 		HookMainRibbonEvents();
+		_mainRibbon.ApplyTheme(AppThemeRegistry.Get(_appPreferences.ThemeName));
 
 		// Sync initial state and listen to IsMinimized changes
 		if (BtnKeepToolsActive != null)

@@ -41,7 +41,7 @@ public partial class App : Application
 				{
 					if (!string.IsNullOrEmpty(result))
 					{
-						mainWindow.OpenPdfTab(result);
+						mainWindow.OpenFileOrImage(result);
 					}
 				}
 				if (mainWindow.WindowState == WindowState.Minimized)
@@ -109,7 +109,7 @@ public partial class App : Application
 					_singleInstanceMutex = new Mutex(initiallyOwned: true, "Local\\PdfPro.SingleInstanceMutex", out var createdNew);
 					if (!createdNew)
 					{
-						string[] pdfArgs = args.Where((string file) => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase)).ToArray();
+						string[] pdfArgs = args.Where((string file) => !string.IsNullOrWhiteSpace(file) && File.Exists(file) && (Path.GetExtension(file).Equals(".pdf", StringComparison.OrdinalIgnoreCase) || Services.ImageToPdfService.IsSupportedImage(file))).ToArray();
 						bool sent = SendArgsToExistingInstance(pdfArgs);
 						if (sent)
 						{
@@ -146,9 +146,9 @@ public partial class App : Application
 					{
 						foreach (string text in args)
 						{
-							if (!string.IsNullOrWhiteSpace(text) && File.Exists(text) && Path.GetExtension(text).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+							if (!string.IsNullOrWhiteSpace(text) && File.Exists(text) && (Path.GetExtension(text).Equals(".pdf", StringComparison.OrdinalIgnoreCase) || Services.ImageToPdfService.IsSupportedImage(text)))
 							{
-								mainWindow.OpenPdfTab(text);
+								mainWindow.OpenFileOrImage(text);
 							}
 						}
 					}

@@ -1,3 +1,4 @@
-- Chuẩn hóa hệ thống tab menu Ribbon theo chuẩn Foxit PhantomPDF (Công cụ, Hiển thị, Chỉnh sửa, Chú thích, Tổ chức trang, Chuyển đổi).
-- Bổ sung công cụ Bàn tay (Hand Tool) kéo cuộn trang mượt mà và nút hiển thị kích thước 100% (Actual Size).
-- Tinh chỉnh đồng bộ màu chữ, màu nền nhóm và viền cho cả giao diện Sáng và Tối (Light/Dark themes).
+- Tối ưu tab Trang chủ: Đưa các tính năng cần thiết ra ngoài thao tác nhanh (Chụp nhanh Snap, In ấn trực tiếp & In hàng loạt, Hộp chú thích, Mũi tên chỉ dẫn, Sửa chữ gốc PDF trực tiếp, Nén PDF tối ưu dung lượng, Xoay 90° 1-chạm).
+- Tính năng mở hình ảnh chuyển sang PDF: Hỗ trợ mở trực tiếp các file ảnh (PNG, JPG, WEBP, BMP, TIFF, GIF) tự động tạo PDF chuẩn DPI, hỗ trợ ghép nhiều ảnh thành 1 tài liệu đa trang và tự động gợi ý lưu cùng thư mục ảnh gốc.
+- Sửa lỗi giao diện Sáng (màu tím tab Tệp và hover), sửa lỗi không nhập được chữ và di chuyển hộp chú thích, mũi tên chỉ dẫn.
+- Gom gọn công cụ Đo đạc thành menu trực quan giúp thanh Ribbon thoáng đãng, đồng bộ kích thước icon.

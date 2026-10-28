@@ -276,7 +276,26 @@ public partial class PdfDocumentTab
 
 	private void RedrawPageAnnotations(Canvas canvas, int pageNumber)
 	{
+		List<UIElement> activeEditors = new List<UIElement>();
+		foreach (UIElement child in canvas.Children)
+		{
+			if (child is System.Windows.Controls.TextBox tb && Canvas.GetZIndex(tb) >= 9999)
+			{
+				activeEditors.Add(tb);
+			}
+			else if (child is FrameworkElement fe && (fe.Tag as string == "StickyNoteEditor" || Canvas.GetZIndex(fe) >= 9999))
+			{
+				activeEditors.Add(fe);
+			}
+		}
+
 		canvas.Children.Clear();
+
+		foreach (UIElement editor in activeEditors)
+		{
+			canvas.Children.Add(editor);
+		}
+
 		if (ActiveTool == "EditText")
 		{
 			DrawEditableTextRegionsHighlight(canvas, pageNumber);

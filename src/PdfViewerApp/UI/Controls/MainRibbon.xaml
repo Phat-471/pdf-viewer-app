@@ -8,11 +8,11 @@
     <SolidColorBrush x:Key="RibbonButtonBackground" Color="#FFFFFF" />
     <SolidColorBrush x:Key="RibbonGroupBackground" Color="#FFFFFF" />
     <SolidColorBrush x:Key="RibbonBorderBrush" Color="#E2E8F0" />
-    <SolidColorBrush x:Key="RibbonTextBrush" Color="#1E293B" />
-    <SolidColorBrush x:Key="RibbonGroupHeaderBrush" Color="#64748B" />
-    <SolidColorBrush x:Key="RibbonAccentBrush" Color="#7B1FA2" />
-    <SolidColorBrush x:Key="RibbonHoverBrush" Color="#F3E8FF" />
-    <SolidColorBrush x:Key="RibbonSelectedBrush" Color="#EDE9FE" />
+    <SolidColorBrush x:Key="RibbonTextBrush" Color="#000000" />
+    <SolidColorBrush x:Key="RibbonGroupHeaderBrush" Color="#334155" />
+    <SolidColorBrush x:Key="RibbonAccentBrush" Color="#2563EB" />
+    <SolidColorBrush x:Key="RibbonHoverBrush" Color="#EFF6FF" />
+    <SolidColorBrush x:Key="RibbonSelectedBrush" Color="#DBEAFE" />
     <SolidColorBrush x:Key="RibbonGroupDocumentBrush" Color="#0F766E" />
     <SolidColorBrush x:Key="RibbonGroupNavigationBrush" Color="#0369A1" />
     <SolidColorBrush x:Key="RibbonGroupPagesBrush" Color="#1D4ED8" />
@@ -27,6 +27,8 @@
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
+      <Setter Property="MinWidth" Value="58" />
+      <Setter Property="Padding" Value="3,2" />
       <EventSetter Event="Loaded" Handler="RibbonFrame_Loaded" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
@@ -50,6 +52,8 @@
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
+      <Setter Property="MinWidth" Value="58" />
+      <Setter Property="Padding" Value="3,2" />
       <EventSetter Event="Loaded" Handler="RibbonFrame_Loaded" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
@@ -78,6 +82,8 @@
       <Setter Property="Foreground" Value="{DynamicResource RibbonTextBrush}" />
       <Setter Property="SnapsToDevicePixels" Value="True" />
       <Setter Property="Margin" Value="2,0" />
+      <Setter Property="MinWidth" Value="58" />
+      <Setter Property="Padding" Value="3,2" />
       <EventSetter Event="Loaded" Handler="RibbonFrame_Loaded" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
@@ -109,10 +115,10 @@
       <Setter Property="HeaderTemplate">
         <Setter.Value>
           <DataTemplate>
-            <Border BorderThickness="0" Padding="3,2,3,2">
+            <Border BorderThickness="0" Padding="4,2,4,2">
               <TextBlock Text="{Binding}" FontSize="10.5" FontWeight="SemiBold" TextAlignment="Center"
                          Foreground="{DynamicResource RibbonGroupHeaderBrush}"
-                         TextTrimming="CharacterEllipsis" />
+                         TextTrimming="None" />
             </Border>
           </DataTemplate>
         </Setter.Value>
@@ -129,10 +135,10 @@
       </Style.Triggers>
     </Style>
     <!-- Vector Icons from SVG (e:\code\pdf\icon) -->
-    <SolidColorBrush x:Key="RibbonIconBrush" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="RibbonIconBrush" Color="#334155" />
     <DrawingImage x:Key="IconHand">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M10,4 C10,3.4 10.4,3 11,3 C11.6,3 12,3.4 12,4 L12,11 L13,11 L13,2 C13,1.4 13.4,1 14,1 C14.6,1 15,1.4 15,2 L15,11 L16,11 L16,3 C16,2.4 16.4,2 17,2 C17.6,2 18,2.4 18,3 L18,11 L19,11 L19,6 C19,5.4 19.4,5 20,5 C20.6,5 21,5.4 21,6 L21,14 C21,18.4 17.4,22 13,22 C9.5,22 6.5,19.5 6,16 L4.5,11.5 C4.3,11 4.6,10.4 5.1,10.2 C5.6,10 6.2,10.3 6.4,10.8 L8,14 L10,14 Z">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -140,7 +146,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconOpen">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M3,7 L9,7 11,10 22,10 19,21 2,21 2,7 M3,7 L3,4 10,4 12,7 20,7 20,10">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -148,7 +154,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconPrinter">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M6,9 L6,3 18,3 18,9 M6,17 L3,17 3,9 21,9 21,17 18,17 M6,14 L18,14 18,22 6,22 Z M17,12 L18,12">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -156,7 +162,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconSetting">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M9,3 L15,3 16,6 19,7 22,10 20,13 20,17 16,19 14,22 10,22 8,19 4,17 4,13 2,10 5,7 8,6 Z M12,8 A4,4 0 1 1 12,16 A4,4 0 1 1 12,8">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -164,7 +170,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconZoomIn">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M10,3 A7,7 0 1 1 10,17 A7,7 0 1 1 10,3 M15,15 L22,22 M6,10 L14,10 M10,6 L10,14">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -172,7 +178,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconZoomOut">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M10,3 A7,7 0 1 1 10,17 A7,7 0 1 1 10,3 M15,15 L22,22 M6,10 L14,10">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -180,7 +186,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconTurnLeft">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M8,4 L3,9 8,14 M3,9 L14,9 A6,6 0 1 1 14,21 L9,21">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -188,7 +194,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconTurnRight">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M16,4 L21,9 16,14 M21,9 L10,9 A6,6 0 1 0 10,21 L15,21">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -196,7 +202,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconBlankPage">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M8,3 L19,3 22,6 22,18 8,18 Z M19,3 L19,6 22,6 M5,6 L5,21 19,21 M2,9 L2,24 16,24">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -204,7 +210,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconTach">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M3,2 L21,2 21,22 3,22 Z M3,12 L7,12 M10,12 L14,12 M17,12 L21,12 M12,5 L12,8 M12,16 L12,19">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -212,7 +218,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconDownload">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M12,2 L12,16 M7,11 L12,16 17,11 M3,17 L3,22 21,22 21,17">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -220,7 +226,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconSnapshot">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,7 L7,7 9,3 15,3 17,7 22,7 22,21 2,21 Z M12,10 A4,4 0 1 1 12,18 A4,4 0 1 1 12,10">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -228,7 +234,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconSave">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M3,2 L18,2 22,6 22,22 3,22 Z M7,2 L7,9 17,9 17,2 M7,14 L18,14 18,22 7,22 Z">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -236,7 +242,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconFit">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M5,2 L19,2 19,22 5,22 Z M8,8 L8,5 11,5 M16,8 L16,5 13,5 M8,16 L8,19 11,19 M16,16 L16,19 13,19">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -244,7 +250,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconSidebar">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,3 L22,3 22,22 2,22 Z M8,3 L8,22 M4,7 L6,7 M4,11 L6,11">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -252,7 +258,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconAddPage">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M4,2 L16,2 21,7 21,22 4,22 Z M16,2 L16,7 21,7 M8,14 L17,14 M12.5,9.5 L12.5,18.5">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -260,7 +266,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconDeletePage">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M4,2 L16,2 21,7 21,22 4,22 Z M16,2 L16,7 21,7 M9,11 L16,18 M16,11 L9,18">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -268,7 +274,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconArrange">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,2 L10,2 10,10 2,10 Z M14,2 L22,2 22,10 14,10 Z M2,14 L10,14 10,22 2,22 Z M14,14 L22,14 22,22 14,22 Z">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -276,7 +282,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconSelect">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M4,2 L20,15 12,15 9,22 Z">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -284,7 +290,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconText">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M3,3 L21,3 M12,3 L12,22 M7,22 L17,22">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -292,7 +298,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconHighlight">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M5,15 L16,3 21,8 10,20 4,21 Z M13,6 L18,11 M2,23 L22,23">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -300,7 +306,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconNote">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,3 L22,3 22,18 11,18 5,23 5,18 2,18 Z M6,8 L18,8 M6,12 L15,12">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -308,7 +314,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconDistance">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,6 L22,6 22,18 2,18 Z M6,6 L6,12 M10,6 L10,10 M14,6 L14,12 M18,6 L18,10">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -316,7 +322,7 @@
     </DrawingImage>
     <DrawingImage x:Key="IconArea">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M3,3 L21,3 21,21 3,21 Z M7,7 L9,7 M15,7 L17,7 M7,17 L9,17 M15,17 L17,17">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
@@ -324,8 +330,319 @@
     </DrawingImage>
     <DrawingImage x:Key="IconOcr">
       <DrawingImage.Drawing><DrawingGroup>
-        <GeometryDrawing Brush="Transparent" Geometry="M0,0 L24,0 24,24 0,24 Z" />
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
         <GeometryDrawing Geometry="M2,8 L2,2 8,2 M16,2 L22,2 22,8 M2,16 L2,22 8,22 M16,22 L22,22 22,16 M6,9 L18,9 M6,13 L18,13 M6,17 L14,17">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCallout">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,4 L21,4 21,15 12,15 7,19 8,15 3,15 Z M7,8 L17,8 M7,11 L14,11">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconArrowUp">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,4 L12,20 M5,11 L12,4 19,11">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconArrowDown">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,20 L12,4 M5,13 L12,20 19,13">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconReverse">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M7,5 L7,19 M4,9 L7,5 10,9 M17,19 L17,5 M14,15 L17,19 20,15">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconResetOrder">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,12 A8,8 0 1,1 7,18 M3,8 L4,13 9,13">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconMerge">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,3 L15,3 15,16 3,16 Z M9,7 L21,7 21,21 9,21 Z M12,14 L18,14 M15,11 L15,17">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCompare">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,3 L10,3 10,21 3,21 Z M14,3 L21,3 21,21 14,21 Z M6,8 L7,8 M6,12 L7,12 M17,8 L18,8 M17,12 L18,12">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCompress">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,12 L8,12 M6,9 L8,12 6,15 M21,12 L16,12 M18,9 L16,12 18,15 M10,5 L14,5 14,19 10,19 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconBatchCompress">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M6,3 L18,3 18,7 M2,7 L14,7 14,21 2,21 Z M18,11 L22,11 M20,9 L22,11 20,13 M8,12 L8,16 M6,14 L8,12 10,14">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconWatermark">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,2 L20,6 20,12 C20,17 16,20.5 12,22 C8,20.5 4,17 4,12 L4,6 Z M8,12 L11,15 16,9">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconPageNumber">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,2 L15,2 20,7 20,22 4,22 Z M15,2 L15,7 20,7 M10,12 L12,10 12,18 M9,18 L15,18">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconSecurity">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M7,10 L7,7 A5,5 0 0,1 17,7 L17,10 M5,10 L19,10 19,21 5,21 Z M12,14 L12,17">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconImage">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,4 L21,4 21,20 3,20 Z M8.5,8 A1.5,1.5 0 1,1 8.5,11 A1.5,1.5 0 1,1 8.5,8 M4,18 L10,12 14,16 16,14 20,18">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconDrawPen">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,21 L5,16 17,4 C17.8,3.2 19.2,3.2 20,4 C20.8,4.8 20.8,6.2 20,7 L8,19 Z M14,7 L17,10">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconRect">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,5 L21,5 21,19 3,19 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCircle">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,3 A9,9 0 1,1 12,21 A9,9 0 1,1 12,3">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconLine">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,20 L20,4 M2,20 L4,20 M20,4 L22,4">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconAiSnapshot">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M2,7 L6,7 8,4 14,4 16,7 20,7 20,19 2,19 Z M11,9 A4,4 0 1,1 11,17 A4,4 0 1,1 11,9 M19,2 L20,4 22,5 20,6 19,8 18,6 16,5 18,4 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCertificate">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,3 L20,3 20,16 4,16 Z M12,13 A3.5,3.5 0 1,0 12,6 A3.5,3.5 0 1,0 12,13 M9.5,15 L8,21 12,19 16,21 14.5,15">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconExportDocx">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,2 L15,2 20,7 20,22 4,22 Z M15,2 L15,7 20,7 M7,11 L9,17 11,12 13,17 15,11">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconDeletePageRed">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,2 L16,2 21,7 21,22 4,22 Z M16,2 L16,7 21,7 M9,11 L16,18 M16,11 L9,18">
+          <GeometryDrawing.Pen><Pen Brush="#EF4444" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconZoom">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M10.5,3 A7.5,7.5 0 1 1 10.5,18 A7.5,7.5 0 1 1 10.5,3 M16,16 L22,22 M7,10.5 L14,10.5 M10.5,7 L10.5,14">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconFitPage">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M5,2 L19,2 19,22 5,22 Z M12,7 L12,17 M7,12 L17,12">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconFitWidth">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,3 L21,3 M3,21 L21,21 M3,3 L3,21 M21,3 L21,21 M7,12 L17,12 M10,9 L7,12 10,15 M14,9 L17,12 14,15">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconRotateClockwise">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,4 A8,8 0 1 1 5.5,8.5 M4,3.5 L5.5,8.5 10.5,8.5">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconAddNote">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M5,3 L15,3 20,8 20,21 5,21 Z M15,3 L15,8 20,8">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M10,10 L10,16 M7,13 L13,13">
+          <GeometryDrawing.Pen><Pen Brush="#D97706" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconHighlightPen">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M8,16 L17,7 20,10 11,19 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M14,10 L17,13">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#F59E0B" Geometry="M8,16 L5,19 6,22 10,20 11,19 Z">
+          <GeometryDrawing.Pen><Pen Brush="#D97706" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M2,23 L22,23">
+          <GeometryDrawing.Pen><Pen Brush="#FBBF24" Thickness="2.5" StartLineCap="Round" EndLineCap="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconShapes">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,12 A6,6 0 1 1 22,12 A6,6 0 0 1 16,17.5">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M3,8 L13,8 C14.1,8 15,8.9 15,10 L15,20 C15,21.1 14.1,22 13,22 L5,22 C3.9,22 3,21.1 3,20 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconTextT">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,4 L20,4 M12,4 L12,20 M8,20 L16,20 M4,4 L4,7 M20,4 L20,7">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconCommentBubble">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,4 L21,4 C22.1,4 23,4.9 23,6 L23,15 C23,16.1 22.1,17 21,17 L9,17 5,21 5.5,17 3,17 C1.9,17 1,16.1 1,15 L1,6 C1,4.9 1.9,4 3,4 Z M6,8.5 L18,8.5 M6,12.5 L14,12.5">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconSignatureBlue">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,18 C6,18 8.5,12 11,8 C12.2,6 14,7 13.5,9.5 C13,12.5 14,16 16.5,15 C18.5,14 19.5,10 21,9">
+          <GeometryDrawing.Pen><Pen Brush="#2563EB" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#2563EB" Geometry="M2,19.5 L3.5,16.5 5,18 Z" />
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconStampRed">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M12,3 A2.5,2.5 0 1 1 12,8">
+          <GeometryDrawing.Pen><Pen Brush="#DC2626" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M11,8 L9.5,13 M13,8 L14.5,13">
+          <GeometryDrawing.Pen><Pen Brush="#DC2626" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M4,13 L20,13 21,18 3,18 Z">
+          <GeometryDrawing.Pen><Pen Brush="#DC2626" Thickness="1.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M2,21 L22,21">
+          <GeometryDrawing.Pen><Pen Brush="#DC2626" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconMeasureDistance">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M2,8 L22,8 22,17 2,17 Z M5,8 L5,13 M8,8 L8,11 M11,8 L11,14 M14,8 L14,11 M17,8 L17,13 M20,8 L20,11">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconMeasureArea">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M3,3 L21,3 21,21 3,21 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M3,9 L9,3 M3,15 L15,3 M3,21 L21,3 M9,21 L21,9 M15,21 L21,15">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup></DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="IconMeasurePerimeter">
+      <DrawingImage.Drawing><DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M-3,-3 L27,-3 27,27 -3,27 Z" />
+        <GeometryDrawing Geometry="M4,4 L20,4 20,11 11,11 11,20 4,20 Z">
+          <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M4,2 L4,5 M20,2 L20,5 M2,20 L5,20 M11,21 L11,23 M21,11 L23,11">
           <GeometryDrawing.Pen><Pen Brush="{DynamicResource RibbonIconBrush}" Thickness="1.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" /></GeometryDrawing.Pen>
         </GeometryDrawing>
       </DrawingGroup></DrawingImage.Drawing>
@@ -372,7 +689,7 @@
 
   <fluent:Ribbon Name="MyRibbon" IsMinimized="False">
     <fluent:Ribbon.ContextualGroups>
-      <fluent:RibbonContextualTabGroup x:Name="CommentFormatGroup" Header="Định dạng chú thích" Visibility="Collapsed" Background="#8B5CF6" BorderBrush="#8B5CF6"/>
+      <fluent:RibbonContextualTabGroup x:Name="CommentFormatGroup" Header="Định dạng chú thích" Visibility="Collapsed" Background="#2563EB" BorderBrush="#2563EB"/>
     </fluent:Ribbon.ContextualGroups>
     <fluent:Ribbon.Style>
       <Style TargetType="fluent:Ribbon">
@@ -380,7 +697,7 @@
       </Style>
     </fluent:Ribbon.Style>
     <fluent:Ribbon.Menu>
-      <fluent:Backstage x:Name="MyBackstage" Header="Tệp" Background="#7B1FA2" Foreground="#FFFFFFFF" WindowChrome.IsHitTestVisibleInChrome="True">
+      <fluent:Backstage x:Name="MyBackstage" Header="Tệp" Background="Transparent" Foreground="{DynamicResource RibbonTextBrush}" WindowChrome.IsHitTestVisibleInChrome="True">
         <fluent:BackstageTabControl>
           <fluent:Button Header="Mở file PDF (Ctrl+O)" Click="OpenPdf_Click" />
           <fluent:Button Header="Lưu (Ctrl+S)" Click="SavePdf_Click" />
@@ -393,132 +710,83 @@
       </fluent:Backstage>
     </fluent:Ribbon.Menu>
     <fluent:RibbonTabItem Header="Trang chủ">
-      <!-- 1. Tools Group -->
-      <fluent:RibbonGroupBox Header="Công cụ" Tag="Navigation">
-        <fluent:ToggleButton Name="HomeHandToolBtn" Header="Bàn tay" LargeIcon="{StaticResource IconHand}" Size="Large" Margin="2,0" Click="HandTool_Click" ToolTip="Bàn tay (Hand Tool): Kéo chuột để cuộn xem trang mượt mà" />
-        <fluent:SplitButton Name="HomeSelectToolBtn" Header="Chọn" LargeIcon="{StaticResource IconSelect}" Size="Large" Margin="2,0" Click="SelectTool_Click" ToolTip="Con trỏ chọn chú thích hoặc chọn văn bản">
-          <fluent:MenuItem Header="Chọn chú thích &amp; đối tượng" Click="SelectTool_Click" ToolTip="Chọn và di chuyển chú thích" />
-          <fluent:MenuItem Header="Chọn văn bản (quét chữ)" Click="SelectTextTool_Click" ToolTip="Quét chọn đoạn chữ trong PDF" />
+      <!-- 1. Tệp -->
+      <fluent:RibbonGroupBox Header="Tệp" Tag="Document">
+        <fluent:SplitButton Name="HomeOpenBtn" Header="Mở" LargeIcon="{StaticResource IconOpen}" Size="Large" Margin="2,0" Click="OpenPdf_Click" ToolTip="Mở tệp PDF hoặc tệp hình ảnh (Ctrl+O)">
+          <fluent:MenuItem Header="Mở tệp PDF / Hình ảnh... (Ctrl+O)" Click="OpenPdf_Click" ToolTip="Mở file PDF hoặc tệp ảnh" />
+          <fluent:MenuItem Header="Tạo PDF từ hình ảnh (Ảnh sang PDF)..." Click="CreatePdfFromImages_Click" ToolTip="Chọn tệp ảnh để chuyển đổi và tạo tài liệu PDF" />
         </fluent:SplitButton>
-        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="2,0">
-          <fluent:ToggleButton Name="HomeSnapshotToolBtn" Header="Chụp ảnh" Size="Small" Margin="1,1" Click="SnapshotTool_Click" ToolTip="Kéo chọn vùng để xem trước, in hoặc copy ảnh (Snapshot)">
-            <fluent:ToggleButton.Icon>
-              <Image Source="{StaticResource IconSnapshot}" Width="16" Height="16" />
-            </fluent:ToggleButton.Icon>
-          </fluent:ToggleButton>
-          <fluent:Button Name="HomePasteBtn" Header="Dán" Size="Small" Margin="1,1" Click="Paste_Click" ToolTip="Dán nội dung từ bộ nhớ tạm (Ctrl+V)">
-            <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C5;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
-            </fluent:Button.Icon>
-          </fluent:Button>
-        </StackPanel>
-      </fluent:RibbonGroupBox>
-
-      <!-- 2. View Group -->
-      <fluent:RibbonGroupBox Header="Hiển thị" Tag="Navigation">
-        <fluent:Button Name="HomeActualSizeBtn" Header="100%" LargeIcon="{StaticResource IconFit}" Size="Large" Margin="2,0" Click="ActualSize_Click" ToolTip="Hiển thị kích thước thực tế 100% (Ctrl+1)" />
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0">
-          <StackPanel Orientation="Vertical" Margin="1,0">
-            <fluent:Button Name="HomeFitPageBtn" Header="Vừa trang" Size="Small" Margin="1,1" Click="FitPage_Click" ToolTip="Hiển thị toàn bộ trang (Ctrl+0)">
-              <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE737;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-            <fluent:Button Name="HomeFitWidthBtn" Header="Vừa rộng" Size="Small" Margin="1,1" Click="FitWidth_Click" ToolTip="Vừa khít chiều rộng màn hình (Ctrl+2)">
-              <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE744;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-          </StackPanel>
-          <StackPanel Orientation="Vertical" Margin="1,0">
-            <fluent:Button Name="HomeRotateLeftBtn" Header="Xoay trái" Size="Small" Margin="1,1" Click="RotateLeft_Click" ToolTip="Xoay trái 90°">
-              <fluent:Button.Icon>
-                <Image Source="{StaticResource IconTurnLeft}" Width="16" Height="16" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-            <fluent:Button Name="HomeRotateRightBtn" Header="Xoay phải" Size="Small" Margin="1,1" Click="RotateRight_Click" ToolTip="Xoay phải 90°">
-              <fluent:Button.Icon>
-                <Image Source="{StaticResource IconTurnRight}" Width="16" Height="16" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-          </StackPanel>
-          <StackPanel Orientation="Vertical" Margin="1,0">
-            <StackPanel Orientation="Horizontal" Margin="0,1">
-              <fluent:Button Header="-" Width="22" Height="18" Click="ZoomOut_Click" ToolTip="Thu nhỏ" />
-              <fluent:Button Header="+" Width="22" Height="18" Margin="2,0,0,0" Click="ZoomIn_Click" ToolTip="Phóng to" />
-            </StackPanel>
-            <fluent:Button Header="Thanh trang" Size="Small" Margin="0,1" Click="ToggleSidebar_Click" ToolTip="Hiện hoặc ẩn danh sách trang">
-              <fluent:Button.Icon>
-                <Image Source="{StaticResource IconSidebar}" Width="16" Height="16" />
-              </fluent:Button.Icon>
-            </fluent:Button>
-          </StackPanel>
-        </StackPanel>
-      </fluent:RibbonGroupBox>
-
-      <!-- 3. Edit Group -->
-      <fluent:RibbonGroupBox Header="Chỉnh sửa" Tag="Pages">
-        <fluent:ToggleButton Name="HomeEditTextToolBtn" Header="Sửa chữ gốc" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="EditTextTool_Click" ToolTip="Chọn khung chữ và sửa nội dung văn bản gốc trực tiếp trên PDF" />
-        <fluent:SplitButton Name="HomeEditObjectBtn" Header="Ký &amp; Ảnh" Size="Large" Margin="2,0" Click="ImageSign_Click" ToolTip="Chèn ảnh chữ ký, con dấu hoặc vẽ ký tay">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9F;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
-          <fluent:MenuItem Header="Ký bằng hình ảnh" Click="ImageSign_Click" />
-          <fluent:MenuItem Header="Ký vẽ tay trực tiếp" Click="HandwriteSign_Click" />
-          <fluent:MenuItem Header="Ký chứng thư số" Click="StampApprove_Click" />
+        <fluent:Button Name="HomeSaveBtn" Header="Lưu" LargeIcon="{StaticResource IconSave}" Size="Large" Margin="2,0" Click="SavePdf_Click" ToolTip="Lưu tệp PDF hiện tại (Ctrl+S)" />
+        <fluent:SplitButton Name="HomePrintBtn" Header="In ấn" LargeIcon="{StaticResource IconPrinter}" Size="Large" Margin="2,0" Click="PrintPdf_Click" ToolTip="In tài liệu PDF (Ctrl+P)">
+          <fluent:MenuItem Header="In tài liệu hiện tại (Ctrl+P)" Click="PrintPdf_Click" ToolTip="In tài liệu PDF đang xem ra máy in" />
+          <fluent:MenuItem Header="In hàng loạt nhiều tệp..." Click="BatchPrint_Click" ToolTip="In hàng loạt nhiều file PDF cùng lúc" />
+        </fluent:SplitButton>
+        <fluent:SplitButton Name="HomeCompressBtn" Header="Nén PDF" LargeIcon="{StaticResource IconCompress}" Size="Large" Margin="2,0" Click="CompressPdf_Click" ToolTip="Nén và tối ưu dung lượng tệp PDF">
+          <fluent:MenuItem Header="Nén tối ưu tệp hiện tại..." Click="CompressPdf_Click" ToolTip="Giảm dung lượng file PDF đang mở" />
+          <fluent:MenuItem Header="Nén hàng loạt nhiều tệp..." Click="BatchCompress_Click" ToolTip="Nén và tối ưu hàng loạt nhiều file PDF" />
         </fluent:SplitButton>
       </fluent:RibbonGroupBox>
 
-      <!-- 4. Comment Group -->
-      <fluent:RibbonGroupBox Header="Chú thích" Tag="Comments">
-        <fluent:ToggleButton Name="HomeTextToolBtn" Header="Hộp chữ" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="TextBoxTool_Click" ToolTip="Thêm hộp văn bản ghi chú (Typewriter)" />
-        <fluent:ToggleButton Name="HomeCalloutToolBtn" Header="Mũi tên" Size="Large" Margin="2,0" Click="CalloutTool_Click" ToolTip="Mũi tên chỉ dẫn (Callout): Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="HomeNoteToolBtn" Header="Ghi chú" LargeIcon="{StaticResource IconNote}" Size="Large" Margin="2,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú nhỏ (Sticky Note) trên trang" />
-        <fluent:ToggleButton Name="HomeHighlightToolBtn" Header="Tô màu" LargeIcon="{StaticResource IconHighlight}" Size="Large" Margin="2,0" Click="HighlightTool_Click" ToolTip="Tô màu nổi bật (Highlight)" />
+      <!-- 2. Thao tác & Chữ -->
+      <fluent:RibbonGroupBox Header="Thao tác &amp; Chữ" Tag="Navigation">
+        <fluent:ToggleButton Name="HomeHandToolBtn" Header="Bàn tay" LargeIcon="{StaticResource IconHand}" Size="Large" Margin="2,0" Click="HandTool_Click" ToolTip="Bàn tay (Hand Tool): Kéo cuộn trang tài liệu" />
+        <fluent:SplitButton Name="HomeSelectToolBtn" Header="Chọn" LargeIcon="{StaticResource IconSelect}" Size="Large" Margin="2,0" Click="SelectTool_Click" ToolTip="Con trỏ chuột chọn chú thích hoặc quét chọn văn bản">
+          <fluent:MenuItem Header="Chọn đối tượng &amp; chú thích" Click="SelectTool_Click" ToolTip="Chọn và di chuyển chú thích" />
+          <fluent:MenuItem Header="Quét chọn văn bản (Select Text)" Click="SelectTextTool_Click" ToolTip="Quét chọn đoạn chữ trong PDF để sao chép" />
+        </fluent:SplitButton>
+        <fluent:ToggleButton Name="HomeEditTextBtn" Header="Sửa chữ&#x0a;gốc" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="EditTextTool_Click" ToolTip="Chỉnh sửa nội dung chữ trực tiếp trên tài liệu PDF gốc" />
       </fluent:RibbonGroupBox>
 
-      <!-- 5. Page Organization Group -->
-      <fluent:RibbonGroupBox Header="Tổ chức trang" Tag="Pages">
-        <fluent:SplitButton Name="HomeRotatePagesBtn" Header="Xoay trang" LargeIcon="{StaticResource IconTurnRight}" Size="Large" Margin="2,0" Click="RotateRight_Click" ToolTip="Xoay trang tài liệu">
+      <!-- 3. Chụp ảnh & Chú thích -->
+      <fluent:RibbonGroupBox Header="Chụp ảnh &amp; Chú thích" Tag="Comments">
+        <fluent:SplitButton Name="HomeSnapshotBtn" Header="Chụp nhanh&#x0a;(Snap)" LargeIcon="{StaticResource IconSnapshot}" Size="Large" Margin="2,0" Click="SnapshotTool_Click" ToolTip="Chụp nhanh vùng chọn trên trang để sao chép, lưu ảnh hoặc in ấn ngay">
+          <fluent:MenuItem Header="Chụp vùng in &amp; lưu ảnh (Snapshot)" Click="SnapshotTool_Click" ToolTip="Kéo chọn vùng trang PDF để xem trước, in nhanh hoặc lưu ảnh" />
+          <fluent:MenuItem Header="Chụp hỏi Trợ lý AI (AI Copilot)" Click="AiSnapshotTool_Click" ToolTip="Chụp vùng bản vẽ/văn bản và gửi đến AI phân tích" />
+        </fluent:SplitButton>
+        <fluent:ToggleButton Name="HomeTextToolBtn" Header="Hộp&#x0a;chú thích" LargeIcon="{StaticResource IconTextT}" Size="Large" Margin="2,0" Click="TextBoxTool_Click" ToolTip="Thêm hộp chữ chú thích tự do (Typewriter)" />
+        <fluent:ToggleButton Name="HomeCalloutToolBtn" Header="Mũi tên&#x0a;chỉ dẫn" LargeIcon="{StaticResource IconCallout}" Size="Large" Margin="2,0" Click="CalloutTool_Click" ToolTip="Hộp chú thích kèm đường mũi tên chỉ điểm (Callout)" />
+        <fluent:ToggleButton Name="HomeNoteToolBtn" Header="Ghi chú" LargeIcon="{StaticResource IconAddNote}" Size="Large" Margin="2,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú dán (Sticky Note) trên trang" />
+        <fluent:ToggleButton Name="HomeHighlightToolBtn" Header="Đánh dấu" LargeIcon="{StaticResource IconHighlightPen}" Size="Large" Margin="2,0" Click="HighlightTool_Click" ToolTip="Tô màu nổi bật (Highlight)" />
+        <fluent:SplitButton Name="HomeShapesBtn" Header="Hình dạng" LargeIcon="{StaticResource IconShapes}" Size="Large" Margin="2,0" Click="RectTool_Click" ToolTip="Vẽ hình hình học (Chữ nhật, Tròn, Đường thẳng)">
+          <fluent:MenuItem Header="Hình chữ nhật" Click="RectTool_Click" />
+          <fluent:MenuItem Header="Hình tròn / Elip" Click="OvalTool_Click" />
+          <fluent:MenuItem Header="Đường thẳng" Click="LineTool_Click" />
+        </fluent:SplitButton>
+      </fluent:RibbonGroupBox>
+
+      <!-- 4. Trang & Xoay -->
+      <fluent:RibbonGroupBox Header="Trang &amp; Xoay" Tag="Navigation">
+        <fluent:SplitButton Name="HomeRotateBtn" Header="Xoay 90°" LargeIcon="{StaticResource IconRotateClockwise}" Size="Large" Margin="2,0" Click="RotateRight_Click" ToolTip="Xoay nhanh trang tài liệu 90° theo chiều kim đồng hồ">
           <fluent:MenuItem Header="Xoay trang hiện tại sang phải 90°" Click="RotateRight_Click" />
-          <fluent:MenuItem Header="Xoay tất cả các trang sang phải 90°" Click="RotateRightAll_Click" />
           <fluent:MenuItem Header="Xoay trang hiện tại sang trái 90°" Click="RotateLeft_Click" />
+          <fluent:MenuItem Header="Xoay tất cả các trang sang phải 90°" Click="RotateRightAll_Click" />
           <fluent:MenuItem Header="Xoay tất cả các trang sang trái 90°" Click="RotateLeftAll_Click" />
         </fluent:SplitButton>
-        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="2,0">
-          <fluent:Button Name="HomeInsertPageBtn" Header="Thêm trang" Size="Small" Margin="1,1" Click="InsertBlankPage_Click" ToolTip="Chèn một trang trống mới vào tài liệu">
-            <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA3B;" FontSize="11" Foreground="{DynamicResource RibbonIconBrush}" />
-            </fluent:Button.Icon>
-          </fluent:Button>
-          <fluent:Button Name="HomeDeletePageBtn" Header="Xóa trang" Size="Small" Margin="1,1" Click="DeletePage_Click" ToolTip="Xóa hoàn toàn trang hiện tại khỏi tài liệu">
-            <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="11" Foreground="#EF4444" />
-            </fluent:Button.Icon>
-          </fluent:Button>
-        </StackPanel>
-        <fluent:Button Name="HomeOrganizeBtn" Header="Bố cục trang" LargeIcon="{StaticResource IconArrange}" Size="Large" Margin="2,0" Click="PageOrganizer_Click" ToolTip="Quản lý và sắp xếp các trang (Page Organizer)" />
+        <fluent:Button Name="HomeFitPageBtn" Header="Phù hợp&#x0a;trang" LargeIcon="{StaticResource IconFitPage}" Size="Large" Margin="2,0" Click="FitPage_Click" ToolTip="Hiển thị vừa vặn toàn bộ trang (Ctrl+0)" />
+        <fluent:Button Name="HomeFitWidthBtn" Header="Vừa&#x0a;chiều rộng" LargeIcon="{StaticResource IconFitWidth}" Size="Large" Margin="2,0" Click="FitWidth_Click" ToolTip="Vừa khít chiều rộng màn hình (Ctrl+2)" />
+        <fluent:SplitButton Name="HomeZoomBtn" Header="Thu phóng" LargeIcon="{StaticResource IconZoom}" Size="Large" Margin="2,0" Click="ActualSize_Click" ToolTip="Thu phóng tài liệu (Kích thước 100%)">
+          <fluent:MenuItem Header="Kích thước thực 100% (Ctrl+1)" Click="ActualSize_Click" />
+          <fluent:MenuItem Header="Phóng to (Ctrl++)" Click="ZoomIn_Click" />
+          <fluent:MenuItem Header="Thu nhỏ (Ctrl+-)" Click="ZoomOut_Click" />
+        </fluent:SplitButton>
       </fluent:RibbonGroupBox>
 
-      <!-- 6. Convert Group -->
-      <fluent:RibbonGroupBox Header="Chuyển đổi" Tag="Ocr">
-        <fluent:Button Name="HomeQuickOcrBtn" Header="Nhận dạng chữ" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="2,0" Click="OcrText_Click" ToolTip="Nhận dạng chữ quang học (Quick OCR) trên trang hiện tại" />
-        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="2,0">
-          <fluent:Button Name="HomeExportWordBtn" Header="Xuất Word" Size="Small" Margin="1,1" Click="ExportDocx_Click" ToolTip="Xuất tài liệu sang file Microsoft Word (.docx)">
-            <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE896;" FontSize="11" Foreground="{DynamicResource RibbonIconBrush}" />
-            </fluent:Button.Icon>
-          </fluent:Button>
-          <fluent:Button Name="HomeExportTextBtn" Header="Xuất Text" Size="Small" Margin="1,1" Click="ExportOcrText_Click" ToolTip="Xuất kết quả nhận dạng sang file văn bản (.txt)">
-            <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C4;" FontSize="11" Foreground="{DynamicResource RibbonIconBrush}" />
-            </fluent:Button.Icon>
-          </fluent:Button>
-        </StackPanel>
+      <!-- 5. Ký -->
+      <fluent:RibbonGroupBox Header="Ký" Tag="Measure">
+        <fluent:SplitButton Name="HomeSignBtn" Header="Chữ ký" LargeIcon="{StaticResource IconSignatureBlue}" Size="Large" Margin="2,0" Click="ImageSign_Click" ToolTip="Chèn ảnh chữ ký hoặc vẽ tay trực tiếp">
+          <fluent:MenuItem Header="Ký bằng hình ảnh" Click="ImageSign_Click" />
+          <fluent:MenuItem Header="Ký vẽ tay trực tiếp" Click="HandwriteSign_Click" />
+        </fluent:SplitButton>
+        <fluent:Button Name="HomeStampBtn" Header="Chứng thư&#x0a;số" LargeIcon="{StaticResource IconCertificate}" Size="Large" Margin="2,0" Click="StampApprove_Click" ToolTip="Ký tài liệu bằng chứng thư số bảo mật (Certificate)" />
+      </fluent:RibbonGroupBox>
+
+      <!-- 6. Đo đạc -->
+      <fluent:RibbonGroupBox Header="Đo đạc" Tag="Measure">
+        <fluent:SplitButton Name="HomeMeasureBtn" Header="Đo đạc" LargeIcon="{StaticResource IconMeasureDistance}" Size="Large" Margin="2,0" Click="MeasureDistanceTool_Click" ToolTip="Công cụ đo đạc bản vẽ kỹ thuật (Khoảng cách, Diện tích, Chu vi)">
+          <fluent:MenuItem Header="Đo khoảng cách giữa 2 điểm" Click="MeasureDistanceTool_Click" />
+          <fluent:MenuItem Header="Đo diện tích vùng chọn" Click="MeasureAreaTool_Click" />
+          <fluent:MenuItem Header="Đo chu vi đa giác" Click="MeasurePerimeterTool_Click" />
+        </fluent:SplitButton>
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
 
@@ -526,8 +794,8 @@
       <fluent:RibbonGroupBox Header="Nhận dạng văn bản &amp; Xuất tài liệu" Tag="Ocr">
         <fluent:Button Header="Nhận dạng chữ" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="3,0" Click="OcrText_Click" ToolTip="Nhận dạng chữ trên trang hiện tại (OCR)" />
         <fluent:Button Header="Xuất văn bản" LargeIcon="{StaticResource IconText}" Size="Large" Margin="3,0" Click="ExportOcrText_Click" ToolTip="Lưu kết quả nhận dạng thành tệp văn bản (.txt)" />
-        <fluent:Button Header="PDF có thể tìm kiếm" LargeIcon="{StaticResource IconSave}" Size="Large" Margin="3,0" Click="ExportSearchablePdf_Click" ToolTip="Thêm lớp văn bản nhận dạng vào PDF (Searchable PDF)" />
-        <fluent:Button Header="Xuất Word" LargeIcon="{StaticResource IconDownload}" Size="Large" Margin="3,0" Click="ExportDocx_Click" ToolTip="Xuất văn bản sang tài liệu Microsoft Word (.docx)" />
+        <fluent:Button Header="PDF tìm kiếm" LargeIcon="{StaticResource IconOcr}" Size="Large" Margin="3,0" Click="ExportSearchablePdf_Click" ToolTip="Thêm lớp văn bản nhận dạng vào PDF (Searchable PDF)" />
+        <fluent:Button Header="Xuất Word" LargeIcon="{StaticResource IconExportDocx}" Size="Large" Margin="3,0" Click="ExportDocx_Click" ToolTip="Xuất văn bản sang tài liệu Microsoft Word (.docx)" />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
 
@@ -537,21 +805,9 @@
         <fluent:ToggleButton Name="EditTextToolBtn" Header="Sửa chữ gốc" LargeIcon="{StaticResource IconText}" Size="Large" Margin="2,0" Click="EditTextTool_Click" ToolTip="Chọn chữ PDF, xem trước và sửa nội dung với font, cỡ chữ, màu và vị trí gốc." />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Chữ ký &amp; Đối tượng" Tag="Measure">
-        <fluent:Button Name="HandwriteSignBtn" Header="Ký vẽ tay" Margin="3,0" Click="HandwriteSign_Click" ToolTip="Vẽ chữ ký trực tiếp bằng chuột hoặc bút cảm ứng">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED15;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ImageSignBtn" Header="Ký hình ảnh" Margin="3,0" Click="ImageSign_Click" ToolTip="Chèn tệp ảnh chữ ký đè lên trang PDF">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9F;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="StampApproveBtn" Header="Chứng thư số" Margin="3,0" Click="StampApprove_Click" ToolTip="Ký tài liệu bằng chứng thư số bảo mật (Certificate)">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEADE;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Name="HandwriteSignBtn" Header="Ký vẽ tay" LargeIcon="{StaticResource IconDrawPen}" Margin="3,0" Click="HandwriteSign_Click" ToolTip="Vẽ chữ ký trực tiếp bằng chuột hoặc bút cảm ứng" />
+        <fluent:Button Name="ImageSignBtn" Header="Ký hình ảnh" LargeIcon="{StaticResource IconImage}" Margin="3,0" Click="ImageSign_Click" ToolTip="Chèn tệp ảnh chữ ký đè lên trang PDF" />
+        <fluent:Button Name="StampApproveBtn" Header="Chứng thư số" LargeIcon="{StaticResource IconCertificate}" Margin="3,0" Click="StampApprove_Click" ToolTip="Ký tài liệu bằng chứng thư số bảo mật (Certificate)" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Trích xuất &amp; Tách trang" Tag="Pages">
         <fluent:Button Header="Nhân bản" LargeIcon="{StaticResource IconBlankPage}" Size="Large" Margin="4,0" Click="DuplicatePage_Click" ToolTip="Nhân bản trang hiện tại" />
@@ -572,92 +828,28 @@
 
     <fluent:RibbonTabItem Header="Tổ chức trang">
       <fluent:RibbonGroupBox Header="Bố cục trang" Tag="Pages">
-        <fluent:Button Name="PageOrganizerBtn" Header="Bố cục trang" Margin="3,0" Click="PageOrganizer_Click" ToolTip="Quản lý, sắp xếp, di chuyển thứ tự các trang tài liệu">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA43;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="MovePageUpBtn" Header="Lên" Margin="3,0" Click="MovePageUp_Click" ToolTip="Di chuyển trang hiện tại lên trước một vị trí">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="MovePageDownBtn" Header="Xuống" Margin="3,0" Click="MovePageDown_Click" ToolTip="Di chuyển trang hiện tại xuống sau một vị trí">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ReversePageOrderBtn" Header="Đảo thứ tự" Margin="3,0" Click="ReversePageOrder_Click" ToolTip="Đảo ngược thứ tự các trang trong tài liệu từ dưới lên trên">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe UI" Text="REV" FontSize="24" FontWeight="Bold" Foreground="#0F766E" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ResetPageOrderBtn" Header="Thứ tự gốc" Margin="3,0" Click="ResetPageOrder_Click" ToolTip="Khôi phục lại thứ tự trang mặc định ban đầu">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe UI" Text="0" FontSize="24" FontWeight="Bold" Foreground="#64748B" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="InsertBlankPageBtn" Header="Chèn trang trống" Margin="3,0" Click="InsertBlankPage_Click" ToolTip="Chèn một trang mới chưa có nội dung vào sau trang hiện tại">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA3B;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="DeletePageBtn" Header="Xóa trang" Margin="3,0" Click="DeletePage_Click" ToolTip="Xóa hoàn toàn trang hiện tại khỏi tài liệu">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74D;" FontSize="24" Foreground="#EF4444" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Name="PageOrganizerBtn" Header="Bố cục trang" LargeIcon="{StaticResource IconArrange}" Margin="3,0" Click="PageOrganizer_Click" ToolTip="Quản lý, sắp xếp, di chuyển thứ tự các trang tài liệu" />
+        <fluent:Button Name="MovePageUpBtn" Header="Lên" LargeIcon="{StaticResource IconArrowUp}" Margin="3,0" Click="MovePageUp_Click" ToolTip="Di chuyển trang hiện tại lên trước một vị trí" />
+        <fluent:Button Name="MovePageDownBtn" Header="Xuống" LargeIcon="{StaticResource IconArrowDown}" Margin="3,0" Click="MovePageDown_Click" ToolTip="Di chuyển trang hiện tại xuống sau một vị trí" />
+        <fluent:Button Name="ReversePageOrderBtn" Header="Đảo thứ tự" LargeIcon="{StaticResource IconReverse}" Margin="3,0" Click="ReversePageOrder_Click" ToolTip="Đảo ngược thứ tự các trang trong tài liệu từ dưới lên trên" />
+        <fluent:Button Name="ResetPageOrderBtn" Header="Thứ tự gốc" LargeIcon="{StaticResource IconResetOrder}" Margin="3,0" Click="ResetPageOrder_Click" ToolTip="Khôi phục lại thứ tự trang mặc định ban đầu" />
+        <fluent:Button Name="InsertBlankPageBtn" Header="Chèn trang trống" LargeIcon="{StaticResource IconBlankPage}" Margin="3,0" Click="InsertBlankPage_Click" ToolTip="Chèn một trang mới chưa có nội dung vào sau trang hiện tại" />
+        <fluent:Button Name="DeletePageBtn" Header="Xóa trang" LargeIcon="{StaticResource IconDeletePageRed}" Margin="3,0" Click="DeletePage_Click" ToolTip="Xóa hoàn toàn trang hiện tại khỏi tài liệu" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Ghép &amp; so sánh" Tag="Pages">
-        <fluent:Button Name="MergeFilesBtn" Header="Ghép nhiều file" Margin="3,0" Click="MergeFiles_Click" ToolTip="Hợp nhất các tài liệu PDF đang mở lại thành một file duy nhất">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA38;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="MergeFromExplorerBtn" Header="Chọn nhiều file &amp; ghép" Margin="3,0" Click="MergeFromExplorer_Click" ToolTip="Chọn trực tiếp các file từ thư mục máy tính để ghép thành một file">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA38;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ComparePdfsBtn" Header="So sánh PDF" Margin="3,0" Click="ComparePdfs_Click" ToolTip="So sánh nội dung hai tệp tin PDF để tìm điểm khác biệt">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE769;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Name="MergeFilesBtn" Header="Ghép nhiều file" LargeIcon="{StaticResource IconMerge}" Margin="3,0" Click="MergeFiles_Click" ToolTip="Hợp nhất các tài liệu PDF đang mở lại thành một file duy nhất" />
+        <fluent:Button Name="MergeFromExplorerBtn" Header="Chọn nhiều file &amp; ghép" LargeIcon="{StaticResource IconAddPage}" Margin="3,0" Click="MergeFromExplorer_Click" ToolTip="Chọn trực tiếp các file từ thư mục máy tính để ghép thành một file" />
+        <fluent:Button Name="ComparePdfsBtn" Header="So sánh PDF" LargeIcon="{StaticResource IconCompare}" Margin="3,0" Click="ComparePdfs_Click" ToolTip="So sánh nội dung hai tệp tin PDF để tìm điểm khác biệt" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Nén &amp; tối ưu" Tag="Pages">
-        <fluent:Button Name="CompressPdfBtn" Header="Tối ưu dung lượng" Margin="3,0" Click="CompressPdf_Click" ToolTip="Nén giảm dung lượng file PDF nhưng giữ nguyên chất lượng">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA47;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="BatchCompressBtn" Header="Nén hàng loạt" Margin="3,0" Click="BatchCompress_Click" ToolTip="Nén giảm dung lượng hàng loạt nhiều tệp PDF cùng lúc">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA47;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Name="CompressPdfBtn" Header="Tối ưu dung lượng" LargeIcon="{StaticResource IconCompress}" Margin="3,0" Click="CompressPdf_Click" ToolTip="Nén giảm dung lượng file PDF nhưng giữ nguyên chất lượng" />
+        <fluent:Button Name="BatchCompressBtn" Header="Nén hàng loạt" LargeIcon="{StaticResource IconBatchCompress}" Margin="3,0" Click="BatchCompress_Click" ToolTip="Nén giảm dung lượng hàng loạt nhiều tệp PDF cùng lúc" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Tiện ích &amp; bảo mật" Tag="Utilities">
-        <fluent:Button Name="WatermarkBtn" Header="Đóng dấu" Margin="3,0" Click="Watermark_Click" ToolTip="Thêm nhãn chữ mờ hoặc bản quyền vào PDF (Watermark)">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE91C;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="PageNumberingBtn" Header="Đánh số trang" Margin="3,0" Click="PageNumbering_Click" ToolTip="Tự động đánh số trang toàn bộ tài liệu PDF">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xF12D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="ExtractImagesBtn2" Header="Trích xuất ảnh" Margin="3,0" Click="ExtractImages_Click" ToolTip="Trích xuất tất cả hình ảnh trong PDF ra thư mục">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9F;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
-        <fluent:Button Name="PdfSecurityBtn" Header="Bảo mật PDF" Margin="3,0" Click="PdfSecurity_Click" ToolTip="Cài mật khẩu và thiết lập quyền hạn cho PDF">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:Button Name="WatermarkBtn" Header="Đóng dấu" LargeIcon="{StaticResource IconWatermark}" Margin="3,0" Click="Watermark_Click" ToolTip="Thêm nhãn chữ mờ hoặc bản quyền vào PDF (Watermark)" />
+        <fluent:Button Name="PageNumberingBtn" Header="Đánh số trang" LargeIcon="{StaticResource IconPageNumber}" Margin="3,0" Click="PageNumbering_Click" ToolTip="Tự động đánh số trang toàn bộ tài liệu PDF" />
+        <fluent:Button Name="ExtractImagesBtn2" Header="Trích xuất ảnh" LargeIcon="{StaticResource IconImage}" Margin="3,0" Click="ExtractImages_Click" ToolTip="Trích xuất tất cả hình ảnh trong PDF ra thư mục" />
+        <fluent:Button Name="PdfSecurityBtn" Header="Bảo mật PDF" LargeIcon="{StaticResource IconSecurity}" Margin="3,0" Click="PdfSecurity_Click" ToolTip="Cài mật khẩu và thiết lập quyền hạn cho PDF" />
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
 
@@ -666,24 +858,24 @@
       <fluent:RibbonGroupBox Header="Bộ nhớ tạm" Tag="Document" Margin="4,0,0,0">
         <fluent:SplitButton Name="PasteBtn" Header="Dán" Click="Paste_Click" Size="Large" ToolTip="Dán nội dung từ bộ nhớ tạm (Ctrl+V)">
           <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C5;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C5;" FontSize="19" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
           </fluent:SplitButton.LargeIcon>
           <fluent:MenuItem Header="Dán" Click="Paste_Click"/>
         </fluent:SplitButton>
         <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,0,4,0">
           <fluent:Button Name="CutBtn" Header="Cắt" Click="Cut_Click" Size="Small" ToolTip="Cắt nội dung được chọn vào bộ nhớ tạm (Ctrl+X)">
             <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C6;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C6;" FontSize="10" Foreground="{DynamicResource RibbonIconBrush}" />
             </fluent:Button.Icon>
           </fluent:Button>
           <fluent:Button Name="CopyBtn" Header="Sao chép" Click="Copy_Click" Size="Small" Margin="0,2,0,0" ToolTip="Sao chép nội dung được chọn vào bộ nhớ tạm (Ctrl+C)">
             <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8C8;" FontSize="10" Foreground="{DynamicResource RibbonIconBrush}" />
             </fluent:Button.Icon>
           </fluent:Button>
           <fluent:Button Name="FormatBtn" Header="Sao định dạng" Click="Format_Click" Size="Small" Margin="0,2,0,0" ToolTip="Sao chép định dạng của đối tượng đang chọn">
             <fluent:Button.Icon>
-              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7B2;" FontSize="12" Foreground="{DynamicResource RibbonIconBrush}" />
+              <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7B2;" FontSize="10" Foreground="{DynamicResource RibbonIconBrush}" />
             </fluent:Button.Icon>
           </fluent:Button>
         </StackPanel>
@@ -691,51 +883,26 @@
 
       <!-- Shape Drawing Group -->
       <fluent:RibbonGroupBox Header="Vẽ hình ghi chú" Tag="Comments">
-        <fluent:SplitButton Name="LineToolBtn2" Header="Vẽ đường thẳng" Click="LineTool_Click" Size="Large" MinWidth="64" ToolTip="Vẽ đường thẳng chú thích hoặc ghi chú trên tài liệu">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE94E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
+        <fluent:SplitButton Name="LineToolBtn2" Header="Vẽ đường thẳng" LargeIcon="{StaticResource IconLine}" Click="LineTool_Click" Size="Large" MinWidth="64" ToolTip="Vẽ đường thẳng chú thích hoặc ghi chú trên tài liệu">
           <fluent:MenuItem Header="Vẽ đường thẳng" Click="LineTool_Click" />
         </fluent:SplitButton>
-        <fluent:SplitButton Name="RectToolBtn2" Header="Vẽ chữ nhật" Click="RectTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình hộp chữ nhật chú thích">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C3;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
+        <fluent:SplitButton Name="RectToolBtn2" Header="Vẽ chữ nhật" LargeIcon="{StaticResource IconRect}" Click="RectTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình hộp chữ nhật chú thích">
           <fluent:MenuItem Header="Vẽ chữ nhật" Click="RectTool_Click" />
         </fluent:SplitButton>
-        <fluent:SplitButton Name="OvalToolBtn2" Header="Vẽ hình tròn" Click="OvalTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình elip/tròn chú thích">
-          <fluent:SplitButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE81D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:SplitButton.LargeIcon>
+        <fluent:SplitButton Name="OvalToolBtn2" Header="Vẽ hình tròn" LargeIcon="{StaticResource IconCircle}" Click="OvalTool_Click" Size="Large" MinWidth="80" ToolTip="Vẽ hình elip/tròn chú thích">
           <fluent:MenuItem Header="Vẽ hình tròn" Click="OvalTool_Click" />
         </fluent:SplitButton>
       </fluent:RibbonGroupBox>
 
       <!-- Measure Group -->
       <fluent:RibbonGroupBox Header="Đo đạc bản vẽ" Tag="Measure">
-        <fluent:ToggleButton Name="MeasureDistanceToolBtn" Header="Đo khoảng cách" Click="MeasureDistanceTool_Click" Size="Large" MinWidth="90" ToolTip="Đo khoảng cách thực tế giữa hai điểm bất kỳ">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED5E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="MeasureAreaToolBtn" Header="Đo diện tích" Click="MeasureAreaTool_Click" Size="Large" MinWidth="64" ToolTip="Đo diện tích thực tế của vùng được chọn">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7C3;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="MeasurePerimeterToolBtn" Header="Đo chu vi" Click="MeasurePerimeterTool_Click" Size="Large" MinWidth="64" ToolTip="Đo tổng chu vi biên dạng thực tế">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE81D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:Button Name="MeasureGuideBtn" Header="Hướng dẫn đo" Click="MeasureGuide_Click" Size="Large" ToolTip="Xem hướng dẫn chi tiết cách thiết lập tỷ lệ và đo đạc bản vẽ">
-          <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:Button.LargeIcon>
-        </fluent:Button>
+        <fluent:ToggleButton Name="MeasureDistanceToolBtn" Header="Đo khoảng cách" LargeIcon="{StaticResource IconDistance}" Click="MeasureDistanceTool_Click" Size="Large" MinWidth="90" ToolTip="Đo khoảng cách thực tế giữa hai điểm bất kỳ" />
+        <fluent:ToggleButton Name="MeasureAreaToolBtn" Header="Đo diện tích" LargeIcon="{StaticResource IconArea}" Click="MeasureAreaTool_Click" Size="Large" MinWidth="64" ToolTip="Đo diện tích thực tế của vùng được chọn" />
+        <fluent:ToggleButton Name="MeasurePerimeterToolBtn" Header="Đo chu vi" LargeIcon="{StaticResource IconDistance}" Click="MeasurePerimeterTool_Click" Size="Large" MinWidth="64" ToolTip="Đo tổng chu vi biên dạng thực tế" />
+        <fluent:Button Name="MeasureGuideBtn" Header="Hướng dẫn đo" LargeIcon="{StaticResource IconNote}" Click="MeasureGuide_Click" Size="Large" ToolTip="Xem hướng dẫn chi tiết cách thiết lập tỷ lệ và đo đạc bản vẽ" />
         <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="8,0,4,0">
           <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7F0;" FontSize="12" Style="{StaticResource ThemeTextBlockStyle}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7F0;" FontSize="10" Style="{StaticResource ThemeTextBlockStyle}" VerticalAlignment="Center" Margin="0,0,4,0"/>
             <TextBlock Text="Tỷ Lệ" FontWeight="SemiBold" Style="{StaticResource ThemeTextBlockStyle}" VerticalAlignment="Center"/>
           </StackPanel>
           <fluent:ComboBox Name="MeasurementScaleCombo" Width="110" Height="22" SelectedIndex="3" SelectionChanged="MeasurementScaleCombo_SelectionChanged" ToolTip="Thiết lập tỷ lệ xích thực tế của bản vẽ">
@@ -752,61 +919,21 @@
 
     <fluent:RibbonTabItem x:Name="CommentTab" Header="Chú thích">
       <fluent:RibbonGroupBox Header="Công cụ vẽ &amp; hình học" Tag="Comments">
-        <fluent:ToggleButton Name="SelectToolBtn" Header="Con trỏ chọn" Margin="3,0" Click="SelectTool_Click" ToolTip="Quay lại công cụ chọn để di chuyển, chỉnh sửa hoặc xóa chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B0;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="InkToolBtn" Header="Bút vẽ" Margin="3,0" Click="InkTool_Click" ToolTip="Vẽ các nét vẽ tự do trên tài liệu">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED63;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="RectToolBtn" Header="Chữ nhật" Margin="3,0" Click="RectTool_Click" ToolTip="Vẽ hình hộp chữ nhật để khoanh vùng chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE739;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="OvalToolBtn" Header="Hình tròn" Margin="3,0" Click="OvalTool_Click" ToolTip="Vẽ hình tròn hoặc hình elip chú thích">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA3A;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="LineToolBtn" Header="Đường thẳng" Margin="3,0" Click="LineTool_Click" ToolTip="Vẽ đường thẳng chú thích hoặc chỉ dẫn">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE94E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="SelectToolBtn" Header="Con trỏ chọn" LargeIcon="{StaticResource IconSelect}" Margin="3,0" Click="SelectTool_Click" ToolTip="Quay lại công cụ chọn để di chuyển, chỉnh sửa hoặc xóa chú thích" />
+        <fluent:ToggleButton Name="InkToolBtn" Header="Bút vẽ" LargeIcon="{StaticResource IconDrawPen}" Margin="3,0" Click="InkTool_Click" ToolTip="Vẽ các nét vẽ tự do trên tài liệu" />
+        <fluent:ToggleButton Name="RectToolBtn" Header="Chữ nhật" LargeIcon="{StaticResource IconRect}" Margin="3,0" Click="RectTool_Click" ToolTip="Vẽ hình hộp chữ nhật để khoanh vùng chú thích" />
+        <fluent:ToggleButton Name="OvalToolBtn" Header="Hình tròn" LargeIcon="{StaticResource IconCircle}" Margin="3,0" Click="OvalTool_Click" ToolTip="Vẽ hình tròn hoặc hình elip chú thích" />
+        <fluent:ToggleButton Name="LineToolBtn" Header="Đường thẳng" LargeIcon="{StaticResource IconLine}" Margin="3,0" Click="LineTool_Click" ToolTip="Vẽ đường thẳng chú thích hoặc chỉ dẫn" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Chú thích văn bản" Tag="Comments">
-        <fluent:ToggleButton Name="TextBoxToolBtn" Header="Hộp văn bản" Margin="3,0" Click="TextBoxTool_Click" ToolTip="Thêm một hộp văn bản ghi chú trực tiếp trên tài liệu">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA44;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="CalloutToolBtn" Header="Mũi tên chỉ dẫn" Margin="3,0" Click="CalloutTool_Click" ToolTip="Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEB9D;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="StickyNoteToolBtn" Header="Ghi chú" Margin="3,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú nhỏ (Sticky Note) để ghi lại các bình luận">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70B;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
-        <fluent:ToggleButton Name="HighlightToolBtn" Header="Tô màu (highlight)" Margin="3,0" Click="HighlightTool_Click" ToolTip="Tô màu nền (Highlight) vùng chữ được chọn">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE7E6;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="TextBoxToolBtn" Header="Hộp văn bản" LargeIcon="{StaticResource IconText}" Margin="3,0" Click="TextBoxTool_Click" ToolTip="Thêm một hộp văn bản ghi chú trực tiếp trên tài liệu" />
+        <fluent:ToggleButton Name="CalloutToolBtn" Header="Mũi tên chỉ dẫn" LargeIcon="{StaticResource IconCallout}" Margin="3,0" Click="CalloutTool_Click" ToolTip="Thêm hộp ghi chú kèm theo đường mũi tên chỉ dẫn tới một điểm cụ thể" />
+        <fluent:ToggleButton Name="StickyNoteToolBtn" Header="Ghi chú" LargeIcon="{StaticResource IconNote}" Margin="3,0" Click="StickyNoteTool_Click" ToolTip="Đặt một ghi chú nhỏ (Sticky Note) để ghi lại các bình luận" />
+        <fluent:ToggleButton Name="HighlightToolBtn" Header="Tô màu (highlight)" LargeIcon="{StaticResource IconHighlight}" Margin="3,0" Click="HighlightTool_Click" ToolTip="Tô màu nền (Highlight) vùng chữ được chọn" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Chụp ảnh &amp; AI" Tag="Ocr">
         <fluent:ToggleButton Name="SnapshotToolBtn" Header="Snapshot" LargeIcon="{StaticResource IconSnapshot}" Size="Large" Margin="3,0" Click="SnapshotTool_Click" ToolTip="Kéo chọn vùng → xem trước → in, copy hoặc lưu ảnh" />
-        <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" Margin="3,0" Click="AiSnapshotTool_Click" ToolTip="Chụp một vùng trên tài liệu để gửi cho trợ lý AI phân tích, dịch thuật">
-          <fluent:ToggleButton.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA54;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
-          </fluent:ToggleButton.LargeIcon>
-        </fluent:ToggleButton>
+        <fluent:ToggleButton Name="AiSnapshotBtn" Header="AI Snapshot" LargeIcon="{StaticResource IconAiSnapshot}" Margin="3,0" Click="AiSnapshotTool_Click" ToolTip="Chụp một vùng trên tài liệu để gửi cho trợ lý AI phân tích, dịch thuật" />
       </fluent:RibbonGroupBox>
       <fluent:RibbonGroupBox Header="Tùy chọn" Tag="Utilities" Visibility="Collapsed">
         <fluent:CheckBox Name="KeepToolsActiveCheckBox" Header="Sử dụng liên tục" Click="KeepToolsActiveCheckBox_Click" ToolTip="Giữ các công cụ vẽ, chú thích, chụp ảnh hoạt động liên tục cho đến khi nhấn ESC" IsChecked="False" />
@@ -826,120 +953,81 @@
       </fluent:RibbonGroupBox>
     </fluent:RibbonTabItem>
 
-    <fluent:RibbonTabItem Header="Biểu mẫu">
-      <fluent:RibbonGroupBox Header="Trường biểu mẫu" Tag="Utilities">
-        <fluent:Button Header="Nút bấm (Push Button)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo nút biểu mẫu." />
-        <fluent:Button Header="Ô chọn (Check Box)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo ô chọn biểu mẫu." />
-        <fluent:Button Header="Nút radio (Radio Button)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo nút chọn biểu mẫu." />
-        <fluent:Button Header="Danh sách chọn (Combo Box)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo danh sách chọn biểu mẫu." />
-        <fluent:Button Header="Hộp danh sách (List Box)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo hộp danh sách biểu mẫu." />
-        <fluent:Button Header="Ô nhập chữ (Text Field)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo trường nhập biểu mẫu." />
-        <fluent:Button Header="Ô chữ ký (Signature Field)" IsEnabled="False" ToolTip="PDF Pro chưa hỗ trợ tạo trường chữ ký biểu mẫu." />
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Công cụ biểu mẫu" Tag="Utilities">
-        <fluent:Button Header="Nhận dạng trường biểu mẫu" IsEnabled="False" ToolTip="Nhận dạng và tạo trường biểu mẫu tự động." />
-        <fluent:Button Header="Đặt lại biểu mẫu" IsEnabled="False" ToolTip="Đặt lại dữ liệu biểu mẫu về mặc định." />
-        <fluent:Button Header="Nhập dữ liệu" IsEnabled="False" ToolTip="Nhập dữ liệu vào biểu mẫu." />
-        <fluent:Button Header="Xuất dữ liệu" IsEnabled="False" ToolTip="Xuất dữ liệu biểu mẫu ra tệp." />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-
-    <fluent:RibbonTabItem Header="Bảo mật">
-      <fluent:RibbonGroupBox Header="Bảo vệ tài liệu" Tag="Utilities">
-        <fluent:Button Name="ProtectPdfBtn" Header="Bảo mật PDF" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="PdfSecurity_Click" ToolTip="Thiết lập mật khẩu và quyền truy cập cho PDF." />
-        <fluent:Button Name="ProtectWatermarkBtn" Header="Đóng dấu (Watermark)" LargeIcon="{StaticResource IconText}" Size="Large" Click="Watermark_Click" ToolTip="Thêm dấu bản quyền hoặc nội dung nhận diện vào PDF." />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-
-    <fluent:RibbonTabItem Header="Chia sẻ">
-      <fluent:RibbonGroupBox Header="Chia sẻ tài liệu" Tag="Utilities">
-        <fluent:Button Header="Gửi Email" IsEnabled="False" ToolTip="Gửi PDF qua email." />
-        <fluent:Button Header="Tạo liên kết" IsEnabled="False" ToolTip="Tạo liên kết chia sẻ PDF." />
-        <fluent:Button Header="Gửi duyệt" IsEnabled="False" ToolTip="Quy trình gửi PDF để nhận xét duyệt." />
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Nhận xét" Tag="Comments">
-        <fluent:Button Header="Nhập nhận xét" IsEnabled="False" ToolTip="Nhập nhận xét từ tệp chia sẻ." />
-        <fluent:Button Header="Xuất nhận xét" IsEnabled="False" ToolTip="Xuất nhận xét để chia sẻ." />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-
-    <fluent:RibbonTabItem Header="Kết nối &amp; AI">
-      <fluent:RibbonGroupBox Header="Trợ lý AI" Tag="Ocr">
-        <fluent:Button Header="Gemini API Key" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="OpenGeminiApiKey_Click" ToolTip="Mở trang quản lý khóa API Gemini." />
-        <fluent:Button Header="OpenAI API Key" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="OpenOpenAiApiKey_Click" ToolTip="Mở trang quản lý khóa API OpenAI." />
-        <fluent:Button Header="Mô hình Ollama" LargeIcon="{StaticResource IconDownload}" Size="Large" Click="OpenOllamaDownload_Click" ToolTip="Mở trang tải Ollama để thiết lập mô hình AI cục bộ." />
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Hệ thống &amp; Dịch vụ" Tag="Utilities">
-        <fluent:Button Header="Kiểm tra thành phần" LargeIcon="{StaticResource IconSetting}" Size="Large" Click="CheckLibraries_Click" ToolTip="Kiểm tra các thành phần và thư viện ứng dụng." />
-        <fluent:Button Header="Lưu trữ đám mây" IsEnabled="False" ToolTip="Kết nối dịch vụ lưu trữ đám mây chưa được hỗ trợ." />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-
-    <fluent:RibbonTabItem Header="Trợ năng">
-      <fluent:RibbonGroupBox Header="Kiểm tra trợ năng" Tag="Utilities">
-        <fluent:Button Header="Kiểm tra trợ năng" IsEnabled="False" ToolTip="Kiểm tra khả năng tiếp cận nội dung PDF." />
-        <fluent:Button Header="Thứ tự đọc" IsEnabled="False" ToolTip="Chỉnh sửa thứ tự đọc văn bản." />
-        <fluent:Button Header="Thêm thẻ cấu trúc" IsEnabled="False" ToolTip="Gắn thẻ cấu trúc cho PDF." />
-      </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Đọc to (Read Aloud)" Tag="Utilities">
-        <fluent:Button Header="Đọc trang hiện tại" IsEnabled="False" ToolTip="Đọc nội dung trang hiện tại." />
-        <fluent:Button Header="Đọc toàn bộ tài liệu" IsEnabled="False" ToolTip="Đọc toàn bộ tài liệu PDF." />
-      </fluent:RibbonGroupBox>
-    </fluent:RibbonTabItem>
-
     <fluent:RibbonTabItem Header="Trợ giúp">
-      <fluent:RibbonGroupBox Header="Giao diện &amp; Cài đặt" Tag="Utilities">
-        <fluent:ToggleButton Name="ThemeToggleBtn" Header="Chủ đề" Margin="3,0" IsChecked="True" Click="ThemeToggle_Click" ToolTip="Chuyển đổi giao diện sáng / tối">
+      <fluent:RibbonGroupBox Header="Giao diện" Tag="Utilities">
+        <fluent:ToggleButton Name="ThemeToggleBtn" Header="Chủ đề" MinWidth="52" Margin="3,0" IsChecked="False" Click="ThemeToggle_Click" ToolTip="Chuyển đổi giao diện sáng / tối">
           <fluent:ToggleButton.LargeIcon>
-            <Border Name="ThemeIconBadge" Width="24" Height="24" CornerRadius="4"
-                    Background="#0D1117" BorderBrush="#14B8A6" BorderThickness="1"
+            <Border Name="ThemeIconBadge" Width="20" Height="20" CornerRadius="4"
+                    Background="#FFFFFF" BorderBrush="#F59E0B" BorderThickness="1"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
-              <TextBlock Name="ThemeToggleIcon" Tag="ThemeToggleIcon" FontFamily="Segoe MDL2 Assets" Text="&#xE708;" FontSize="16"
-                         Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Name="ThemeToggleIcon" Tag="ThemeToggleIcon" FontFamily="Segoe MDL2 Assets" Text="&#xE706;" FontSize="13"
+                         Foreground="#F59E0B" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
           </fluent:ToggleButton.LargeIcon>
         </fluent:ToggleButton>
-        <fluent:Button Header="Cài đặt" LargeIcon="{StaticResource IconSetting}" Margin="3,0" Click="Settings_Click" ToolTip="Cài đặt cấu hình hệ thống" />
+        <fluent:Button Header="Cài đặt" LargeIcon="{StaticResource IconSetting}" MinWidth="52" Margin="3,0" Click="Settings_Click" ToolTip="Cài đặt cấu hình hệ thống" />
       </fluent:RibbonGroupBox>
-      <fluent:RibbonGroupBox Header="Trợ giúp &amp; Hệ thống" Tag="Utilities">
-        <fluent:Button Header="Hướng dẫn" Margin="3,0" Click="UserGuide_Click" ToolTip="Xem hướng dẫn sử dụng chi tiết các tính năng của phần mềm">
+      <fluent:RibbonGroupBox Header="Trợ lý AI" Tag="Ocr">
+        <fluent:Button Header="Gemini API" MinWidth="56" Size="Large" Click="OpenGeminiApiKey_Click" ToolTip="Mở trang quản lý khóa API Gemini.">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE70F;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEA86;" FontSize="19" Foreground="#7C3AED" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Phản hồi" Margin="3,0" Click="Feedback_Click" ToolTip="Gửi ý kiến đóng góp hoặc báo cáo lỗi trực tiếp đến nhà phát triển">
+        <fluent:Button Header="OpenAI API" MinWidth="56" Size="Large" Click="OpenOpenAiApiKey_Click" ToolTip="Mở trang quản lý khóa API OpenAI.">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE768;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xEBD2;" FontSize="19" Foreground="#10B981" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Cài máy in" Margin="3,0" Click="VirtualPrinterConfig_Click" ToolTip="Cấu hình hoặc cài đặt trình điều khiển máy in ảo của ứng dụng">
+        <fluent:Button Header="Tải Ollama" MinWidth="56" Size="Large" Click="OpenOllamaDownload_Click" ToolTip="Mở trang tải Ollama để thiết lập mô hình AI cục bộ.">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE749;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE896;" FontSize="19" Foreground="#EA580C" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Cập nhật" Margin="3,0" Click="ManualUpdateCheck_Click" ToolTip="Kiểm tra xem có bản cập nhật mới nhất cho ứng dụng không">
+        <fluent:Button Header="Kiểm tra" MinWidth="56" Size="Large" Click="CheckLibraries_Click" ToolTip="Kiểm tra các thành phần và thư viện ứng dụng.">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE895;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D5;" FontSize="19" Foreground="#0284C7" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Chẩn đoán PDF" Margin="3,0" Click="ShowPdfDiagnostics_Click" ToolTip="Xem chẩn đoán chi tiết và phân tích hiệu năng của tài liệu PDF">
+      </fluent:RibbonGroupBox>
+      <fluent:RibbonGroupBox Header="Trợ giúp &amp; Bản quyền" Tag="Utilities">
+        <fluent:Button Header="Hướng dẫn" MinWidth="52" Margin="3,0" Click="UserGuide_Click" ToolTip="Xem hướng dẫn sử dụng chi tiết các tính năng của phần mềm">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D9;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE82D;" FontSize="19" Foreground="#2563EB" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Khôi phục bản trước" Margin="3,0" Click="RestorePreviousVersion_Click" ToolTip="Khôi phục về phiên bản trước đó nếu gặp lỗi sau khi cập nhật">
+        <fluent:Button Header="Phản hồi" MinWidth="52" Margin="3,0" Click="Feedback_Click" ToolTip="Gửi ý kiến đóng góp hoặc báo cáo lỗi trực tiếp đến nhà phát triển">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xED15;" FontSize="19" Foreground="#8B5CF6" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Kích hoạt" Margin="3,0" Click="Activation_Click" ToolTip="Nhập mã bản quyền để kích hoạt toàn bộ tính năng cao cấp của phần mềm">
+        <fluent:Button Header="Cài máy in" MinWidth="54" Margin="3,0" Click="VirtualPrinterConfig_Click" ToolTip="Cấu hình hoặc cài đặt trình điều khiển máy in ảo của ứng dụng">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE72E;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE749;" FontSize="19" Foreground="#0D9488" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
-        <fluent:Button Header="Giới thiệu" Margin="3,0" Click="About_Click" ToolTip="Xem thông tin phiên bản phần mềm, bản quyền và nhà cung cấp">
+        <fluent:Button Header="Cập nhật" MinWidth="52" Margin="3,0" Click="ManualUpdateCheck_Click" ToolTip="Kiểm tra xem có bản cập nhật mới nhất cho ứng dụng không">
           <fluent:Button.LargeIcon>
-            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="24" Foreground="{DynamicResource RibbonIconBrush}" HorizontalAlignment="Center" />
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE895;" FontSize="19" Foreground="#059669" Tag="ColorLocked" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Chẩn đoán" MinWidth="54" Margin="3,0" Click="ShowPdfDiagnostics_Click" ToolTip="Xem chẩn đoán chi tiết và phân tích hiệu năng của tài liệu PDF">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D9;" FontSize="19" Foreground="#D97706" Tag="ColorLocked" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Khôi phục" MinWidth="52" Margin="3,0" Click="RestorePreviousVersion_Click" ToolTip="Khôi phục về phiên bản trước đó nếu gặp lỗi sau khi cập nhật">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE777;" FontSize="19" Foreground="#64748B" Tag="ColorLocked" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Kích hoạt" MinWidth="52" Margin="3,0" Click="Activation_Click" ToolTip="Nhập mã bản quyền để kích hoạt toàn bộ tính năng cao cấp của phần mềm">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8D7;" FontSize="19" Foreground="#D97706" Tag="ColorLocked" HorizontalAlignment="Center" />
+          </fluent:Button.LargeIcon>
+        </fluent:Button>
+        <fluent:Button Header="Giới thiệu" MinWidth="52" Margin="3,0" Click="About_Click" ToolTip="Xem thông tin phiên bản phần mềm, bản quyền và nhà cung cấp">
+          <fluent:Button.LargeIcon>
+            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE946;" FontSize="19" Foreground="#0284C7" Tag="ColorLocked" HorizontalAlignment="Center" />
           </fluent:Button.LargeIcon>
         </fluent:Button>
       </fluent:RibbonGroupBox>
@@ -982,32 +1070,32 @@
           <StackPanel Orientation="Horizontal">
             <ToggleButton Name="AlignLeftToggle" Width="22" Height="22" Style="{StaticResource ThemeToggleButtonStyle}" Click="AlignLeftToggle_Click" ToolTip="Căn lề trái">
               <ToggleButton.Content>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A4;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A4;" FontSize="9.5" />
               </ToggleButton.Content>
             </ToggleButton>
             <ToggleButton Name="AlignCenterToggle" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="AlignCenterToggle_Click" ToolTip="Căn lề giữa">
               <ToggleButton.Content>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A3;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A3;" FontSize="9.5" />
               </ToggleButton.Content>
             </ToggleButton>
             <ToggleButton Name="AlignRightToggle" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="AlignRightToggle_Click" ToolTip="Căn lề phải">
               <ToggleButton.Content>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A2;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A2;" FontSize="9.5" />
               </ToggleButton.Content>
             </ToggleButton>
             <ToggleButton Name="AlignJustifyToggle" Width="22" Height="22" Margin="4,0,0,0" Style="{StaticResource ThemeToggleButtonStyle}" Click="AlignJustifyToggle_Click" ToolTip="Căn lề đều hai bên">
               <ToggleButton.Content>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8F7;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8F7;" FontSize="9.5" />
               </ToggleButton.Content>
             </ToggleButton>
             <fluent:Button Name="BulletListBtn" Width="22" Height="22" Margin="10,0,0,0" Click="BulletListBtn_Click" ToolTip="Tạo danh sách dấu đầu dòng">
               <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8FD;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8FD;" FontSize="9.5" />
               </fluent:Button.Icon>
             </fluent:Button>
             <fluent:Button Name="NumberListBtn" Width="22" Height="22" Margin="4,0,0,0" Click="NumberListBtn_Click" ToolTip="Tạo danh sách đánh số">
               <fluent:Button.Icon>
-                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xF14A;" FontSize="11" />
+                <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xF14A;" FontSize="9.5" />
               </fluent:Button.Icon>
             </fluent:Button>
           </StackPanel>

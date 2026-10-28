@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace PdfViewerApp;
 
@@ -95,7 +95,33 @@ internal static class AppThemeRegistry
 	/// <summary>Tất cả theme theo thứ tự hiển thị trong UI.</summary>
 	public static readonly IReadOnlyList<AppThemeDefinition> All = new List<AppThemeDefinition>
 	{
-		// ─── 1. TỐI (DARK) - Mặc định ──────────────────────────────────────────
+		// ─── 1. SÁNG (LIGHT) - Mặc định ───────────────────────────────────────
+		new AppThemeDefinition
+		{
+			Name                  = Light,
+			DisplayName           = "Sáng",
+			Icon                  = "☀️",
+			WindowBackground      = "#FFFFFF",
+			TitleBarBackground    = "#F8FAFC",
+			PanelBackground       = "#FFFFFF",
+			SurfaceBackground     = "#F8FAFC",
+			HoverBackground       = "#F1F5F9",
+			BorderColor           = "#E2E8F0",
+			AccentColor           = "#2563EB",
+			AccentDark            = "#1D4ED8",
+			ForegroundPrimary     = "#0F172A",
+			ForegroundSecondary   = "#475569",
+			StatusBarStart        = "#F8FAFC",
+			StatusBarMid          = "#F1F5F9",
+			FluentTheme           = "Light.Blue",
+			IsLight               = true,
+			ThemeBadgeIconGlyph   = "\uE706",
+			ThemeBadgeBackground  = "#FFFFFF",
+			ThemeBadgeBorder      = "#F59E0B",
+			ThemeBadgeIconColor   = "#F59E0B",
+			ThemeBadgeGlowColor   = "#F59E0B",
+		},
+		// ─── 2. TỐI (DARK) ────────────────────────────────────────────────────
 		new AppThemeDefinition
 		{
 			Name                  = Dark,
@@ -115,37 +141,11 @@ internal static class AppThemeRegistry
 			StatusBarMid          = "#1E293B",
 			FluentTheme           = "Dark.Blue",
 			IsLight               = false,
-			ThemeBadgeIconGlyph   = "\uE708", 
-			ThemeBadgeBackground  = "#1E293B", // Chìm vào nền
-			ThemeBadgeBorder      = "#14B8A6", 
-			ThemeBadgeIconColor   = "#2DD4BF", // Phát sáng Teal
+			ThemeBadgeIconGlyph   = "\uE708",
+			ThemeBadgeBackground  = "#1E293B",
+			ThemeBadgeBorder      = "#14B8A6",
+			ThemeBadgeIconColor   = "#2DD4BF",
 			ThemeBadgeGlowColor   = "#14B8A6",
-		},
-		// ─── 2. SÁNG (LIGHT) ───────────────────────────────────────────────────
-		new AppThemeDefinition
-		{
-			Name                  = Light,
-			DisplayName           = "Sáng",
-			Icon                  = "☀️",
-			WindowBackground      = "#F8FAFC",
-			TitleBarBackground    = "#E2E8F0",
-			PanelBackground       = "#FFFFFF",
-			SurfaceBackground     = "#F1F5F9",
-			HoverBackground       = "#E2E8F0",
-			BorderColor           = "#CBD5E1",
-			AccentColor           = "#0F766E",
-			AccentDark            = "#0D9488",
-			ForegroundPrimary     = "#0F172A",
-			ForegroundSecondary   = "#475569",
-			StatusBarStart        = "#E2E8F0",
-			StatusBarMid          = "#F1F5F9",
-			FluentTheme           = "Light.Blue",
-			IsLight               = true,
-			ThemeBadgeIconGlyph   = "\uE706", 
-			ThemeBadgeBackground  = "#F1F5F9", 
-			ThemeBadgeBorder      = "#0F766E", 
-			ThemeBadgeIconColor   = "#B45309", // Hổ phách đậm tương phản tốt
-			ThemeBadgeGlowColor   = "#000000",
 		},
 		// ─── 3. RỪNG XANH (FOREST) ─────────────────────────────────────────────
 		new AppThemeDefinition
@@ -331,7 +331,7 @@ internal static class AppThemeRegistry
 		},
 	};
 
-	/// <summary>Lấy theme theo tên, fallback về Dark nếu không tìm thấy.</summary>
+	/// <summary>Lấy theme theo tên, fallback về Light nếu không tìm thấy.</summary>
 	public static AppThemeDefinition Get(string? name)
 	{
 		if (!string.IsNullOrEmpty(name))
@@ -342,7 +342,7 @@ internal static class AppThemeRegistry
 					return t;
 			}
 		}
-		return All[0]; // Dark
+		return All[0]; // Light
 	}
 
 	/// <summary>Tương thích ngược: chuyển bool IsDarkTheme → ThemeName.</summary>

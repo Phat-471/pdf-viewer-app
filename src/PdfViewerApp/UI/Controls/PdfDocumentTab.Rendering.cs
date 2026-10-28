@@ -843,7 +843,6 @@ public partial class PdfDocumentTab
 		finally
 		{
 			_loadingPages.Remove(pageNumber);
-			RequestViewportRefresh();
 		}
 	}
 

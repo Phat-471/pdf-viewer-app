@@ -24,6 +24,10 @@ public partial class MainRibbon : UserControl
 	public System.Windows.Controls.Primitives.ToggleButton? SubscriptToggle2 => null;
 	public System.Windows.Controls.Button? FontGrowBtn2 => null;
 	public System.Windows.Controls.Button? FontShrinkBtn2 => null;
+	public System.Windows.Controls.Primitives.ToggleButton? HomeSnapshotToolBtn => null;
+	public System.Windows.Controls.Primitives.ToggleButton? HomeEditTextToolBtn => null;
+	public System.Windows.Controls.Control? HomeDeletePageBtn => null;
+	public System.Windows.Controls.Control? HomeInsertPageBtn => null;
 
 	public bool KeepToolsActive
 	{
@@ -38,6 +42,7 @@ public partial class MainRibbon : UserControl
 	}
 
 	public event RoutedEventHandler? OpenPdfRequested;
+	public event RoutedEventHandler? CreatePdfFromImagesRequested;
 
 	public event RoutedEventHandler? SavePdfRequested;
 
@@ -204,6 +209,7 @@ public partial class MainRibbon : UserControl
 	public MainRibbon()
 	{
 		InitializeComponent();
+		ApplyTheme(AppThemeRegistry.Get(AppThemeRegistry.Light));
 	}
 
 	public void ApplyTheme(bool isDark)
@@ -216,9 +222,10 @@ public partial class MainRibbon : UserControl
 		_currentTheme = theme;
 		ApplyRibbonSurfaceTheme(theme);
 		bool isLight = theme.IsLight;
-		var foxitPurple = isLight ? Color.FromRgb(123, 31, 162) : Color.FromRgb(167, 139, 250);
-		Resources["RibbonIconBrush"] = new SolidColorBrush(foxitPurple);
-		var accent = new SolidColorBrush(foxitPurple);
+		var themeAccent = (Color)ColorConverter.ConvertFromString(theme.AccentColor);
+		var iconDefault = isLight ? Color.FromRgb(51, 65, 85) : Color.FromRgb(226, 232, 240);
+		Resources["RibbonIconBrush"] = new SolidColorBrush(iconDefault);
+		var accent = new SolidColorBrush(themeAccent);
 		var foreground = new SolidColorBrush(isLight ? Color.FromRgb(30, 41, 59) : Color.FromRgb(248, 250, 252));
 		foreach (string key in new[] { "Fluent.Ribbon.Brushes.Accent", "Fluent.Ribbon.Brushes.AccentBase" })
 			MyRibbon.Resources[key] = accent;
@@ -233,6 +240,11 @@ public partial class MainRibbon : UserControl
         foreach (string key in new[] { "Fluent.Ribbon.Brushes.Button.MouseOver.Border", "Fluent.Ribbon.Brushes.Button.Pressed.Border",
             "Fluent.Ribbon.Brushes.ToggleButton.Checked.Border", "Fluent.Ribbon.Brushes.ToggleButton.CheckedMouseOver.Border" })
             MyRibbon.Resources[key] = Resources["RibbonAccentBrush"];
+		if (CommentFormatGroup != null)
+		{
+			CommentFormatGroup.Background = accent;
+			CommentFormatGroup.BorderBrush = accent;
+		}
 		bool isDark = !theme.IsLight;
 		PdfPerfLogger.Log($"ApplyTheme: Starting theme update to {theme.Name} (isDark={isDark}, AccentColor={theme.AccentColor})");
 
@@ -266,8 +278,8 @@ public partial class MainRibbon : UserControl
 
 		if (MyBackstage != null)
 		{
-			MyBackstage.Background = new SolidColorBrush(Color.FromRgb(123, 31, 162));
-			MyBackstage.Foreground = Brushes.White;
+			MyBackstage.Background = isLight ? Brushes.Transparent : new SolidColorBrush(Color.FromRgb(30, 41, 59));
+			MyBackstage.Foreground = foreground;
 			PdfPerfLogger.Log("ApplyTheme: MyBackstage background updated.");
 		}
 
@@ -334,10 +346,11 @@ public partial class MainRibbon : UserControl
 
         bool isLight = theme.IsLight;
         var panel = isLight ? Colors.White : Color.FromRgb(30, 41, 59);
-        var accent = isLight ? Color.FromRgb(123, 31, 162) : Color.FromRgb(167, 139, 250);
+        var accent = (Color)ColorConverter.ConvertFromString(theme.AccentColor);
         var text = isLight ? Color.FromRgb(30, 41, 59) : Color.FromRgb(248, 250, 252);
-        var groupHeader = isLight ? Color.FromRgb(100, 116, 139) : Color.FromRgb(148, 163, 184);
+        var groupHeader = isLight ? Color.FromRgb(71, 85, 105) : Color.FromRgb(148, 163, 184);
         var border = isLight ? Color.FromRgb(226, 232, 240) : Color.FromRgb(51, 65, 85);
+        var iconDefault = isLight ? Color.FromRgb(51, 65, 85) : Color.FromRgb(226, 232, 240);
 
         Token("RibbonButtonBackground", panel);
         Token("RibbonGroupBackground", panel);
@@ -345,8 +358,9 @@ public partial class MainRibbon : UserControl
         Token("RibbonTextBrush", text);
         Token("RibbonGroupHeaderBrush", groupHeader);
         Token("RibbonAccentBrush", accent);
-        Token("RibbonHoverBrush", Mix(panel, accent, isLight ? 0.08 : 0.22));
-        Token("RibbonSelectedBrush", Mix(panel, accent, isLight ? 0.18 : 0.38));
+        Token("RibbonIconBrush", iconDefault);
+        Token("RibbonHoverBrush", isLight ? Color.FromRgb(239, 246, 255) : Mix(panel, accent, 0.22));
+        Token("RibbonSelectedBrush", isLight ? Color.FromRgb(219, 234, 254) : Mix(panel, accent, 0.38));
         var groupColors = new Dictionary<string, string>
         {
             ["Document"] = isLight ? "#64748B" : "#94A3B8",
@@ -388,6 +402,21 @@ public partial class MainRibbon : UserControl
         frame.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background)) { Source = control });
         frame.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush)) { Source = control });
         frame.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness)) { Source = control });
+
+        // Tối ưu kích thước icon gọn gàng hơn 20%
+        if (control is Fluent.Button or Fluent.ToggleButton or Fluent.SplitButton)
+        {
+            var largeIcon = control.Template.FindName("PART_LargeIcon", control) as FrameworkElement;
+            if (largeIcon != null)
+            {
+                largeIcon.LayoutTransform = new ScaleTransform(0.80, 0.80);
+            }
+            var smallIcon = control.Template.FindName("PART_Icon", control) as FrameworkElement;
+            if (smallIcon != null)
+            {
+                smallIcon.LayoutTransform = new ScaleTransform(0.85, 0.85);
+            }
+        }
     }
 
 	/// <summary>Cập nhật màu foreground cho tất cả icon TextBlock trong Ribbon.</summary>
@@ -402,6 +431,7 @@ public partial class MainRibbon : UserControl
 			foreach (var tb in textBlocks)
 			{
 				if (tb.Name == "ThemeToggleIcon" || tb.Tag?.ToString() == "ThemeToggleIcon" || tb == ThemeToggleIcon) continue;
+				if (tb.Tag?.ToString() == "ColorLocked") continue;
 
 				string? fontSource = tb.FontFamily?.Source;
 				if (fontSource == null) continue;
@@ -452,13 +482,17 @@ public partial class MainRibbon : UserControl
 		{
 			HomeSelectToolBtn.IsChecked = activeTool == "Select";
 		}
-		if (HomeSnapshotToolBtn != null)
+		if (HomeNoteToolBtn != null)
 		{
-			HomeSnapshotToolBtn.IsChecked = activeTool == "Snapshot";
+			HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
 		}
-		if (HomeEditTextToolBtn != null)
+		if (HomeHighlightToolBtn != null)
 		{
-			HomeEditTextToolBtn.IsChecked = activeTool == "EditText";
+			HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
+		}
+		if (HomeShapesBtn != null)
+		{
+			HomeShapesBtn.IsChecked = activeTool == "ShapeRect" || activeTool == "ShapeOval" || activeTool == "ShapeLine";
 		}
 		if (HomeTextToolBtn != null)
 		{
@@ -468,13 +502,17 @@ public partial class MainRibbon : UserControl
 		{
 			HomeCalloutToolBtn.IsChecked = activeTool == "Callout";
 		}
-		if (HomeHighlightToolBtn != null)
+		if (HomeSnapshotBtn != null)
 		{
-			HomeHighlightToolBtn.IsChecked = activeTool == "Highlight";
+			HomeSnapshotBtn.IsChecked = activeTool == "Snapshot" || activeTool == "AiSnapshot";
 		}
-		if (HomeNoteToolBtn != null)
+		if (HomeEditTextBtn != null)
 		{
-			HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
+			HomeEditTextBtn.IsChecked = activeTool == "EditText";
+		}
+		if (HomeMeasureBtn != null)
+		{
+			HomeMeasureBtn.IsChecked = activeTool == "MeasureDistance" || activeTool == "MeasureArea" || activeTool == "MeasurePerimeter";
 		}
 
 		if (SelectTextToolBtn != null)
@@ -569,6 +607,7 @@ public partial class MainRibbon : UserControl
 		ApplyProButtonState(ExtractPagesBtn, opacity, toolTip);
 		ApplyProButtonState(AiSnapshotBtn, opacity, toolTip);
 		ApplyProButtonState(CompressPdfBtn, opacity, toolTip);
+		ApplyProButtonState(HomeCompressBtn, opacity, toolTip);
 		ApplyProButtonState(BatchCompressBtn, opacity, toolTip);
 	}
 
@@ -731,6 +770,7 @@ public partial class MainRibbon : UserControl
 	}
 
 	private void OpenPdf_Click(object sender, RoutedEventArgs e) => OpenPdfRequested?.Invoke(this, e);
+	private void CreatePdfFromImages_Click(object sender, RoutedEventArgs e) => CreatePdfFromImagesRequested?.Invoke(this, e);
 
 	private void SavePdf_Click(object sender, RoutedEventArgs e) => SavePdfRequested?.Invoke(this, e);
 
@@ -1083,7 +1123,7 @@ public partial class MainRibbon : UserControl
 		{
 			FontFamily = new FontFamily("Segoe UI"),
 			Text = glyph,
-			FontSize = 24.0,
+			FontSize = 19.0,
 			Foreground = (Brush)new BrushConverter().ConvertFromString(foreground),
 			HorizontalAlignment = HorizontalAlignment.Center
 		};

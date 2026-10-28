@@ -306,6 +306,9 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 	public event EventHandler? SelectedAnnotationChanged;
 
+	private PdfAnnotation? _lastClickedAnnotation;
+	private DateTime _lastAnnClickTime = DateTime.MinValue;
+
 	private PdfAnnotation? _selectedAnnotation;
 	public PdfAnnotation? SelectedAnnotation
 	{
@@ -345,6 +348,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	public TextAlignment ActiveTextAlignment { get; set; } = TextAlignment.Left;
 
 	public string? CurrentPdfPath { get; private set; }
+	public string? ConvertedFromImagePath { get; set; }
+	public string? CustomTabTitle { get; set; }
 
 	public int PageCount { get; private set; }
 
@@ -383,6 +388,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
+		DependencyObject? curDown = e.Source as DependencyObject;
+		while (curDown != null && curDown != canvas)
+		{
+			if (curDown is System.Windows.Controls.TextBox ||
+			    curDown is System.Windows.Controls.Primitives.TextBoxBase ||
+			    (curDown as FrameworkElement)?.Tag as string == "StickyNoteEditor" ||
+			    (curDown as FrameworkElement)?.Tag as string == "InlineTextEditor")
+			{
+				return;
+			}
+			curDown = VisualTreeHelper.GetParent(curDown);
+		}
 		PdfPerfLogger.LogUiAction($"Page gesture start: {ActiveTool}", $"page={num}; clickCount={e.ClickCount}; x={e.GetPosition(canvas).X:0.0}; y={e.GetPosition(canvas).Y:0.0}");
 
 		if (ActiveTool == "EditText")
@@ -392,71 +409,18 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			{
 				clickedElement = VisualTreeHelper.GetParent(clickedElement) as FrameworkElement;
 			}
-			if (clickedElement != null && clickedElement.Tag is PdfTextBoxAnnotation clickedTextAnnotation && !string.IsNullOrEmpty(clickedTextAnnotation.Text))
+			if (clickedElement != null && clickedElement.Tag is PdfTextBoxAnnotation clickedTextAnnotation)
 			{
 				SelectedAnnotation = clickedTextAnnotation;
 				e.Handled = true;
-				if (e.ClickCount >= 2)
-				{
-					ShowEditTextBoxInput(canvas, clickedTextAnnotation, num);
-				}
-				else
-				{
-					RedrawPageAnnotations(canvas, num);
-				}
+				ShowEditTextBoxInput(canvas, clickedTextAnnotation, num);
 				return;
 			}
-		            if (canvas.IsMouseCaptured) canvas.ReleaseMouseCapture();
-            _skipNextEditTextMouseUp = true;
-            e.Handled = true;
-            ShowDirectTextEditOverlay(canvas, -1, num, e.GetPosition(canvas));
-            return;
-        }
-		if (ActiveTool != "EditText" && ActiveTool != "SelectText")
-		{
-			FrameworkElement clickedElement = e.Source as FrameworkElement;
-			while (clickedElement != null && clickedElement != canvas && !(clickedElement.Tag is PdfAnnotation))
-			{
-				clickedElement = VisualTreeHelper.GetParent(clickedElement) as FrameworkElement;
-			}
-			if (clickedElement != null && clickedElement.Tag is PdfAnnotation clickedAnnotation)
-			{
-				// Auto-switch to Select tool to allow moving and editing the annotation
-				ActiveTool = "Select";
-				if (Window.GetWindow(this) is MainWindow mainWindow)
-				{
-					mainWindow.ActiveTool = "Select";
-				}
-				SelectedAnnotation = clickedAnnotation;
-
-				if (e.ClickCount == 2)
-				{
-					if (clickedAnnotation is PdfTextBoxAnnotation tb)
-					{
-						ShowEditTextBoxInput(canvas, tb, num);
-						e.Handled = true;
-						return;
-					}
-					else if (clickedAnnotation is PdfStickyNoteAnnotation sticky)
-					{
-						ShowStickyNoteEdit(canvas, sticky, num);
-						e.Handled = true;
-						return;
-					}
-				}
-				else
-				{
-					SaveUndoState();
-					_isDraggingAnn = true;
-					_drawStartPoint = e.GetPosition(canvas);
-					_dragStartAnnX = clickedAnnotation.X;
-					_dragStartAnnY = clickedAnnotation.Y;
-					canvas.CaptureMouse();
-				}
-				e.Handled = true;
-				RedrawPageAnnotations(canvas, num);
-				return;
-			}
+			if (canvas.IsMouseCaptured) canvas.ReleaseMouseCapture();
+			_skipNextEditTextMouseUp = true;
+			e.Handled = true;
+			ShowDirectTextEditOverlay(canvas, -1, num, e.GetPosition(canvas));
+			return;
 		}
 		if (ActiveTool == "EditText" || ActiveTool == "SelectText" || ActiveTool == "Highlight")
 		{
@@ -603,14 +567,24 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			}
 			if (frameworkElement != null && frameworkElement.Tag is PdfAnnotation pdfAnnotation)
 			{
+				DateTime now = DateTime.UtcNow;
+				bool isDoubleClick = e.ClickCount >= 2 ||
+					(pdfAnnotation == _lastClickedAnnotation && (now - _lastAnnClickTime).TotalMilliseconds < 500);
+				_lastClickedAnnotation = pdfAnnotation;
+				_lastAnnClickTime = now;
+
 				SelectedAnnotation = pdfAnnotation;
-				if (e.ClickCount == 2 && pdfAnnotation is PdfTextBoxAnnotation tb)
+				if (isDoubleClick && pdfAnnotation is PdfTextBoxAnnotation tb)
 				{
 					ShowEditTextBoxInput(canvas, tb, num);
+					e.Handled = true;
+					return;
 				}
-				else if (e.ClickCount == 2 && pdfAnnotation is PdfStickyNoteAnnotation sticky)
+				else if (isDoubleClick && pdfAnnotation is PdfStickyNoteAnnotation sticky)
 				{
 					ShowStickyNoteEdit(canvas, sticky, num);
+					e.Handled = true;
+					return;
 				}
 				else
 				{
@@ -627,11 +601,26 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			else
 			{
 				SelectedAnnotation = null;
+				_lastClickedAnnotation = null;
 				RedrawPageAnnotations(canvas, num);
 			}
 		}
 		else if (ActiveTool == "TextBox" || ActiveTool == "Snapshot" || ActiveTool == "AiSnapshot" || ActiveTool == "ShapeRect" || ActiveTool == "ShapeOval")
 		{
+			if (ActiveTool == "TextBox")
+			{
+				FrameworkElement clickedEl = e.Source as FrameworkElement;
+				while (clickedEl != null && clickedEl != canvas && !(clickedEl.Tag is PdfAnnotation))
+					clickedEl = VisualTreeHelper.GetParent(clickedEl) as FrameworkElement;
+				if (clickedEl?.Tag is PdfTextBoxAnnotation existingTb)
+				{
+					SelectedAnnotation = existingTb;
+					ShowEditTextBoxInput(canvas, existingTb, num);
+					e.Handled = true;
+					return;
+				}
+			}
+			SelectedAnnotation = null;
 			_isDrawing = true;
 			_drawStartPoint = e.GetPosition(canvas);
 			_activeCanvas = canvas;
@@ -664,6 +653,20 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		else if (ActiveTool == "Callout" || ActiveTool == "ShapeLine")
 		{
+			if (ActiveTool == "Callout")
+			{
+				FrameworkElement clickedEl = e.Source as FrameworkElement;
+				while (clickedEl != null && clickedEl != canvas && !(clickedEl.Tag is PdfAnnotation))
+					clickedEl = VisualTreeHelper.GetParent(clickedEl) as FrameworkElement;
+				if (clickedEl?.Tag is PdfCalloutAnnotation existingCallout)
+				{
+					SelectedAnnotation = existingCallout;
+					ShowEditTextBoxInput(canvas, existingCallout, num);
+					e.Handled = true;
+					return;
+				}
+			}
+			SelectedAnnotation = null;
 			_isDrawing = true;
 			_drawStartPoint = e.GetPosition(canvas);
 			_activeCanvas = canvas;
@@ -682,6 +685,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		}
 		else if (ActiveTool == "Ink")
 		{
+			SelectedAnnotation = null;
 			_isDrawing = true;
 			_drawStartPoint = e.GetPosition(canvas);
 			_activeCanvas = canvas;
@@ -1064,6 +1068,19 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		{
 			return;
 		}
+		DependencyObject? curUp = e.Source as DependencyObject;
+		while (curUp != null && curUp != canvas)
+		{
+			if (curUp is System.Windows.Controls.TextBox ||
+			    curUp is System.Windows.Controls.Primitives.TextBoxBase ||
+			    (curUp as FrameworkElement)?.Tag as string == "StickyNoteEditor" ||
+			    (curUp as FrameworkElement)?.Tag as string == "InlineTextEditor")
+			{
+				return;
+			}
+			curUp = VisualTreeHelper.GetParent(curUp);
+		}
+
 		PdfPerfLogger.LogUiAction($"Page gesture end: {ActiveTool}", $"page={num}; clickCount={e.ClickCount}; drawing={_isDrawing}; x={e.GetPosition(canvas).X:0.0}; y={e.GetPosition(canvas).Y:0.0}");
 
 		if (_isSelectingText)
@@ -1206,7 +1223,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				};
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation);
-				SelectedAnnotation = pdfShapeAnnotation;
+				SelectedAnnotation = null;
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
@@ -1236,7 +1253,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				};
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation2);
-				SelectedAnnotation = pdfShapeAnnotation2;
+				SelectedAnnotation = null;
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
@@ -1257,6 +1274,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					x4 = Math.Min(canvas.Width - w4 - 10.0, drawStartPoint.X + 50.0);
 					y4 = Math.Max(10.0, Math.Min(canvas.Height - h4 - 10.0, drawStartPoint.Y - 40.0));
 				}
+				EndMouseInteraction(canvas);
 				ShowCalloutTextBoxInput(canvas, drawStartPoint, x4, y4, w4, h4, num);
 			}
 			else if (ActiveTool == "ShapeLine" && _tempLine != null)
@@ -1277,7 +1295,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				};
 				SaveUndoState();
 				Annotations.Add(pdfShapeAnnotation3);
-				SelectedAnnotation = pdfShapeAnnotation3;
+				SelectedAnnotation = null;
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
@@ -1304,7 +1322,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 
 				SaveUndoState();
 				Annotations.Add(measureAnn);
-				SelectedAnnotation = measureAnn;
+				SelectedAnnotation = null;
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
@@ -1356,7 +1374,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 					};
 					SaveUndoState();
 					Annotations.Add(pdfInkAnnotation);
-					SelectedAnnotation = pdfInkAnnotation;
+					SelectedAnnotation = null;
 				}
 				if (!IsContinuousTool(ActiveTool))
 				{
@@ -1475,45 +1493,52 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private void ShowTextBoxInput(Canvas canvas, double x, double y, double w, double h, int pageNumber)
 	{
 		PdfPerfLogger.LogUiAction("Text box editor shown", $"page={pageNumber}; width={w:0.0}; height={h:0.0}");
+		double initialW = Math.Max(w, 130.0);
+		double initialH = Math.Max(h, 44.0);
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
-			Width = w,
-			Height = h,
-			Text = "Nh蘯ｭp ghi chﾃｺ...",
-			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = ActiveFontSize,
+			Width = initialW,
+			Height = initialH,
+			Text = "",
+			FontFamily = new FontFamily(ActiveFontFamily ?? "Segoe UI"),
+			FontSize = Math.Max(12.0, ActiveFontSize),
 			FontWeight = (ActiveIsBold ? FontWeights.Bold : FontWeights.Normal),
 			FontStyle = (ActiveIsItalic ? FontStyles.Italic : FontStyles.Normal),
-			Foreground = new SolidColorBrush(ActiveStrokeColor),
+			Foreground = new SolidColorBrush(ActiveStrokeColor.A == 0 ? Colors.Black : ActiveStrokeColor),
+			Background = (ActiveBgColor == Colors.Transparent) ? new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)) : new SolidColorBrush(ActiveBgColor),
+			CaretBrush = new SolidColorBrush(ActiveStrokeColor.A == 0 ? Colors.Black : ActiveStrokeColor),
 			TextWrapping = TextWrapping.Wrap,
 			AcceptsReturn = true,
 			BorderBrush = Brushes.DodgerBlue,
-			BorderThickness = new Thickness(1.5)
+			BorderThickness = new Thickness(2.0),
+			Padding = new Thickness(4.0)
 		};
 		Canvas.SetLeft(tbInput, x);
 		Canvas.SetTop(tbInput, y);
+		Canvas.SetZIndex(tbInput, 99999);
 		canvas.Children.Add(tbInput);
-		tbInput.Loaded += delegate
+		FocusTextInputWhenLoaded(tbInput);
+
+		DateTime openTime = DateTime.UtcNow;
+		bool committed = false;
+		void CommitChanges()
 		{
-			Dispatcher.BeginInvoke(new Action(() =>
-			{
-				tbInput.Focus();
-				tbInput.SelectAll();
-			}), DispatcherPriority.Input);
-		};
-		tbInput.LostFocus += delegate
-		{
+			if (committed) return;
+			committed = true;
 			string text = tbInput.Text.Trim();
-			canvas.Children.Remove(tbInput);
-			if (!string.IsNullOrEmpty(text) && text != "Nh蘯ｭp ghi chﾃｺ...")
+			if (canvas.Children.Contains(tbInput))
+			{
+				canvas.Children.Remove(tbInput);
+			}
+			if (!string.IsNullOrEmpty(text))
 			{
 				PdfTextBoxAnnotation pdfTextBoxAnnotation = new PdfTextBoxAnnotation
 				{
 					PageIndex = pageNumber - 1,
 					X = x / canvas.Width,
 					Y = y / canvas.Height,
-					Width = w / canvas.Width,
-					Height = h / canvas.Height,
+					Width = initialW / canvas.Width,
+					Height = initialH / canvas.Height,
 					Text = text,
 					FontFamily = ActiveFontFamily,
 					FontSize = ActiveFontSize,
@@ -1526,12 +1551,12 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				};
 				SaveUndoState();
 				Annotations.Add(pdfTextBoxAnnotation);
-				SelectedAnnotation = pdfTextBoxAnnotation;
+				SelectedAnnotation = null;
 				PdfPerfLogger.LogTestStatus("Text box annotation", $"PASS: text committed and annotation added on page {pageNumber}.");
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
-					LogStatus("ﾄ静｣ t蘯｡o h盻冪 vﾄハ b蘯｣n. Cﾃｴng c盻･ ﾄ妥｣ quay v盻・Select ﾄ黛ｻ・kﾃｩo ho蘯ｷc co giﾃ｣n khung.");
+					LogStatus("Đã tạo hộp văn bản. Công cụ đã quay về Select để kéo hoặc co giãn khung.");
 				}
 			}
 			else
@@ -1539,61 +1564,120 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				PdfPerfLogger.LogTestStatus("Text box annotation", "INFO: editor closed without text; no annotation was saved.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
+		}
+
+		tbInput.LostFocus += delegate
+		{
+			if ((DateTime.UtcNow - openTime).TotalMilliseconds < 500)
+			{
+				Dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (canvas.Children.Contains(tbInput))
+					{
+						tbInput.Focus();
+						Keyboard.Focus(tbInput);
+					}
+				}), DispatcherPriority.Input);
+				return;
+			}
+			CommitChanges();
 		};
 		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
-				tbInput.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+				CommitChanges();
+				ev.Handled = true;
 			}
 			else if (ev.Key == Key.Escape)
 			{
-				canvas.Children.Remove(tbInput);
-				ActiveTool = "Select";
+				committed = true;
+				if (canvas.Children.Contains(tbInput))
+				{
+					canvas.Children.Remove(tbInput);
+				}
+				if (!IsContinuousTool(ActiveTool))
+				{
+					ActiveTool = "Select";
+				}
 				RedrawPageAnnotations(canvas, pageNumber);
+				ev.Handled = true;
 			}
 		};
 	}
 
 	private void FocusTextInputWhenLoaded(System.Windows.Controls.TextBox textBox)
 	{
-		textBox.Loaded += delegate
+		bool focused = false;
+		void DoFocus()
 		{
+			if (focused) return;
+			focused = true;
 			Dispatcher.BeginInvoke(new Action(() =>
 			{
+				if (Mouse.Captured != null && Mouse.Captured != textBox)
+				{
+					Mouse.Capture(null);
+				}
 				textBox.Focus();
+				Keyboard.Focus(textBox);
+				textBox.CaretIndex = textBox.Text.Length;
 				textBox.SelectAll();
 			}), DispatcherPriority.Input);
-		};
+		}
+
+		if (textBox.IsLoaded)
+		{
+			DoFocus();
+		}
+		else
+		{
+			textBox.Loaded += delegate { DoFocus(); };
+			Dispatcher.BeginInvoke(new Action(DoFocus), DispatcherPriority.Loaded);
+		}
 	}
 
 	private void ShowCalloutTextBoxInput(Canvas canvas, Point arrowTip, double x, double y, double w, double h, int pageNumber)
 	{
 		PdfPerfLogger.LogUiAction("Callout text editor shown", $"page={pageNumber}; width={w:0.0}; height={h:0.0}");
+		double initialW = Math.Max(w, 130.0);
+		double initialH = Math.Max(h, 44.0);
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
-			Width = w,
-			Height = h,
-			Text = "Nhập ghi chú...",
-			FontFamily = new FontFamily(ActiveFontFamily),
-			FontSize = ActiveFontSize,
+			Width = initialW,
+			Height = initialH,
+			Text = "",
+			FontFamily = new FontFamily(ActiveFontFamily ?? "Segoe UI"),
+			FontSize = Math.Max(12.0, ActiveFontSize),
 			FontWeight = (ActiveIsBold ? FontWeights.Bold : FontWeights.Normal),
 			FontStyle = (ActiveIsItalic ? FontStyles.Italic : FontStyles.Normal),
-			Foreground = new SolidColorBrush(ActiveStrokeColor),
+			Foreground = new SolidColorBrush(ActiveStrokeColor.A == 0 ? Colors.Black : ActiveStrokeColor),
+			Background = (ActiveBgColor == Colors.Transparent) ? new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)) : new SolidColorBrush(ActiveBgColor),
+			CaretBrush = new SolidColorBrush(ActiveStrokeColor.A == 0 ? Colors.Black : ActiveStrokeColor),
 			TextWrapping = TextWrapping.Wrap,
 			AcceptsReturn = true,
 			BorderBrush = Brushes.DodgerBlue,
-			BorderThickness = new Thickness(1.5)
+			BorderThickness = new Thickness(2.0),
+			Padding = new Thickness(4.0)
 		};
 		Canvas.SetLeft(tbInput, x);
 		Canvas.SetTop(tbInput, y);
+		Canvas.SetZIndex(tbInput, 99999);
 		canvas.Children.Add(tbInput);
 		FocusTextInputWhenLoaded(tbInput);
-		tbInput.LostFocus += delegate
+
+		DateTime openTime = DateTime.UtcNow;
+		bool committed = false;
+		void CommitChanges()
 		{
+			if (committed) return;
+			committed = true;
 			string text = tbInput.Text.Trim();
-			canvas.Children.Remove(tbInput);
-			if (string.IsNullOrEmpty(text) || text == "Nhập ghi chú..." || text == "Nh蘯ｭp ghi chﾃｺ...")
+			if (canvas.Children.Contains(tbInput))
+			{
+				canvas.Children.Remove(tbInput);
+			}
+			if (string.IsNullOrEmpty(text))
 			{
 				text = "Ghi chú";
 			}
@@ -1602,8 +1686,8 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				PageIndex = pageNumber - 1,
 				X = x / canvas.Width,
 				Y = y / canvas.Height,
-				Width = w / canvas.Width,
-				Height = h / canvas.Height,
+				Width = initialW / canvas.Width,
+				Height = initialH / canvas.Height,
 				Text = text,
 				ArrowX = arrowTip.X / canvas.Width,
 				ArrowY = arrowTip.Y / canvas.Height,
@@ -1618,7 +1702,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			};
 			SaveUndoState();
 			Annotations.Add(pdfCalloutAnnotation);
-			SelectedAnnotation = pdfCalloutAnnotation;
+			SelectedAnnotation = null;
 			PdfPerfLogger.LogTestStatus("Callout annotation", $"PASS: callout text committed and annotation added on page {pageNumber}.");
 			if (!IsContinuousTool(ActiveTool))
 			{
@@ -1626,21 +1710,44 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				LogStatus("Đã tạo mũi tên chỉ dẫn. Công cụ đã quay về Select; muốn tạo mũi tên nữa hãy chọn lại.");
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
+		}
+
+		tbInput.LostFocus += delegate
+		{
+			if ((DateTime.UtcNow - openTime).TotalMilliseconds < 500)
+			{
+				Dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (canvas.Children.Contains(tbInput))
+					{
+						tbInput.Focus();
+						Keyboard.Focus(tbInput);
+					}
+				}), DispatcherPriority.Input);
+				return;
+			}
+			CommitChanges();
 		};
 		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
-				tbInput.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+				CommitChanges();
+				ev.Handled = true;
 			}
 			else if (ev.Key == Key.Escape)
 			{
-				canvas.Children.Remove(tbInput);
+				committed = true;
+				if (canvas.Children.Contains(tbInput))
+				{
+					canvas.Children.Remove(tbInput);
+				}
 				if (!IsContinuousTool(ActiveTool))
 				{
 					ActiveTool = "Select";
 				}
 				RedrawPageAnnotations(canvas, pageNumber);
+				ev.Handled = true;
 			}
 		};
 	}
@@ -1733,7 +1840,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	{
 		PdfPerfLogger.LogUiAction("Sticky note editor shown", $"page={pageNumber}");
 		double num = 240.0;
-		double num2 = 120.0;
+		double num2 = 130.0;
 		double num3 = sticky.X * canvas.Width;
 		double num4 = sticky.Y * canvas.Height;
 		if (num3 + num > canvas.Width)
@@ -1756,21 +1863,46 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			CornerRadius = new CornerRadius(4.0),
 			Tag = "StickyNoteEditor"
 		};
-		StackPanel stackPanel = new StackPanel();
-		editorBorder.Child = stackPanel;
-		TextBlock element = new TextBlock
+		Canvas.SetLeft(editorBorder, num3);
+		Canvas.SetTop(editorBorder, num4);
+		Canvas.SetZIndex(editorBorder, 99999);
+
+		DockPanel rootPanel = new DockPanel();
+		editorBorder.Child = rootPanel;
+
+		DockPanel headerPanel = new DockPanel { Margin = new Thickness(6.0, 4.0, 6.0, 2.0) };
+		DockPanel.SetDock(headerPanel, Dock.Top);
+		rootPanel.Children.Add(headerPanel);
+
+		System.Windows.Controls.Button btnClose = new System.Windows.Controls.Button
+		{
+			Content = "✕",
+			Width = 20,
+			Height = 20,
+			Padding = new Thickness(0),
+			FontSize = 11,
+			FontWeight = FontWeights.Bold,
+			Background = Brushes.Transparent,
+			BorderThickness = new Thickness(0),
+			Foreground = (Brush)new BrushConverter().ConvertFromString("#92400E"),
+			Cursor = Cursors.Hand,
+			ToolTip = "Đóng"
+		};
+		DockPanel.SetDock(btnClose, Dock.Right);
+		headerPanel.Children.Add(btnClose);
+
+		TextBlock headerTitle = new TextBlock
 		{
 			Text = "Ghi chú nhanh",
 			FontWeight = FontWeights.Bold,
 			FontSize = 11.0,
 			Foreground = (Brush)new BrushConverter().ConvertFromString("#B45309"),
-			Margin = new Thickness(6.0, 4.0, 6.0, 2.0)
+			VerticalAlignment = VerticalAlignment.Center
 		};
-		stackPanel.Children.Add(element);
+		headerPanel.Children.Add(headerTitle);
+
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
-			Width = num - 12.0,
-			Height = num2 - 32.0,
 			Text = ((sticky.NoteText == "Nhập ghi chú nhanh..." || sticky.NoteText == "Nhập ghi chú nhanh ở đây..." || sticky.NoteText == "Nh蘯ｭp ghi chﾃｺ nhanh...") ? "" : sticky.NoteText),
 			FontFamily = new FontFamily("Segoe UI"),
 			FontSize = 12.0,
@@ -1781,15 +1913,22 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 			Background = Brushes.Transparent,
 			Margin = new Thickness(6.0, 0.0, 6.0, 6.0)
 		};
-		stackPanel.Children.Add(tbInput);
-		Canvas.SetLeft(editorBorder, num3);
-		Canvas.SetTop(editorBorder, num4);
+		rootPanel.Children.Add(tbInput);
+
 		canvas.Children.Add(editorBorder);
 		FocusTextInputWhenLoaded(tbInput);
-		tbInput.LostFocus += delegate
+
+		DateTime openTime = DateTime.UtcNow;
+		bool committed = false;
+		void CommitChanges()
 		{
+			if (committed) return;
+			committed = true;
 			string text = tbInput.Text.Trim();
-			canvas.Children.Remove(editorBorder);
+			if (canvas.Children.Contains(editorBorder))
+			{
+				canvas.Children.Remove(editorBorder);
+			}
 			if (!string.IsNullOrEmpty(text))
 			{
 				SaveUndoState();
@@ -1801,61 +1940,158 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				sticky.NoteText = "Ghi chú";
 			}
 			RedrawPageAnnotations(canvas, pageNumber);
+		}
+
+		btnClose.Click += (s, ev) =>
+		{
+			CommitChanges();
+			ev.Handled = true;
 		};
+
+		tbInput.LostFocus += delegate
+		{
+			if ((DateTime.UtcNow - openTime).TotalMilliseconds < 500)
+			{
+				Dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (canvas.Children.Contains(editorBorder))
+					{
+						tbInput.Focus();
+						Keyboard.Focus(tbInput);
+					}
+				}), DispatcherPriority.Input);
+				return;
+			}
+			CommitChanges();
+		};
+
 		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
-			if (ev.Key == Key.Escape)
+			if (ev.Key == Key.Return && Keyboard.Modifiers == ModifierKeys.Control)
 			{
-				canvas.Children.Remove(editorBorder);
+				CommitChanges();
+				ev.Handled = true;
+			}
+			else if (ev.Key == Key.Escape)
+			{
+				committed = true;
+				if (canvas.Children.Contains(editorBorder))
+				{
+					canvas.Children.Remove(editorBorder);
+				}
 				RedrawPageAnnotations(canvas, pageNumber);
+				ev.Handled = true;
 			}
 		};
 	}
 
 	private void ShowEditTextBoxInput(Canvas canvas, PdfTextBoxAnnotation tb, int pageNumber)
 	{
-		double width = tb.Width * canvas.Width;
-		double height = tb.Height * canvas.Height;
+		double width = Math.Max(tb.Width * canvas.Width, 80.0);
+		double height = Math.Max(tb.Height * canvas.Height, 32.0);
 		double length = tb.X * canvas.Width;
 		double length2 = tb.Y * canvas.Height;
+		Size pageSize = (pageNumber - 1 >= 0 && pageNumber - 1 < _pageDimensions.Count) ? _pageDimensions[pageNumber - 1] : new Size(canvas.Width, canvas.Height);
+		double scale = (pageSize.Height > 0) ? (canvas.Height / pageSize.Height) : 1.0;
+		double scaledFontSize = Math.Max(12.0, tb.FontSize * scale);
+
 		System.Windows.Controls.TextBox tbInput = new System.Windows.Controls.TextBox
 		{
 			Width = width,
 			Height = height,
 			Text = tb.Text,
-			FontFamily = new FontFamily(tb.FontFamily),
-			FontSize = tb.FontSize,
+			FontFamily = new FontFamily(tb.FontFamily ?? "Segoe UI"),
+			FontSize = scaledFontSize,
 			FontWeight = (tb.IsBold ? FontWeights.Bold : FontWeights.Normal),
 			FontStyle = (tb.IsItalic ? FontStyles.Italic : FontStyles.Normal),
-			Foreground = new SolidColorBrush(tb.StrokeColor),
+			Foreground = new SolidColorBrush(tb.StrokeColor.A == 0 ? Colors.Black : tb.StrokeColor),
+			Background = (tb.BgColor == Colors.Transparent) ? new SolidColorBrush(Color.FromArgb(245, 255, 255, 255)) : new SolidColorBrush(tb.BgColor),
+			CaretBrush = new SolidColorBrush(tb.StrokeColor.A == 0 ? Colors.Black : tb.StrokeColor),
 			TextWrapping = TextWrapping.Wrap,
 			AcceptsReturn = true,
 			BorderBrush = Brushes.DodgerBlue,
-			BorderThickness = new Thickness(1.5)
+			BorderThickness = new Thickness(2.0),
+			Padding = new Thickness(4.0)
 		};
 		Canvas.SetLeft(tbInput, length);
 		Canvas.SetTop(tbInput, length2);
+		Canvas.SetZIndex(tbInput, 99999);
 		canvas.Children.Add(tbInput);
+
 		FocusTextInputWhenLoaded(tbInput);
-		tbInput.LostFocus += delegate
+
+		DateTime openTime = DateTime.UtcNow;
+		bool committed = false;
+		void CommitChanges()
 		{
+			if (committed) return;
+			committed = true;
 			SaveUndoState();
 			tb.Text = tbInput.Text.Trim();
-			canvas.Children.Remove(tbInput);
+			if (canvas.Children.Contains(tbInput))
+			{
+				canvas.Children.Remove(tbInput);
+			}
 			RedrawPageAnnotations(canvas, pageNumber);
+		}
+
+		tbInput.LostFocus += delegate
+		{
+			if ((DateTime.UtcNow - openTime).TotalMilliseconds < 500)
+			{
+				Dispatcher.BeginInvoke(new Action(() =>
+				{
+					if (canvas.Children.Contains(tbInput))
+					{
+						tbInput.Focus();
+						Keyboard.Focus(tbInput);
+					}
+				}), DispatcherPriority.Input);
+				return;
+			}
+			CommitChanges();
 		};
 		tbInput.PreviewKeyDown += delegate(object s, KeyEventArgs ev)
 		{
 			if (ev.Key == Key.Return && Keyboard.Modifiers != ModifierKeys.Shift)
 			{
-				tbInput.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+				CommitChanges();
+				ev.Handled = true;
 			}
 			else if (ev.Key == Key.Escape)
 			{
-				canvas.Children.Remove(tbInput);
+				committed = true;
+				if (canvas.Children.Contains(tbInput))
+				{
+					canvas.Children.Remove(tbInput);
+				}
 				RedrawPageAnnotations(canvas, pageNumber);
+				ev.Handled = true;
 			}
 		};
+	}
+
+	public bool TryEditSelectedAnnotation()
+	{
+		if (SelectedAnnotation is PdfTextBoxAnnotation tb)
+		{
+			int pageNum = tb.PageIndex + 1;
+			if (GetPageBorder(pageNum)?.Child is Grid grid && grid.Children.OfType<Canvas>().FirstOrDefault() is Canvas canvas)
+			{
+				ShowEditTextBoxInput(canvas, tb, pageNum);
+				return true;
+			}
+		}
+		else if (SelectedAnnotation is PdfStickyNoteAnnotation sticky)
+		{
+			int pageNum = sticky.PageIndex + 1;
+			if (GetPageBorder(pageNum)?.Child is Grid grid && grid.Children.OfType<Canvas>().FirstOrDefault() is Canvas canvas)
+			{
+				ShowStickyNoteEdit(canvas, sticky, pageNum);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public void CopySelectedAnnotation()
