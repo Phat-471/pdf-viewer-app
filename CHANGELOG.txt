@@ -1,4 +1,3 @@
-- Tối ưu tab Trang chủ: Đưa các tính năng cần thiết ra ngoài thao tác nhanh (Chụp nhanh Snap, In ấn trực tiếp & In hàng loạt, Hộp chú thích, Mũi tên chỉ dẫn, Sửa chữ gốc PDF trực tiếp, Nén PDF tối ưu dung lượng, Xoay 90° 1-chạm).
-- Tính năng mở hình ảnh chuyển sang PDF: Hỗ trợ mở trực tiếp các file ảnh (PNG, JPG, WEBP, BMP, TIFF, GIF) tự động tạo PDF chuẩn DPI, hỗ trợ ghép nhiều ảnh thành 1 tài liệu đa trang và tự động gợi ý lưu cùng thư mục ảnh gốc.
-- Sửa lỗi giao diện Sáng (màu tím tab Tệp và hover), sửa lỗi không nhập được chữ và di chuyển hộp chú thích, mũi tên chỉ dẫn.
-- Gom gọn công cụ Đo đạc thành menu trực quan giúp thanh Ribbon thoáng đãng, đồng bộ kích thước icon.
+- Tinh gọn thanh công cụ Trang chủ giúp không gian làm việc thoáng đãng và trực quan.
+- Tối ưu hóa tính năng mở và xem tệp hình ảnh, tích hợp mở trực tiếp từ Windows.
+- Cải thiện hiệu năng và độ ổn định hệ thống.

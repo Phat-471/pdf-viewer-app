@@ -9,14 +9,14 @@ using PdfSharp.Pdf;
 namespace PdfViewerApp.Services;
 
 /// <summary>
-/// Dịch vụ chuyển đổi tệp hình ảnh (.png, .jpg, .jpeg, .bmp, .webp, .tiff, ...) thành tài liệu PDF.
+/// Dịch vụ chuyển đổi tệp hình ảnh (.png, .jpg, .jpeg, .jfif, .bmp, .webp, .tiff, ...) thành tài liệu PDF.
 /// Hỗ trợ cả chuyển đổi 1 ảnh đơn lẻ hoặc ghép nhiều ảnh thành file PDF nhiều trang.
 /// </summary>
 public static class ImageToPdfService
 {
 	public static readonly string[] SupportedImageExtensions = new[]
 	{
-		".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tiff", ".tif", ".gif", ".ico"
+		".png", ".jpg", ".jpeg", ".jfif", ".bmp", ".webp", ".tiff", ".tif", ".gif", ".ico"
 	};
 
 	public static bool IsSupportedImage(string? filePath)
@@ -97,83 +97,89 @@ public static class ImageToPdfService
 			}
 		}
 
-		using var doc = new PdfDocument();
-		doc.Info.Title = Path.GetFileNameWithoutExtension(validImages[0]);
-		doc.Info.Creator = "PDF Pro - Image to PDF Converter";
-
-		foreach (var imgPath in validImages)
-		{
-			AddImagePageToDocument(doc, imgPath);
-		}
-
-		doc.Save(outputPath);
-		return outputPath;
-	}
-
-	private static void AddImagePageToDocument(PdfDocument doc, string imgPath)
-	{
-		XImage? xImage = null;
-		MemoryStream? fallbackStream = null;
-
+		var disposables = new List<IDisposable>();
 		try
 		{
-			// Bước 1: Thử nạp trực tiếp qua PdfSharp XImage
-			try
+			using var doc = new PdfDocument();
+			doc.Info.Title = Path.GetFileNameWithoutExtension(validImages[0]);
+			doc.Info.Creator = "PDF Pro - Image to PDF Converter";
+
+			foreach (var imgPath in validImages)
 			{
-				xImage = XImage.FromFile(imgPath);
-			}
-			catch
-			{
-				// XImage.FromFile có thể không hỗ trợ WebP hoặc một số format TIFF đặc thù
-				xImage = null;
+				AddImagePageToDocument(doc, imgPath, disposables);
 			}
 
-			// Bước 2: Fallback nạp qua Windows Imaging Component (WIC / WPF BitmapDecoder)
-			if (xImage == null)
-			{
-				using var fileStream = File.OpenRead(imgPath);
-				var decoder = BitmapDecoder.Create(fileStream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
-				if (decoder.Frames.Count > 0)
-				{
-					var frame = decoder.Frames[0];
-					var encoder = new PngBitmapEncoder();
-					encoder.Frames.Add(BitmapFrame.Create(frame));
-					fallbackStream = new MemoryStream();
-					encoder.Save(fallbackStream);
-					fallbackStream.Position = 0;
-					xImage = XImage.FromStream(fallbackStream);
-				}
-			}
-
-			if (xImage == null)
-			{
-				throw new InvalidOperationException($"Không thể giải mã dữ liệu hình ảnh: {imgPath}");
-			}
-
-			// Tính toán kích thước trang theo tỉ lệ điểm ảnh chuẩn (72 points/inch)
-			double dpiX = xImage.HorizontalResolution > 0 ? xImage.HorizontalResolution : 96.0;
-			double dpiY = xImage.VerticalResolution > 0 ? xImage.VerticalResolution : 96.0;
-
-			double widthPt = xImage.PixelWidth * 72.0 / dpiX;
-			double heightPt = xImage.PixelHeight * 72.0 / dpiY;
-
-			if (widthPt <= 0 || heightPt <= 0)
-			{
-				widthPt = xImage.PointWidth > 0 ? xImage.PointWidth : 595.0;
-				heightPt = xImage.PointHeight > 0 ? xImage.PointHeight : 842.0;
-			}
-
-			var page = doc.AddPage();
-			page.Width = XUnit.FromPoint(widthPt);
-			page.Height = XUnit.FromPoint(heightPt);
-
-			using var gfx = XGraphics.FromPdfPage(page);
-			gfx.DrawImage(xImage, 0, 0, widthPt, heightPt);
+			doc.Save(outputPath);
+			return outputPath;
 		}
 		finally
 		{
-			xImage?.Dispose();
-			fallbackStream?.Dispose();
+			foreach (var d in disposables)
+			{
+				try { d.Dispose(); } catch { }
+			}
 		}
+	}
+
+	private static void AddImagePageToDocument(PdfDocument doc, string imgPath, List<IDisposable> disposables)
+	{
+		XImage? xImage = null;
+
+		// Bước 1: Thử nạp qua WIC (WPF BitmapDecoder) với FileShare.ReadWrite và OnLoad để đọc toàn bộ byte ảnh vào bộ nhớ
+		try
+		{
+			using var fileStream = new FileStream(imgPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+			var decoder = BitmapDecoder.Create(fileStream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+			if (decoder.Frames.Count > 0)
+			{
+				var frame = decoder.Frames[0];
+				var encoder = new PngBitmapEncoder();
+				encoder.Frames.Add(BitmapFrame.Create(frame));
+				var memoryStream = new MemoryStream();
+				encoder.Save(memoryStream);
+				memoryStream.Position = 0;
+				disposables.Add(memoryStream);
+				xImage = XImage.FromStream(memoryStream);
+				disposables.Add(xImage);
+			}
+		}
+		catch
+		{
+			xImage = null;
+		}
+
+		// Bước 2: Fallback nạp trực tiếp qua PdfSharp XImage.FromFile
+		if (xImage == null)
+		{
+			try
+			{
+				xImage = XImage.FromFile(imgPath);
+				disposables.Add(xImage);
+			}
+			catch (Exception ex)
+			{
+				throw new InvalidOperationException($"Không thể giải mã dữ liệu hình ảnh '{Path.GetFileName(imgPath)}': {ex.Message}", ex);
+			}
+		}
+
+		// Tính toán kích thước trang theo tỉ lệ điểm ảnh chuẩn (72 points/inch)
+		double dpiX = xImage.HorizontalResolution > 0 ? xImage.HorizontalResolution : 96.0;
+		double dpiY = xImage.VerticalResolution > 0 ? xImage.VerticalResolution : 96.0;
+
+		double widthPt = xImage.PixelWidth * 72.0 / dpiX;
+		double heightPt = xImage.PixelHeight * 72.0 / dpiY;
+
+		if (widthPt <= 0 || heightPt <= 0)
+		{
+			widthPt = xImage.PointWidth > 0 ? xImage.PointWidth : 595.0;
+			heightPt = xImage.PointHeight > 0 ? xImage.PointHeight : 842.0;
+		}
+
+		var page = doc.AddPage();
+		page.Width = XUnit.FromPoint(widthPt);
+		page.Height = XUnit.FromPoint(heightPt);
+
+		using var gfx = XGraphics.FromPdfPage(page);
+		gfx.DrawImage(xImage, 0, 0, widthPt, heightPt);
 	}
 }

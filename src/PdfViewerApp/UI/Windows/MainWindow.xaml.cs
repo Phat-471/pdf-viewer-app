@@ -1121,6 +1121,11 @@ public partial class MainWindow : Window, IComponentConnector
 
 	public void OpenPdfTab(string path, string? originalSourcePath, string? displayTitle)
 	{
+		if (string.IsNullOrEmpty(originalSourcePath) && !string.IsNullOrWhiteSpace(path) && ImageToPdfService.IsSupportedImage(path))
+		{
+			OpenFileOrImage(path);
+			return;
+		}
 		foreach (TabItem item in (IEnumerable)PdfTabControl.Items)
 		{
 			if (item.Content is PdfDocumentTab pdfDocumentTab &&

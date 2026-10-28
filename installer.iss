@@ -60,6 +60,16 @@ Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.pdf\shell\PdfPro.M
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\open\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "PDF Pro - {#MyAppPublisher}"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".pdf"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".png"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".jpg"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".jpeg"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".jfif"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".bmp"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".webp"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".tiff"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".tif"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".gif"; ValueData: ""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".ico"; ValueData: ""; Flags: uninsdeletekey
 
 ; App Paths registration for Windows shell execution
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppExeName}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName}"; Flags: uninsdeletekey
@@ -73,14 +83,48 @@ Root: HKCU; Subkey: "Software\Classes\PDFPro.PDF\shell\open\command"; ValueType:
 ; Associate PDF extension with our ProgID under OpenWithProgids
 Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.PDF"; Flags: uninsdeletevalue
 
+; Define ProgID for Image files
+Root: HKCU; Subkey: "Software\Classes\PDFPro.Image"; ValueType: string; ValueName: ""; ValueData: "Tệp hình ảnh"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\PDFPro.Image\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\PDFPro.Image\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+
+; Context menu for images
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\image\shell\PdfPro.Open"; ValueType: string; ValueName: "MUIVerb"; ValueData: "Mở bằng PDF Pro"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\image\shell\PdfPro.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\image\shell\PdfPro.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey
+
+; Associate image extensions under OpenWithProgids
+Root: HKCU; Subkey: "Software\Classes\.png\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.jpg\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.jpeg\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.jfif\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.bmp\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.webp\OpenWithProgids"; ValueType: none; ValueName: "PDFPro.Image"; Flags: uninsdeletevalue
+
 ; Modern Windows Default App Capabilities Registration
 Root: HKCU; Subkey: "Software\PDFPro\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "PDF Pro"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\PDFPro\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Bộ công cụ xem và xử lý PDF chuyên nghiệp"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".pdf"; ValueData: "PDFPro.PDF"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".png"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpg"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpeg"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jfif"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".bmp"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webp"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tiff"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tif"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".gif"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\PDFPro\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ico"; ValueData: "PDFPro.Image"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "PDF Pro"; ValueData: "Software\PDFPro\Capabilities"; Flags: uninsdeletevalue
 
 ; Open With list support
 Root: HKCU; Subkey: "Software\Classes\.pdf\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.png\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.jpg\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.jpeg\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.jfif\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.bmp\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\.webp\OpenWithList\{#MyAppExeName}"; Flags: uninsdeletekey
 
 ; Upgrade in place. Never delete the installed app or registry keys during wizard initialization.
 [Code]

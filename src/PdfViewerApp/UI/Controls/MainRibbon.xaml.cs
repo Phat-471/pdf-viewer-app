@@ -478,10 +478,6 @@ public partial class MainRibbon : UserControl
 		{
 			HomeHandToolBtn.IsChecked = activeTool == "Hand";
 		}
-		if (HomeSelectToolBtn != null)
-		{
-			HomeSelectToolBtn.IsChecked = activeTool == "Select";
-		}
 		if (HomeNoteToolBtn != null)
 		{
 			HomeNoteToolBtn.IsChecked = activeTool == "StickyNote";
@@ -509,10 +505,6 @@ public partial class MainRibbon : UserControl
 		if (HomeEditTextBtn != null)
 		{
 			HomeEditTextBtn.IsChecked = activeTool == "EditText";
-		}
-		if (HomeMeasureBtn != null)
-		{
-			HomeMeasureBtn.IsChecked = activeTool == "MeasureDistance" || activeTool == "MeasureArea" || activeTool == "MeasurePerimeter";
 		}
 
 		if (SelectTextToolBtn != null)

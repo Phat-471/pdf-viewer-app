@@ -285,10 +285,7 @@ public partial class App : Application
 							}
 							else
 							{
-								foreach (string item in paths)
-								{
-									mainWindow.OpenPdfTab(item);
-								}
+								mainWindow.OpenMultipleFilesOrImages(paths);
 								if (mainWindow.WindowState == WindowState.Minimized)
 								{
 									mainWindow.WindowState = WindowState.Normal;
