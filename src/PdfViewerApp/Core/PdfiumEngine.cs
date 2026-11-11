@@ -421,6 +421,7 @@ public static class PdfiumEngine
 
 	public static void Initialize()
 	{
+		PdfInterop.EnsureInitialized();
 		Monitor.Enter(RenderLock);
 		try
 		{

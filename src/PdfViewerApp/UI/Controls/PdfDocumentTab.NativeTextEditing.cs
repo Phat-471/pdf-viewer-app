@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -7,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using PdfViewerApp.Services;
 
 namespace PdfViewerApp;
 
@@ -15,26 +17,53 @@ public partial class PdfDocumentTab
     private readonly Dictionary<int, List<PdfNativeTextRegion>> _pageEditableRegions = new();
     private readonly Dictionary<int, Task<List<PdfNativeTextRegion>>> _textRegionLoads = new();
     private readonly List<PdfNativeTextEdit> _nativeTextEdits = new();
+    private ulong _textEditSessionId;
+    private string? _workingPdfPath;
     private bool _isHighlightEditableRegionsEnabled;
     private bool _textEditDialogOpen;
     private PdfInlineTextEditor? _inlineTextEditor;
     private PdfNativeTextRegion? _inlineTextRegion;
-    private Task<PdfNativeTextEditor.PreviewSession>? _inlinePreviewSession;
     private Canvas? _inlineTextCanvas;
+    private int _textEditRevision;
+    private bool _savingDocument;
+    private sealed record DocumentEditSnapshot(List<PdfAnnotation> Annotations, PdfNativeTextEdit[] TextEdits);
+
     internal bool HasInlineTextEditor => _inlineTextEditor != null;
-    internal bool HasNativeFontPopupOpen => _inlineTextEditor?.IsFontPopupOpen == true;
+    internal bool HasNativeFontPopupOpen => false;
+
     internal bool HandleInlineTextKey(KeyEventArgs e)
     {
         if (_inlineTextEditor == null) return false;
         if (_textEditDialogOpen) { e.Handled = true; return true; }
         if (e.Key == Key.Escape) { CancelInlineTextEditor(); LogStatus("Đã hủy nội dung đang nhập."); e.Handled = true; return true; }
-        if (e.Key == Key.Enter && (_inlineTextEditor.IsInputFocused || Keyboard.Modifiers == ModifierKeys.Control))
-            { _ = ApplyInlineTextAsync(); e.Handled = true; return true; }
+        if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            _ = ApplyInlineTextAsync();
+            e.Handled = true;
+            return true;
+        }
         return false;
     }
-    private int _textEditRevision;
-    private bool _savingDocument;
-    private sealed record DocumentEditSnapshot(List<PdfAnnotation> Annotations, PdfNativeTextEdit[] TextEdits);
+
+    private void EnsureTextEditSession()
+    {
+        if (_textEditSessionId != 0 && !string.IsNullOrEmpty(_workingPdfPath) && File.Exists(_workingPdfPath))
+            return;
+
+        string source = CurrentPdfPath;
+        if (string.IsNullOrEmpty(source) || !File.Exists(source)) return;
+
+        if (string.IsNullOrEmpty(_workingPdfPath))
+        {
+            _workingPdfPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"pdfpro-work-{Guid.NewGuid():N}.pdf");
+            File.Copy(source, _workingPdfPath, true);
+        }
+
+        if (_textEditSessionId == 0)
+        {
+            _textEditSessionId = PdfCoreInterop.pdf_session_open(_workingPdfPath);
+        }
+    }
 
     public async void SetHighlightEditableRegions(bool enable)
     {
@@ -44,8 +73,8 @@ public partial class PdfDocumentTab
             try
             {
                 var regions = await GetEditableTextRegionsAsync(Math.Clamp(SelectedPageNumber, 1, PageCount));
-                LogStatus(regions.Count == 0 ? "Trang không có chữ PDF để sửa. OCR nhận dạng chữ trong ảnh; font gốc không thể khôi phục từ ảnh."
-                    : "Chọn khung chữ → sửa trực tiếp trên trang → áp dụng → lưu PDF. Ctrl+Enter áp dụng; Esc hủy.");
+                LogStatus(regions.Count == 0 ? "Trang không có chữ PDF để sửa (dạng ảnh scan). Hãy dùng OCR trước."
+                    : "Sửa văn bản (PdfCraft): Bấm vào chữ để sửa trực tiếp trên trang · Enter hoặc bấm ra ngoài để lưu · Esc để hủy");
             }
             catch (Exception ex) { LogStatus("Không đọc được vùng chữ: " + ex.Message); }
         }
@@ -56,21 +85,39 @@ public partial class PdfDocumentTab
     {
         if (_pageEditableRegions.TryGetValue(pageNumber, out var saved)) return Task.FromResult(saved);
         if (_textRegionLoads.TryGetValue(pageNumber, out var loading)) return loading;
-        string path = CurrentPdfPath;
+
+        EnsureTextEditSession();
+        ulong session = _textEditSessionId;
+        string path = _workingPdfPath ?? CurrentPdfPath;
         int generation = _loadGeneration, revision = _textEditRevision;
-        var edits = _nativeTextEdits.ToArray();
+
         async Task<List<PdfNativeTextRegion>> LoadAsync()
         {
             try
             {
-                var regions = await Task.Run(() => PdfNativeTextEditor.ReadRegions(path, pageNumber, edits));
+                double pw = 595.0, ph = 842.0;
+                lock (PdfiumEngine.SyncRoot)
+                {
+                    if (_documentHandle != IntPtr.Zero)
+                    {
+                        PdfiumEngine.TryGetPageSizeByIndex(_documentHandle, pageNumber - 1, out pw, out ph);
+                    }
+                }
+
+                var regions = await Task.Run(() => PdfNativeTextEditor.ReadRegions(session, path, pageNumber, pw, ph));
                 if (generation == _loadGeneration && revision == _textEditRevision)
                     _pageEditableRegions[pageNumber] = regions;
                 return regions;
             }
-            finally { if (generation == _loadGeneration && revision == _textEditRevision) _textRegionLoads.Remove(pageNumber); }
+            finally
+            {
+                if (generation == _loadGeneration && revision == _textEditRevision)
+                    _textRegionLoads.Remove(pageNumber);
+            }
         }
-        var task = LoadAsync(); _textRegionLoads[pageNumber] = task; return task;
+        var task = LoadAsync();
+        _textRegionLoads[pageNumber] = task;
+        return task;
     }
 
     private async void DrawEditableTextRegionsHighlight(Canvas canvas, int pageNumber)
@@ -87,16 +134,50 @@ public partial class PdfDocumentTab
             catch (Exception ex) { LogStatus("Không đọc được vùng chữ: " + ex.Message); }
             return;
         }
+        var transparentBrush = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
+        var hoverStroke = new SolidColorBrush(Color.FromArgb(210, 56, 189, 248)); // #38BDF8
+        var hoverFill = new SolidColorBrush(Color.FromArgb(28, 56, 189, 248));
+        var warningStroke = new SolidColorBrush(Color.FromArgb(210, 245, 158, 11)); // Amber
+
         foreach (var region in regions)
         {
             if (canvas.Width <= 0 || canvas.Height <= 0) continue;
             var rect = RegionCanvasBounds(canvas, region);
-            var border = new Rectangle { Width = Math.Max(4, rect.Width), Height = Math.Max(4, rect.Height),
-                Stroke = region.UnsupportedReason == null ? Brushes.DodgerBlue : Brushes.DarkOrange, StrokeThickness = 1,
-                Fill = new SolidColorBrush(Color.FromArgb(12, 56, 189, 248)), Cursor = Cursors.IBeam,
-                ToolTip = region.UnsupportedReason ?? $"{region.Text}\n{region.FontName} · {region.DisplayFontSize:0.###} pt" };
-            Canvas.SetLeft(border, rect.Left); Canvas.SetTop(border, rect.Top); canvas.Children.Add(border);
-            border.MouseLeftButtonDown += (_, e) => { e.Handled = true; _skipNextEditTextMouseUp = true; OpenNativeTextEditor(region, canvas, e.GetPosition(canvas)); };
+            var border = new Rectangle
+            {
+                Width = Math.Max(4, rect.Width),
+                Height = Math.Max(4, rect.Height),
+                RadiusX = 2,
+                RadiusY = 2,
+                Stroke = Brushes.Transparent,
+                StrokeThickness = 1,
+                Fill = transparentBrush,
+                Cursor = Cursors.IBeam,
+                ToolTip = region.UnsupportedReason ?? (region.Text.Length > 80 ? region.Text.Substring(0, 77) + "..." : region.Text)
+            };
+
+            border.MouseEnter += (_, _) =>
+            {
+                border.Stroke = region.UnsupportedReason == null ? hoverStroke : warningStroke;
+                border.Fill = hoverFill;
+            };
+
+            border.MouseLeave += (_, _) =>
+            {
+                border.Stroke = Brushes.Transparent;
+                border.Fill = transparentBrush;
+            };
+
+            Canvas.SetLeft(border, rect.Left);
+            Canvas.SetTop(border, rect.Top);
+            canvas.Children.Add(border);
+
+            border.MouseLeftButtonDown += (_, e) =>
+            {
+                e.Handled = true;
+                _skipNextEditTextMouseUp = true;
+                OpenNativeTextEditor(region, canvas, e.GetPosition(canvas));
+            };
         }
     }
 
@@ -113,35 +194,33 @@ public partial class PdfDocumentTab
                 var hit = regions.Where(r => RegionCanvasBounds(canvas, r).Contains(point)).OrderBy(r => r.Bounds.Width * r.Bounds.Height).FirstOrDefault();
                 if (hit != null) { OpenNativeTextEditor(hit, canvas, point); return; }
             }
-            LogStatus("Chọn một khung chữ để sửa nội dung gốc.");
+            // Clicked outside on blank space: auto-commit current edit if open (PdfCraft click-away style)
+            if (_inlineTextEditor != null)
+            {
+                await ApplyInlineTextAsync();
+            }
         }
         catch (Exception ex) { LogStatus("Không mở được vùng chữ: " + ex.Message); }
     }
 
-    private void OpenNativeTextEditor(PdfNativeTextRegion region, Canvas canvas, Point? click = null)
+    private async void OpenNativeTextEditor(PdfNativeTextRegion region, Canvas canvas, Point? click = null)
     {
         if (_textEditDialogOpen || _documentOpening || _savingDocument) return;
         if (_inlineTextEditor != null)
         {
-            LogStatus("Áp dụng hoặc hủy vùng chữ đang sửa trước khi chọn vùng khác.");
-            return;
+            if (_inlineTextRegion == region) return;
+            // Auto-commit existing edit before opening the new one (PdfCraft seamless workflow)
+            bool ok = await ApplyInlineTextAsync();
+            if (!ok || ActiveTool != "EditText") return;
         }
         if (region.UnsupportedReason != null) { LogStatus(region.UnsupportedReason); return; }
-        string path = CurrentPdfPath;
-        var pending = _nativeTextEdits.ToArray();
-        var previous = pending.FirstOrDefault(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
+
         _inlineTextRegion = region;
-        _inlinePreviewSession = Task.Run(() => new PdfNativeTextEditor.PreviewSession(path, region, pending));
-        var session = _inlinePreviewSession;
-        _inlineTextEditor = new PdfInlineTextEditor(region, previous?.Font, async (text, font) =>
-        {
-            var loaded = await session;
-            return await Task.Run(() => loaded.Preview(text, font));
-        });
+        _inlineTextEditor = new PdfInlineTextEditor(region);
         _inlineTextEditor.ApplyRequested += async () => await ApplyInlineTextAsync();
-        _inlineTextEditor.CancelRequested += () => { CancelInlineTextEditor(); LogStatus("Đã hủy nội dung đang nhập."); };
+        _inlineTextEditor.CancelRequested += () => { CancelInlineTextEditor(); LogStatus("Đã hủy sửa văn bản."); };
         AttachInlineTextEditor(canvas, region.PageNumber, click);
-        LogStatus("Đặt con trỏ, chọn ký tự và nhập chữ trên trang. Enter/Ctrl+Enter áp dụng; Esc hủy.");
+        LogStatus("Sửa trực tiếp (PdfCraft): Nhập chữ · Enter hoặc bấm ra ngoài để lưu · Esc để hủy");
     }
 
     private async Task<bool> ApplyInlineTextAsync()
@@ -150,39 +229,57 @@ public partial class PdfDocumentTab
         var editor = _inlineTextEditor;
         var region = _inlineTextRegion;
         if (editor == null || region == null) return true;
-        if (!editor.CanApply) { LogStatus("Chờ bản xem trước hợp lệ trước khi áp dụng hoặc lưu."); return false; }
         string text = editor.ReplacementText;
-        var font = editor.ReplacementFont;
-        var previous = _nativeTextEdits.FirstOrDefault(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
-        bool changed = text != region.Text || !Equals(font, previous?.Font);
+        bool changed = text != region.Text;
         if (!changed) { CancelInlineTextEditor(); return true; }
-        var originalEdits = _nativeTextEdits.ToArray();
+
         _textEditDialogOpen = true;
         editor.SetApplying(true);
         try
         {
+            EnsureTextEditSession();
+            if (_textEditSessionId == 0) throw new InvalidOperationException("Chưa khởi tạo phiên làm việc PdfCraft.");
+
+            // 1. Commit trực tiếp vào Document Session của PdfCraft trong RAM
+            bool committed = await Task.Run(() =>
+                PdfNativeTextEditor.CommitBlock(_textEditSessionId, region.PageNumber, region.ObjectIndex, text, 0));
+
+            if (!committed)
+                throw new InvalidOperationException("PdfCraft không áp dụng được nội dung chữ.");
+
+            // 2. Xuất ra tệp làm việc PDF
+            bool exported = await Task.Run(() =>
+                PdfNativeTextEditor.Export(_textEditSessionId, _workingPdfPath!, false));
+
+            if (!exported)
+                throw new InvalidOperationException("Không lưu được tệp PDF xem trước.");
+
+            // 3. Cập nhật danh sách edits để theo dõi trạng thái chưa lưu
             _nativeTextEdits.RemoveAll(e => e.PageNumber == region.PageNumber && e.ObjectIndex == region.ObjectIndex);
-            if (text != region.OriginalText || font != null)
-                _nativeTextEdits.Add(new(region.PageNumber, region.ObjectIndex, region.OriginalText, text, font));
+            _nativeTextEdits.Add(new(region.PageNumber, region.ObjectIndex, region.OriginalText, text));
+
+            // 4. Xóa cache khối chữ để lần bấm sửa tiếp theo sẽ đọc lại dữ liệu mới nhất từ PdfCraft
+            _pageEditableRegions.Clear();
+            _textRegionLoads.Clear();
+
+            // 5. Làm mới hiển thị PDFium
             await RefreshNativeTextRenderingAsync(preserveInlineEditor: true);
-            var appliedEdits = _nativeTextEdits.ToArray();
-            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(originalEdits);
-            SaveUndoState();
-            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(appliedEdits);
+
             CancelInlineTextEditor();
-            LogStatus("Đã áp dụng sửa chữ. Nhấn Lưu để ghi vào PDF; Ctrl+Z để hoàn tác.");
+            LogStatus("Đã áp dụng sửa chữ (PdfCraft). Nhấn Lưu để ghi vào PDF; Ctrl+Z để hoàn tác.");
             return true;
         }
         catch (Exception ex)
         {
-            _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(originalEdits);
-            try { await RefreshNativeTextRenderingAsync(preserveInlineEditor: true); }
-            catch (Exception restoreError) { LogStatus("Không mở lại được trang: " + restoreError.Message); }
-            editor.ReportApplyFailure("Chưa áp dụng thay đổi: " + ex.Message + " Nội dung đang nhập được giữ lại.");
-            LogStatus("Chưa áp dụng thay đổi. Nội dung đang nhập được giữ lại; kiểm tra thông báo trong ô sửa.");
+            editor.ReportApplyFailure("Chưa áp dụng thay đổi: " + ex.Message);
+            LogStatus("Chưa áp dụng thay đổi: " + ex.Message);
             return false;
         }
-        finally { _textEditDialogOpen = false; editor.SetApplying(false); }
+        finally
+        {
+            _textEditDialogOpen = false;
+            editor.SetApplying(false);
+        }
     }
 
     private void AttachInlineTextEditor(Canvas canvas, int pageNumber, Point? click = null)
@@ -200,12 +297,6 @@ public partial class PdfDocumentTab
     {
         if (_inlineTextEditor != null) { _inlineTextCanvas?.Children.Remove(_inlineTextEditor); _inlineTextEditor.Dispose(); }
         _inlineTextEditor = null; _inlineTextRegion = null; _inlineTextCanvas = null;
-        var session = _inlinePreviewSession; _inlinePreviewSession = null;
-        if (session != null) _ = session.ContinueWith(t =>
-        {
-            if (t.Status == TaskStatus.RanToCompletion) t.Result.Dispose();
-            else if (t.IsFaulted) _ = t.Exception;
-        }, TaskScheduler.Default);
     }
 
     private static Rect RegionCanvasBounds(Canvas canvas, PdfNativeTextRegion region) =>
@@ -225,28 +316,35 @@ public partial class PdfDocumentTab
     private async void RestoreNativeTextEdits(PdfNativeTextEdit[] edits)
     {
         CancelInlineTextEditor();
-        if (_nativeTextEdits.SequenceEqual(edits)) return;
-        _nativeTextEdits.Clear(); _nativeTextEdits.AddRange(edits);
-        try { await RefreshNativeTextRenderingAsync(); }
-        catch (Exception ex) { LogStatus("Không làm mới được chữ: " + ex.Message); }
+        if (_textEditSessionId != 0 && PdfNativeTextEditor.Undo(_textEditSessionId))
+        {
+            PdfNativeTextEditor.Export(_textEditSessionId, _workingPdfPath!, false);
+            try { await RefreshNativeTextRenderingAsync(); }
+            catch (Exception ex) { LogStatus("Không làm mới được chữ: " + ex.Message); }
+        }
     }
 
     private void ResetNativeTextEditing()
     {
         CancelInlineTextEditor();
         _textEditRevision++; _pageEditableRegions.Clear(); _textRegionLoads.Clear(); _nativeTextEdits.Clear();
-        _undoStack.Clear(); _redoStack.Clear();
+        if (_textEditSessionId != 0)
+        {
+            PdfNativeTextEditor.CloseSession(_textEditSessionId);
+            _textEditSessionId = 0;
+        }
+        if (!string.IsNullOrEmpty(_workingPdfPath))
+        {
+            try { File.Delete(_workingPdfPath); } catch { }
+            _workingPdfPath = null;
+        }
     }
 
     private async Task<string?> CreateNativeTextPrintCopyAsync()
     {
         if (!await ApplyInlineTextAsync()) throw new InvalidOperationException("Cần áp dụng hoặc hủy vùng chữ đang sửa trước khi in.");
-        if (_nativeTextEdits.Count == 0) return null;
-        string source = CurrentPdfPath;
-        var edits = _nativeTextEdits.ToArray();
-        string copy = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"pdfpro-text-{Guid.NewGuid():N}.pdf");
-        await Task.Run(() => PdfNativeTextEditor.SaveCopy(source, copy, edits));
-        return copy;
+        if (_textEditSessionId == 0 && _nativeTextEdits.Count == 0) return null;
+        return _workingPdfPath ?? CurrentPdfPath;
     }
 
     private static void CommitSavedPdf(string source, string target)

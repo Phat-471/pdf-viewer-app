@@ -54,6 +54,18 @@ if (-not (Test-Path $exePath)) {
     throw "Publish failed: PdfViewerApp.exe was not created."
 }
 
+# Đảm bảo các native DLLs luôn nằm cùng thư mục EXE để Windows nạp tức thì
+Copy-Item (Join-Path $libsDir "pdfium.dll") -Destination (Join-Path $OutputDir "pdfium.dll") -Force
+Copy-Item (Join-Path $libsDir "pdf_core.dll") -Destination (Join-Path $OutputDir "pdf_core.dll") -Force
+
+# Cập nhật cả thư mục publish ở root của dự án
+$rootPublish = Join-Path $repoRoot "publish"
+if (Test-Path $rootPublish) {
+    Copy-Item $exePath -Destination (Join-Path $rootPublish "PdfViewerApp.exe") -Force
+    Copy-Item (Join-Path $libsDir "pdfium.dll") -Destination (Join-Path $rootPublish "pdfium.dll") -Force
+    Copy-Item (Join-Path $libsDir "pdf_core.dll") -Destination (Join-Path $rootPublish "pdf_core.dll") -Force
+}
+
 $sizeMb = [Math]::Round((Get-Item $exePath).Length / 1MB, 2)
 Write-Host ""
 Write-Host "Single exe ready:"

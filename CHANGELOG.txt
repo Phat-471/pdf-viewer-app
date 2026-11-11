@@ -1,3 +1,3 @@
-- Tinh gọn thanh công cụ Trang chủ giúp không gian làm việc thoáng đãng và trực quan.
-- Tối ưu hóa tính năng mở và xem tệp hình ảnh, tích hợp mở trực tiếp từ Windows.
-- Cải thiện hiệu năng và độ ổn định hệ thống.
+- Nâng cấp trải nghiệm chỉnh sửa văn bản trực tiếp trên PDF mượt mà, giữ nguyên bố cục và phông chữ gốc.
+- Khắc phục lỗi không sửa được liên tiếp nhiều vùng văn bản và tối ưu thao tác hoàn tác/làm lại khi chỉnh sửa.
+- Cải thiện khả năng khởi chạy độc lập và nâng cao độ ổn định hệ thống.

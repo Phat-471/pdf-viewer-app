@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
@@ -32,11 +32,6 @@ public partial class PdfDocumentTab
 			{
 				return IntPtr.Zero;
 			}
-			if (!retained)
-            {
-                try { PdfNativeTextEditor.ApplyPage(_documentHandle, pageHandle, _nativeTextEdits.Where(e => e.PageNumber == pageNumber).ToArray()); }
-                catch { PdfiumEngine.FPDF_ClosePage(pageHandle); throw; }
-            }
             value = PdfiumEngine.FPDFText_LoadPage(pageHandle);
 			
 			// QUAN TRỌNG: Không ClosePage ở đây để giữ text bắt chuột nhạy bén

@@ -9,11 +9,115 @@ namespace PdfViewerApp;
 /// </summary>
 public static class PdfInterop
 {
+    private static bool _resolverRegistered = false;
+    private static readonly object _initLock = new();
+
+    /// <summary>
+    /// Ensures that the native DLL resolver is registered before any P/Invoke is attempted.
+    /// Safely handles both pdfium.dll and pdf_core.dll across all launch environments.
+    /// </summary>
+    public static void EnsureInitialized()
+    {
+        if (_resolverRegistered) return;
+        lock (_initLock)
+        {
+            if (_resolverRegistered) return;
+            try
+            {
+                NativeLibrary.SetDllImportResolver(typeof(PdfInterop).Assembly, ResolveNativeDll);
+                _resolverRegistered = true;
+            }
+            catch
+            {
+                // Already registered by another component or assembly loader
+                _resolverRegistered = true;
+            }
+        }
+    }
+
+    static PdfInterop()
+    {
+        EnsureInitialized();
+    }
+
+    private static IntPtr ResolveNativeDll(string name, System.Reflection.Assembly assembly, DllImportSearchPath? searchPath)
+    {
+        bool isPdfium = name.Equals("pdfium", StringComparison.OrdinalIgnoreCase) || name.Equals("pdfium.dll", StringComparison.OrdinalIgnoreCase);
+        bool isPdfCore = name.Equals("pdf_core", StringComparison.OrdinalIgnoreCase) || name.Equals("pdf_core.dll", StringComparison.OrdinalIgnoreCase);
+
+        if (!isPdfium && !isPdfCore)
+            return IntPtr.Zero;
+
+        string fileName = isPdfium ? "pdfium.dll" : "pdf_core.dll";
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string? exeDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath);
+
+        var candidateDirs = new[]
+        {
+            baseDir,
+            exeDir,
+            System.IO.Path.Combine(baseDir, "runtimes", "win-x64", "native"),
+            exeDir != null ? System.IO.Path.Combine(exeDir, "runtimes", "win-x64", "native") : null,
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, @"..\..\..\libs")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, @"..\..\..\..\..\libs")),
+            @"E:\code\03_Desktop_Apps\pdf_pro\libs",
+            @"E:\code\03_Desktop_Apps\pdf_pro\publish",
+            @"E:\code\03_Desktop_Apps\pdf_pro\dist\PdfPro-1.15.4-win-x64",
+            @"E:\code\03_Desktop_Apps\pdf_pro\src\PdfCore\target\release"
+        };
+
+        foreach (var dir in candidateDirs)
+        {
+            if (string.IsNullOrEmpty(dir)) continue;
+            string candidate = System.IO.Path.Combine(dir, fileName);
+            if (System.IO.File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out IntPtr handle))
+            {
+                return handle;
+            }
+        }
+
+        // Tự động trích xuất DLL từ Embedded Resources vào AppData nếu không tìm thấy trên đĩa (Bảo vệ chạy Single-File EXE độc lập)
+        try
+        {
+            string localNativeDir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PdfPro",
+                "native"
+            );
+            System.IO.Directory.CreateDirectory(localNativeDir);
+            string extractedPath = System.IO.Path.Combine(localNativeDir, fileName);
+
+            string resourceName = isPdfium ? "native/pdfium.dll" : "native/pdf_core.dll";
+            using var stream = typeof(PdfInterop).Assembly.GetManifestResourceStream(resourceName);
+            if (stream != null)
+            {
+                using var fs = new System.IO.FileStream(extractedPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                stream.CopyTo(fs);
+                fs.Flush();
+            }
+
+            if (System.IO.File.Exists(extractedPath) && NativeLibrary.TryLoad(extractedPath, out IntPtr embeddedHandle))
+            {
+                return embeddedHandle;
+            }
+        }
+        catch
+        {
+            // Bỏ qua lỗi fallback
+        }
+
+        return IntPtr.Zero;
+    }
+
     // =========================================================================
     // pdfium.dll API Declarations
     // =========================================================================
     public static class Pdfium
     {
+        static Pdfium()
+        {
+            EnsureInitialized();
+        }
         [DllImport("pdfium.dll")]
         public static extern void FPDF_InitLibrary();
 
@@ -95,6 +199,11 @@ public static class PdfInterop
     // =========================================================================
     public static class PdfCore
     {
+        static PdfCore()
+        {
+            EnsureInitialized();
+        }
+
         [DllImport("pdf_core.dll", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool rotate_pdf_page(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string pdfPath, 

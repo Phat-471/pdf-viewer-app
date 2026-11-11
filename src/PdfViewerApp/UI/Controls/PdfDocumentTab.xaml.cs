@@ -3601,7 +3601,7 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 				return;
 			}
 			_documentHandle = tempDoc;
-			_renderSession = new PdfRenderSession(path, _nativeTextEdits.ToArray());
+			_renderSession = new PdfRenderSession(path);
 			Stopwatch stopwatch2 = Stopwatch.StartNew();
 			int pageCount = opened.Pages.Count;
 			stopwatch2.Stop();
@@ -3689,11 +3689,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 	private async Task ResumeDocumentHandlesAsync(bool throwOnFailure = false)
 	{
 		int generation = _loadGeneration;
-		string path = CurrentPdfPath;
+		string path = !string.IsNullOrEmpty(_workingPdfPath) && File.Exists(_workingPdfPath) ? _workingPdfPath : CurrentPdfPath;
 		_documentOpening = true;
-		var edits = _nativeTextEdits.ToArray();
 		int selectedPage = SelectedPageNumber;
-		_renderSession = new PdfRenderSession(path, edits);
+		_renderSession = new PdfRenderSession(path);
 		_detailViewportKey = string.Empty;
 		try
 		{
@@ -3706,21 +3705,13 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
                     if (handle == 0) throw new InvalidOperationException("Không mở lại được PDF.");
                     try
                     {
-                        foreach (var group in edits.GroupBy(e => e.PageNumber))
+                        if (selectedPage >= 1)
                         {
-                            nint editedPage = PdfiumEngine.FPDF_LoadPage(handle, group.Key - 1);
-                            if (editedPage == 0) throw new InvalidOperationException("Không đọc được trang vừa sửa.");
-                            try
+                            page = PdfiumEngine.FPDF_LoadPage(handle, selectedPage - 1);
+                            if (page != 0)
                             {
-                                PdfNativeTextEditor.ApplyPage(handle, editedPage, group.ToArray());
-                                if (group.Key == selectedPage)
-                                {
-                                    page = editedPage; editedPage = 0;
-                                    text = PdfiumEngine.FPDFText_LoadPage(page);
-                                    if (text == 0) throw new InvalidOperationException("Không đọc lại được chữ vừa áp dụng.");
-                                }
+                                text = PdfiumEngine.FPDFText_LoadPage(page);
                             }
-                            finally { if (editedPage != 0) PdfiumEngine.FPDF_ClosePage(editedPage); }
                         }
                         return (Handle: handle, Page: page, Text: text);
                     }
@@ -4022,8 +4013,10 @@ public partial class PdfDocumentTab : UserControl, IComponentConnector
 		string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{Guid.NewGuid():N}.pdf");
 		try
 		{
-			if (nativeTextEdits.Length > 0)
-				await Task.Run(() => PdfNativeTextEditor.SaveCopy(sourcePath, tempFile, nativeTextEdits));
+			if (_textEditSessionId != 0)
+				await Task.Run(() => PdfNativeTextEditor.Export(_textEditSessionId, tempFile));
+			else if (!string.IsNullOrEmpty(_workingPdfPath) && File.Exists(_workingPdfPath))
+				File.Copy(_workingPdfPath, tempFile, overwrite: true);
 			else File.Copy(sourcePath, tempFile, overwrite: true);
 			if (!(await Task.Run(delegate
 			{

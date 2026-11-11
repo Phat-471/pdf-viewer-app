@@ -56,6 +56,7 @@ public partial class App : Application
 
 	public App()
 	{
+		PdfInterop.EnsureInitialized();
 		base.Startup += async delegate(object sender, StartupEventArgs e)
 		{
             // A launch during file replacement yields to the installer, which

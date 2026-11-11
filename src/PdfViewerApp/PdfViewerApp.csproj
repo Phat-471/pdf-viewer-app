@@ -21,6 +21,11 @@
     <Content Include="tessdata\eng.traineddata;tessdata\vie.traineddata;tessdata\LICENSE;tessdata\NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="assets\fonts\*.ttf;assets\fonts\LICENSE;assets\fonts\NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="assets\licenses\pdfium\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="..\..\libs\pdfium.dll;..\..\libs\pdf_core.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\libs\pdfium.dll" LogicalName="native/pdfium.dll" />
+    <EmbeddedResource Include="..\..\libs\pdf_core.dll" LogicalName="native/pdf_core.dll" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="assets\hphat_logo_1780279208636.png" />
